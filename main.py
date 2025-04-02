@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         btn_financeiro = MenuButton("FINANCEIRO")
         btn_relatorios = MenuButton("RELATÓRIOS")
         btn_notas = MenuButton("NOTAS FISCAIS")
+        btn_ferramentas = MenuButton("FERRAMENTAS")
         
         # Adicionar ações aos botões de menu
         btn_geral.add_menu_actions([
@@ -93,7 +94,6 @@ class MainWindow(QMainWindow):
             "Cadastro Funcionários",
             "Consulta CNPJ",
             "Cadastro de Email",
-            "Ferramentas"
         ], self)
         
         btn_produtos.add_menu_actions([
@@ -126,6 +126,10 @@ class MainWindow(QMainWindow):
             "Estoque",
             "Fiscal"
         ], self)
+
+        btn_ferramentas.add_menu_actions([
+            "Configuração de estação"
+        ], self)
         
         # Adicionar botões ao layout
         menu_layout.addWidget(btn_geral)
@@ -135,6 +139,7 @@ class MainWindow(QMainWindow):
         menu_layout.addWidget(btn_financeiro)
         menu_layout.addWidget(btn_relatorios)
         menu_layout.addWidget(btn_notas)
+        menu_layout.addWidget(btn_ferramentas)
         
         # Adicionar barra de menu ao layout principal
         main_layout.addWidget(menu_frame)
@@ -172,18 +177,18 @@ class MainWindow(QMainWindow):
         # Adicionar tela inicial ao layout principal
         main_layout.addWidget(home_screen, 1)
         
-        # Barra inferior para ferramentas do admin
-        admin_frame = QFrame()
-        admin_frame.setFixedHeight(40)
-        admin_frame.setStyleSheet("background-color: #1a1a1a;")
-        admin_layout = QHBoxLayout(admin_frame)
+        # # Barra inferior para ferramentas do admin
+        # admin_frame = QFrame()
+        # admin_frame.setFixedHeight(40)
+        # admin_frame.setStyleSheet("background-color: #1a1a1a;")
+        # admin_layout = QHBoxLayout(admin_frame)
         
-        admin_label = QLabel("FERRAMENTAS DO ADMIN")
-        admin_label.setStyleSheet("color: white; font-weight: bold;")
-        admin_label.setAlignment(Qt.AlignCenter)
-        admin_layout.addWidget(admin_label)
+        # admin_label = QLabel("FERRAMENTAS DO ADMIN")
+        # admin_label.setStyleSheet("color: white; font-weight: bold;")
+        # admin_label.setAlignment(Qt.AlignCenter)
+        # admin_layout.addWidget(admin_label)
         
-        main_layout.addWidget(admin_frame)
+        # main_layout.addWidget(admin_frame)
         
         # Dicionário para mapear os títulos de ações para os arquivos .py correspondentes
         self.action_to_py_file = {
@@ -192,23 +197,23 @@ class MainWindow(QMainWindow):
             "Cadastro Funcionários": "cadastro_funcionarios.py",
             "Consulta CNPJ": "consulta_cnpj.py",
             "Cadastro de Email": "cadastro_email.py",
-            "Ferramentas": "ferramentas.py",
+            "Configuração de estação": "configuracao_impressora.py",
             "Grupo de produtos": "grupo_produtos.py",
             "Un - unidade de medida": "unidade_medida.py",
             "Produtos": "produtos.py",
             "Fornecedores": "fornecedores.py",
             "Clientes": "clientes.py",
             "Pedido de vendas": "pedido_vendas.py",
-            "Contas a receber": "contas_receber.py",
+            #"Contas a receber": "contas_receber.py",
             "Recebimento de clientes": "recebimento_clientes.py",
-            "Contas a pagar": "contas_pagar.py",
+            #"Contas a pagar": "contas_pagar.py",
             "Gerar lançamento Financeiro": "lancamento_financeiro.py",
-            "Controle de caixa (PDV)": "controle_caixa.py",
-            "Conta corrente": "conta_corrente.py",
-            "Classes financeiras": "classes_financeiras.py",
-            "Financeiro": "relatorio_financeiro.py",
+            #"Controle de caixa (PDV)": "controle_caixa.py",
+            #"Conta corrente": "conta_corrente.py",
+            #"Classes financeiras": "classes_financeiras.py",
+            #"Financeiro": "relatorio_financeiro.py",
             "Estoque": "relatorio_estoque.py",
-            "Fiscal": "relatorio_fiscal.py"
+            #"Fiscal": "relatorio_fiscal.py"
         }
         
         self.show()
