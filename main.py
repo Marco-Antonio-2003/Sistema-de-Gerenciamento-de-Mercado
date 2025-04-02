@@ -54,8 +54,10 @@ class MenuButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, usuario=None, empresa=None):
         super().__init__()
+        self.usuario = usuario if usuario else "Usuário"
+        self.empresa = empresa if empresa else "Empresa"
         self.initUI()
         
     def initUI(self):
@@ -154,10 +156,20 @@ class MainWindow(QMainWindow):
         title_layout = QVBoxLayout()
         title_layout.setAlignment(Qt.AlignCenter)
         
-        # Placeholder para a logo (relógio com ícones)
-        clock_label = QLabel()
-        clock_label.setStyleSheet("margin-top: 30px; margin-bottom: 30px;")
-        clock_label.setAlignment(Qt.AlignCenter)
+        # Logo
+        logo_label = QLabel()
+        logo_pixmap = QPixmap("logo.PNG")  # Usar o mesmo logo da tela de login
+        if not logo_pixmap.isNull():
+            logo_label.setPixmap(logo_pixmap.scaled(400, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            # Se o logo não for encontrado, cria um texto alternativo
+            logo_label = QLabel("MB SISTEMA\nSOLUÇÕES TECNOLÓGICAS")
+            logo_label.setFont(QFont("Arial", 24, QFont.Bold))
+            logo_label.setStyleSheet("color: #00E676; text-align: center;")
+            logo_label.setAlignment(Qt.AlignCenter)
+        
+        logo_label.setStyleSheet("margin-top: 30px; margin-bottom: 30px;")
+        logo_label.setAlignment(Qt.AlignCenter)
         
         system_title = QLabel("MB Sistema")
         system_title.setFont(QFont("Arial", 36, QFont.Bold))
@@ -169,26 +181,20 @@ class MainWindow(QMainWindow):
         system_subtitle.setStyleSheet("color: white;")
         system_subtitle.setAlignment(Qt.AlignCenter)
         
-        title_layout.addWidget(clock_label)
+        # Informações do usuário
+        user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
+        user_info.setFont(QFont("Arial", 14))
+        user_info.setStyleSheet("color: white; margin-top: 40px;")
+        user_info.setAlignment(Qt.AlignCenter)
+        
+        title_layout.addWidget(logo_label)
         title_layout.addWidget(system_title)
         title_layout.addWidget(system_subtitle)
+        title_layout.addWidget(user_info)
         home_layout.addLayout(title_layout)
         
         # Adicionar tela inicial ao layout principal
         main_layout.addWidget(home_screen, 1)
-        
-        # # Barra inferior para ferramentas do admin
-        # admin_frame = QFrame()
-        # admin_frame.setFixedHeight(40)
-        # admin_frame.setStyleSheet("background-color: #1a1a1a;")
-        # admin_layout = QHBoxLayout(admin_frame)
-        
-        # admin_label = QLabel("FERRAMENTAS DO ADMIN")
-        # admin_label.setStyleSheet("color: white; font-weight: bold;")
-        # admin_label.setAlignment(Qt.AlignCenter)
-        # admin_layout.addWidget(admin_label)
-        
-        # main_layout.addWidget(admin_frame)
         
         # Dicionário para mapear os títulos de ações para os arquivos .py correspondentes
         self.action_to_py_file = {
@@ -212,7 +218,7 @@ class MainWindow(QMainWindow):
             #"Conta corrente": "conta_corrente.py",
             #"Classes financeiras": "classes_financeiras.py",
             #"Financeiro": "relatorio_financeiro.py",
-            "Estoque": "relatorio_estoque.py",
+            "Estoque": "estoque.py",
             #"Fiscal": "relatorio_fiscal.py"
         }
         
