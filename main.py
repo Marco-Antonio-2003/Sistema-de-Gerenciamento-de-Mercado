@@ -1,69 +1,40 @@
 import sys
-import subprocess
+import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
-                             QMenu, QToolBar)
-from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap
-from PyQt5.QtCore import Qt, QSize
+                           QHBoxLayout, QPushButton, QLabel, QLineEdit,
+                           QMessageBox, QFrame)
+from PyQt5.QtGui import QFont, QIcon, QPixmap
+from PyQt5.QtCore import Qt, QSettings
+from principal import MainWindow
 
-class MenuButton(QPushButton):
-    def __init__(self, text, parent=None):
-        super().__init__(text, parent)
-        self.setFixedHeight(50)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #005079; 
-                color: white; 
-                border: none; 
-                font-size: 14px; 
-                font-weight: bold;
-                padding: 10px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-            QPushButton:pressed {
-                background-color: #00283d;
-            }
-        """)
-        
-        self.menu = QMenu(self)
-        self.menu.setStyleSheet("""
-            QMenu {
-                background-color: #ffffff;
-                color: black;
-                border: 1px solid #cccccc;
-            }
-            QMenu::item {
-                padding: 8px 30px 8px 20px;
-                min-width: 200px;
-            }
-            QMenu::item:selected {
-                background-color: #e6e6e6;
-            }
-        """)
-        
-        self.setMenu(self.menu)
-
-    def add_menu_actions(self, action_titles, window):
-        for title in action_titles:
-            action = QAction(title, self)
-            action.triggered.connect(lambda checked, t=title: window.menu_action_triggered(t))
-            self.menu.addAction(action)
-
-
-class MainWindow(QMainWindow):
-    def __init__(self, usuario=None, empresa=None):
+class LoginWindow(QMainWindow):
+    def __init__(self):
         super().__init__()
-        self.usuario = usuario if usuario else "Usuário"
-        self.empresa = empresa if empresa else "Empresa"
+        self.setWindowTitle("MB Sistema - Login")
+        self.setFixedSize(450, 600)
+        
+        # Centralizar a janela na tela
+        self.center_on_screen()
+        
+        # Configurações para salvar dados de usuário
+        self.settings = QSettings("MBSistema", "Login")
+        
+        # Configurar a interface
         self.initUI()
         
+        # Carregar o usuário salvo, se existir
+        self.carregar_usuario_salvo()
+    
+    def center_on_screen(self):
+        """Centraliza a janela na tela"""
+        screen_geometry = QApplication.desktop().availableGeometry()
+        x = (screen_geometry.width() - self.width()) // 2
+        y = (screen_geometry.height() - self.height()) // 2
+        self.move(x, y)
+    
     def initUI(self):
-        self.setWindowTitle("MB Sistema - Sistema de Gerenciamento")
-        self.setGeometry(100, 100, 1200, 700)
-        self.setStyleSheet("background-color: #272525;")
+        # Define o estilo de fundo
+        self.setStyleSheet("background-color: #003b57;")
         
         # Widget central
         central_widget = QWidget()
@@ -71,94 +42,15 @@ class MainWindow(QMainWindow):
         
         # Layout principal
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Barra de ferramentas para botões de menu
-        menu_frame = QFrame()
-        menu_frame.setStyleSheet("background-color: #272525;")
-        menu_layout = QHBoxLayout(menu_frame)
-        menu_layout.setSpacing(5)
-        
-        # Botões do menu
-        btn_geral = MenuButton("GERAL")
-        btn_produtos = MenuButton("PRODUTOS E\nSERVIÇOS")
-        btn_compras = MenuButton("COMPRAS")
-        btn_vendas = MenuButton("VENDAS")
-        btn_financeiro = MenuButton("FINANCEIRO")
-        btn_relatorios = MenuButton("RELATÓRIOS")
-        btn_notas = MenuButton("NOTAS FISCAIS")
-        btn_ferramentas = MenuButton("FERRAMENTAS")
-        
-        # Adicionar ações aos botões de menu
-        btn_geral.add_menu_actions([
-            "Cadastro de empresa",
-            "Cadastro Pessoas (clientes)",
-            "Cadastro Funcionários",
-            "Consulta CNPJ",
-            "Cadastro de Email",
-        ], self)
-        
-        btn_produtos.add_menu_actions([
-            "Grupo de produtos",
-            "Un - unidade de medida",
-            "Produtos"
-        ], self)
-        
-        btn_compras.add_menu_actions([
-            "Fornecedores"
-        ], self)
-        
-        btn_vendas.add_menu_actions([
-            "Clientes",
-            "Pedido de vendas"
-        ], self)
-        
-        btn_financeiro.add_menu_actions([
-            "Contas a receber",
-            "Recebimento de clientes",
-            "Contas a pagar",
-            "Gerar lançamento Financeiro",
-            "Controle de caixa (PDV)",
-            "Conta corrente",
-            "Classes financeiras"
-        ], self)
-        
-        btn_relatorios.add_menu_actions([
-            "Financeiro",
-            "Estoque",
-            "Fiscal"
-        ], self)
-
-        btn_ferramentas.add_menu_actions([
-            "Configuração de estação"
-        ], self)
-        
-        # Adicionar botões ao layout
-        menu_layout.addWidget(btn_geral)
-        menu_layout.addWidget(btn_produtos)
-        menu_layout.addWidget(btn_compras)
-        menu_layout.addWidget(btn_vendas)
-        menu_layout.addWidget(btn_financeiro)
-        menu_layout.addWidget(btn_relatorios)
-        menu_layout.addWidget(btn_notas)
-        menu_layout.addWidget(btn_ferramentas)
-        
-        # Adicionar barra de menu ao layout principal
-        main_layout.addWidget(menu_frame)
-        
-        # Área de conteúdo com tela inicial
-        home_screen = QWidget()
-        home_screen.setStyleSheet("background-color: #005079;")
-        home_layout = QVBoxLayout(home_screen)
-        home_layout.setAlignment(Qt.AlignCenter)
-        
-        # Logo e título
-        title_layout = QVBoxLayout()
-        title_layout.setAlignment(Qt.AlignCenter)
+        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(20)
+        main_layout.setAlignment(Qt.AlignCenter)
         
         # Logo
         logo_label = QLabel()
-        logo_pixmap = QPixmap("logo.PNG")  # Usar o mesmo logo da tela de login
+        # Caminho absoluto para o logo
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
+        logo_pixmap = QPixmap(logo_path)
         if not logo_pixmap.isNull():
             logo_label.setPixmap(logo_pixmap.scaled(400, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
@@ -168,79 +60,185 @@ class MainWindow(QMainWindow):
             logo_label.setStyleSheet("color: #00E676; text-align: center;")
             logo_label.setAlignment(Qt.AlignCenter)
         
-        logo_label.setStyleSheet("margin-top: 30px; margin-bottom: 30px;")
         logo_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(logo_label)
         
-        system_title = QLabel("MB Sistema")
-        system_title.setFont(QFont("Arial", 36, QFont.Bold))
-        system_title.setStyleSheet("color: white; margin-top: 20px;")
-        system_title.setAlignment(Qt.AlignCenter)
+        # Espaço após o logo
+        main_layout.addSpacing(30)
         
-        system_subtitle = QLabel("Sistema de gerenciamento")
-        system_subtitle.setFont(QFont("Arial", 26))
-        system_subtitle.setStyleSheet("color: white;")
-        system_subtitle.setAlignment(Qt.AlignCenter)
+        # Frame para os campos de login
+        login_frame = QFrame()
+        login_frame.setStyleSheet("background-color: #00304d; border-radius: 10px;")
+        login_frame.setFrameShape(QFrame.Box)
+        login_frame.setFrameShadow(QFrame.Plain)
+        login_frame.setLineWidth(0)
         
-        # Informações do usuário
-        user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
-        user_info.setFont(QFont("Arial", 14))
-        user_info.setStyleSheet("color: white; margin-top: 40px;")
-        user_info.setAlignment(Qt.AlignCenter)
+        login_layout = QVBoxLayout(login_frame)
+        login_layout.setContentsMargins(30, 40, 30, 40)
+        login_layout.setSpacing(20)
         
-        title_layout.addWidget(logo_label)
-        title_layout.addWidget(system_title)
-        title_layout.addWidget(system_subtitle)
-        title_layout.addWidget(user_info)
-        home_layout.addLayout(title_layout)
+        # Estilo comum para QLineEdit
+        lineedit_style = """
+            QLineEdit {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 12px;
+                font-size: 15px;
+                border-radius: 20px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #0078d7;
+            }
+        """
         
-        # Adicionar tela inicial ao layout principal
-        main_layout.addWidget(home_screen, 1)
+        # Campo Usuário
+        self.usuario_input = QLineEdit()
+        self.usuario_input.setPlaceholderText("Usuario")
+        self.usuario_input.setStyleSheet(lineedit_style)
+        login_layout.addWidget(self.usuario_input)
         
-        # Dicionário para mapear os títulos de ações para os arquivos .py correspondentes
-        self.action_to_py_file = {
-            "Cadastro de empresa": "cadastro_empresa.py",
-            "Cadastro Pessoas (clientes)": "cadastro_pessoa.py",
-            "Cadastro Funcionários": "cadastro_funcionarios.py",
-            "Consulta CNPJ": "consulta_cnpj.py",
-            "Cadastro de Email": "cadastro_email.py",
-            "Configuração de estação": "configuracao_impressora.py",
-            "Grupo de produtos": "grupo_produtos.py",
-            "Un - unidade de medida": "unidade_medida.py",
-            "Produtos": "produtos.py",
-            "Fornecedores": "fornecedores.py",
-            "Clientes": "clientes.py",
-            "Pedido de vendas": "pedido_vendas.py",
-            #"Contas a receber": "contas_receber.py",
-            "Recebimento de clientes": "recebimento_clientes.py",
-            #"Contas a pagar": "contas_pagar.py",
-            "Gerar lançamento Financeiro": "lancamento_financeiro.py",
-            #"Controle de caixa (PDV)": "controle_caixa.py",
-            #"Conta corrente": "conta_corrente.py",
-            #"Classes financeiras": "classes_financeiras.py",
-            #"Financeiro": "relatorio_financeiro.py",
-            "Estoque": "estoque.py",
-            #"Fiscal": "relatorio_fiscal.py"
-        }
+        # Campo Senha
+        self.senha_input = QLineEdit()
+        self.senha_input.setPlaceholderText("Senha")
+        self.senha_input.setEchoMode(QLineEdit.Password)  # Oculta a senha digitada
+        self.senha_input.setStyleSheet(lineedit_style)
+        login_layout.addWidget(self.senha_input)
         
-        self.show()
-            
-    def menu_action_triggered(self, action_title):
-        print(f"Menu action triggered: {action_title}")
+        # Campo Empresa
+        self.empresa_input = QLineEdit()
+        self.empresa_input.setPlaceholderText("Empresa")
+        self.empresa_input.setStyleSheet(lineedit_style)
+        login_layout.addWidget(self.empresa_input)
         
-        # Verificar se existe um arquivo .py correspondente à ação
-        if action_title in self.action_to_py_file:
-            py_file = self.action_to_py_file[action_title]
-            try:
-                # Executar o arquivo Python correspondente como um processo separado
-                subprocess.Popen([sys.executable, py_file])
-                print(f"Executando arquivo: {py_file}")
-            except Exception as e:
-                print(f"Erro ao abrir o arquivo {py_file}: {str(e)}")
+        # Botão Login
+        self.login_button = QPushButton("Login")
+        self.login_button.setStyleSheet("""
+            QPushButton {
+                background-color: #000000;
+                color: white;
+                border: none;
+                padding: 12px;
+                font-size: 15px;
+                border-radius: 20px;
+            }
+            QPushButton:hover {
+                background-color: #1a1a1a;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+            }
+        """)
+        self.login_button.clicked.connect(self.login)
+        login_layout.addWidget(self.login_button)
+        
+        main_layout.addWidget(login_frame)
+        
+        # Versão do programa
+        versao_label = QLabel("V. 1.0.0")
+        versao_label.setStyleSheet("color: white; font-size: 12px;")
+        versao_label.setAlignment(Qt.AlignRight)
+        main_layout.addWidget(versao_label)
+        
+        # Conectar evento Enter para entrar
+        self.usuario_input.returnPressed.connect(self.avancar_para_senha)
+        self.senha_input.returnPressed.connect(self.avancar_para_empresa)
+        self.empresa_input.returnPressed.connect(self.login)
+    
+    def avancar_para_senha(self):
+        """Avança para o campo de senha quando Enter é pressionado no campo de usuário"""
+        self.senha_input.setFocus()
+    
+    def avancar_para_empresa(self):
+        """Avança para o campo de empresa quando Enter é pressionado no campo de senha"""
+        self.empresa_input.setFocus()
+    
+    def carregar_usuario_salvo(self):
+        """Carrega o usuário salvo anteriormente, se existir"""
+        usuario_salvo = self.settings.value("ultimo_usuario", "")
+        if usuario_salvo:
+            self.usuario_input.setText(usuario_salvo)
+            self.senha_input.setFocus()  # Coloca o foco no campo de senha
+    
+    def salvar_usuario(self, usuario):
+        """Salva o usuário para uso futuro"""
+        self.settings.setValue("ultimo_usuario", usuario)
+        self.settings.sync()  # Garante que as configurações sejam salvas imediatamente
+    
+    def login(self):
+        """Processa o login quando o botão é clicado ou Enter é pressionado"""
+        usuario = self.usuario_input.text()
+        senha = self.senha_input.text()
+        empresa = self.empresa_input.text()
+        
+        # Validação dos campos
+        if not usuario:
+            self.mostrar_mensagem("Atenção", "Por favor, informe o usuário!")
+            self.usuario_input.setFocus()
+            return
+        
+        if not senha:
+            self.mostrar_mensagem("Atenção", "Por favor, informe a senha!")
+            self.senha_input.setFocus()
+            return
+        
+        if not empresa:
+            self.mostrar_mensagem("Atenção", "Por favor, informe a empresa!")
+            self.empresa_input.setFocus()
+            return
+        
+        # Salvar o usuário para próximos logins
+        self.salvar_usuario(usuario)
+        
+        # Aqui você pode adicionar a lógica de validação de login real
+        # Por enquanto, apenas vamos simular um login bem-sucedido
+        
+        # Para fins de teste, vamos considerar qualquer login válido
+        self.mostrar_mensagem("Sucesso", "Login realizado com sucesso!")
+        
+        # Abrir a tela principal
+        try:
+            self.main_window = MainWindow(usuario=usuario, empresa=empresa)
+            self.main_window.show()
+            self.close()
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao abrir o sistema: {str(e)}")
+            print(f"Erro ao abrir a tela principal: {str(e)}")
+    
+    def mostrar_mensagem(self, titulo, texto):
+        """Exibe uma caixa de mensagem"""
+        msg_box = QMessageBox()
+        if "Atenção" in titulo:
+            msg_box.setIcon(QMessageBox.Warning)
+        elif "Sucesso" in titulo:
+            msg_box.setIcon(QMessageBox.Information)
+        elif "Erro" in titulo:
+            msg_box.setIcon(QMessageBox.Critical)
         else:
-            print(f"Nenhum arquivo .py encontrado para a ação: {action_title}")
+            msg_box.setIcon(QMessageBox.Information)
+        
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(texto)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: white;
+            }
+            QLabel { 
+                color: black;
+                background-color: white;
+            }
+            QPushButton {
+                background-color: #003b57;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                border-radius: 2px;
+            }
+        """)
+        msg_box.exec_()
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    login_window = LoginWindow()
+    login_window.show()
     sys.exit(app.exec_())
