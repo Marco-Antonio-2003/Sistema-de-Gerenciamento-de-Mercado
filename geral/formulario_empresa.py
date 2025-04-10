@@ -1,5 +1,10 @@
 import sys
-import requests
+# Importação condicional do requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -399,6 +404,14 @@ class FormularioEmpresa(QWidget):
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
         
+        # Verificar e avisar se o módulo requests não estiver disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CNPJ e CEP não funcionarão.")
+            # Desabilitar botões de consulta
+            self.btn_consultar.setEnabled(False)
+            self.btn_buscar_cep.setEnabled(False)
+        
     def atualizar_tipo_documento(self):
         """Atualiza o label CNPJ/CPF baseado no tipo de regime selecionado"""
         regime = self.regime_combo.currentText()
@@ -590,7 +603,7 @@ class FormularioEmpresa(QWidget):
                 self.documento_input.blockSignals(False)
                 
                 # Se o CNPJ estiver completo (14 dígitos), consultar automaticamente
-                if len(texto_limpo) == 14:
+                if len(texto_limpo) == 14 and REQUESTS_AVAILABLE:
                     self.consultar_documento()
     
     def formatar_cep(self, texto):
@@ -638,11 +651,17 @@ class FormularioEmpresa(QWidget):
             self.cep_input.blockSignals(False)
         
         # Se o CEP estiver completo (8 dígitos), buscar endereço automaticamente
-        if len(texto_limpo) == 8:
+        if len(texto_limpo) == 8 and REQUESTS_AVAILABLE:
             self.buscar_endereco_por_cep()
     
     def buscar_endereco_por_cep(self):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            return
+            
         # Obter o CEP sem formatação
         cep = ''.join(filter(str.isdigit, self.cep_input.text()))
         
@@ -682,6 +701,12 @@ class FormularioEmpresa(QWidget):
     
     def consultar_documento(self):
         """Consulta informações da empresa pelo CNPJ ou pessoa pelo CPF"""
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Funcionalidade indisponível", 
+                               "A consulta de CNPJ/CPF requer o módulo 'requests' que não está disponível.")
+            return
+            
         # Obter o documento sem formatação
         doc_limpo = ''.join(filter(str.isdigit, self.documento_input.text()))
         

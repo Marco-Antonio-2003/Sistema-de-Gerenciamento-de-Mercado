@@ -1,4 +1,3 @@
-#controle de caixa
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -7,6 +6,33 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QRadioButton, QButtonGroup)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDate
+import os
+import importlib.util
+
+# Função para importar a classe AbrirCaixa de forma dinâmica
+def importar_abrir_caixa():
+    try:
+        # Tente importar normalmente
+        from abrir_caixa import AbrirCaixa
+        return AbrirCaixa
+    except ImportError:
+        try:
+            # Se falhar, importe dinamicamente do arquivo no mesmo diretório
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            module_path = os.path.join(current_dir, 'abrir_caixa.py')
+            
+            if not os.path.exists(module_path):
+                print(f"Arquivo 'abrir_caixa.py' não encontrado em: {current_dir}")
+                return None
+                
+            spec = importlib.util.spec_from_file_location("abrir_caixa", module_path)
+            abrir_caixa_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(abrir_caixa_module)
+            
+            return abrir_caixa_module.AbrirCaixa
+        except Exception as e:
+            print(f"Erro ao importar 'abrir_caixa.py': {e}")
+            return None
 
 class DialogoEscolhaOperacao(QDialog):
     """Diálogo para escolher entre entrada e saída"""
@@ -103,7 +129,7 @@ class DialogoEscolhaOperacao(QDialog):
             self.tipo_operacao = "Saída"
         self.accept()
 
-class ControleCaixa(QWidget):
+class ControleCaixaWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
@@ -268,36 +294,13 @@ class ControleCaixa(QWidget):
             }
             QDateEdit::drop-down {
                 border: 0px;
-                image: url(ico-img/calendar-outline.svg);
-                width: 20px;
-                height: 20px;
-                subcontrol-position: right center;
-                subcontrol-origin: padding;
-                margin-right: 5px;
             }
             QDateEdit::down-arrow {
-                width: 0px;
-                height: 0px;
+                width: 12px;
+                height: 12px;
             }
             QDateEdit:focus {
                 border: 2px solid #0078d7;
-            }
-            QCalendarWidget {
-                background-color: white;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                background-color: white;
-            }
-            QCalendarWidget QAbstractItemView::item:selected {
-                background-color: #0078d7;
-                color: white;
-            }
-            QCalendarWidget QWidget {
-                background-color: white;
-            }
-            QCalendarWidget QToolButton {
-                background-color: white;
-                color: black;
             }
         """)
         periodo_layout.addWidget(self.data_inicial)
@@ -324,36 +327,13 @@ class ControleCaixa(QWidget):
             }
             QDateEdit::drop-down {
                 border: 0px;
-                image: url(ico-img/calendar-outline.svg);
-                width: 20px;
-                height: 20px;
-                subcontrol-position: right center;
-                subcontrol-origin: padding;
-                margin-right: 5px;
             }
             QDateEdit::down-arrow {
-                width: 0px;
-                height: 0px;
+                width: 12px;
+                height: 12px;
             }
             QDateEdit:focus {
                 border: 2px solid #0078d7;
-            }
-            QCalendarWidget {
-                background-color: white;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                background-color: white;
-            }
-            QCalendarWidget QAbstractItemView::item:selected {
-                background-color: #0078d7;
-                color: white;
-            }
-            QCalendarWidget QWidget {
-                background-color: white;
-            }
-            QCalendarWidget QToolButton {
-                background-color: white;
-                color: black;
             }
         """)
         periodo_layout.addWidget(self.data_final)
@@ -492,8 +472,50 @@ class ControleCaixa(QWidget):
                 
                 # Dependendo da escolha, abrir a tela apropriada
                 try:
-                    # Importa o módulo abrir_caixa.py
-                    from abrir_caixa import AbrirCaixa
+                    # Importar a classe AbrirCaixa dinamicamente
+                    AbrirCaixa = importar_abrir_caixa()
+                    
+                    if AbrirCaixa is None:
+                        # Se não conseguir importar, exibe mensagem de erro
+                        msg_box = QMessageBox(
+                            QMessageBox.Warning,
+                            "Arquivo não encontrado",
+                            f"O arquivo 'abrir_caixa.py' não foi encontrado. Operação: {tipo_operacao}, Código: {codigo}",
+                            QMessageBox.Ok,
+                            self
+                        )
+                        
+                        # Aplicar estilo com texto branco
+                        msg_box.setStyleSheet("""
+                            QMessageBox QLabel {
+                                color: white;
+                                font-weight: bold;
+                            }
+                        """)
+                        
+                        # Obter o botão OK e aplicar estilo diretamente nele
+                        ok_button = msg_box.button(QMessageBox.Ok)
+                        if ok_button:
+                            ok_button.setStyleSheet("""
+                                QPushButton {
+                                    color: white;
+                                    background-color: #004465;
+                                    border: none;
+                                    border-radius: 3px;
+                                    min-width: 80px;
+                                    min-height: 25px;
+                                    font-weight: bold;
+                                }
+                                QPushButton:hover {
+                                    background-color: #00354f;
+                                }
+                                QPushButton:pressed {
+                                    background-color: #0078d7;
+                                }
+                            """)
+                        
+                        msg_box.exec_()
+                        return
                     
                     # Cria uma instância da classe AbrirCaixa
                     tela_caixa = AbrirCaixa(codigo=codigo, 
@@ -542,12 +564,12 @@ class ControleCaixa(QWidget):
                         
                         msg_box.exec_()
                 
-                except ImportError:
-                    # Se o módulo não existir, exibe uma mensagem
+                except Exception as e:
+                    # Se ocorrer qualquer erro, exibe uma mensagem
                     msg_box = QMessageBox(
                         QMessageBox.Warning,
-                        "Arquivo não encontrado",
-                        f"O arquivo 'abrir_caixa.py' não foi encontrado. Operação: {tipo_operacao}, Código: {codigo}",
+                        "Erro",
+                        f"Ocorreu um erro ao abrir o caixa: {str(e)}",
                         QMessageBox.Ok,
                         self
                     )
@@ -647,7 +669,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 1000, 650)
     window.setStyleSheet("QMainWindow, QWidget { background-color: #003353; }")
     
-    controle_caixa = ControleCaixa()
+    controle_caixa = ControleCaixaWindow()
     window.setCentralWidget(controle_caixa)
     
     window.show()

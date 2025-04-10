@@ -1,10 +1,14 @@
 import sys
+import os
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
                              QMessageBox, QStyle, QComboBox)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
+from geral.formulario_pessoa import FormularioPessoa
+
 
 class CadastroPessoa(QWidget):
     def __init__(self, parent=None):
@@ -365,9 +369,570 @@ class CadastroPessoa(QWidget):
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec_()
     
+    def load_formulario_pessoa(self):
+        """Carrega dinamicamente o módulo FormularioPessoa"""
+        try:
+            # Tente primeiro com importação direta (para ambiente de desenvolvimento)
+            try:
+                # Importação direta usando o módulo
+                from geral.formulario_pessoa import FormularioPessoa
+                print("Importação direta de FormularioPessoa bem-sucedida")
+                return FormularioPessoa
+            except ImportError as e:
+                print(f"Importação direta falhou: {str(e)}, tentando método alternativo...")
+                
+                # Caminho para o módulo formulario_pessoa.py
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                module_path = os.path.join(script_dir, "formulario_pessoa.py")
+                
+                # Se o arquivo não existir, vamos criar um básico
+                if not os.path.exists(module_path):
+                    self.criar_formulario_pessoa_padrao(module_path)
+                
+                # Carregar o módulo dinamicamente
+                module_name = "formulario_pessoa"
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                if spec is None:
+                    raise ImportError(f"Não foi possível carregar o módulo {module_name}")
+                    
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # Retornar a classe FormularioPessoa
+                if hasattr(module, "FormularioPessoa"):
+                    return getattr(module, "FormularioPessoa")
+                else:
+                    raise ImportError(f"A classe FormularioPessoa não foi encontrada no módulo {module_name}")
+        except Exception as e:
+            print(f"Erro ao carregar FormularioPessoa: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Não foi possível carregar o formulário: {str(e)}", QMessageBox.Critical)
+            return None
+            
+    def criar_formulario_pessoa_padrao(self, filepath):
+        """Cria um arquivo formulario_pessoa.py básico se não existir"""
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('''import sys
+# Importação condicional do requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+import json
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
+                             QFormLayout, QComboBox, QMessageBox, QTableWidgetItem,
+                             QDateEdit, QCalendarWidget)
+from PyQt5.QtGui import QFont, QIcon, QPixmap
+from PyQt5.QtCore import Qt, QDate
+
+class FormularioPessoa(QWidget):
+    def __init__(self, cadastro_tela=None, janela_parent=None):
+        super().__init__()
+        self.cadastro_tela = cadastro_tela  # Referência para a tela de cadastro
+        self.janela_parent = janela_parent  # Referência para a janela que contém este widget
+        self.initUI()
+        
+    def initUI(self):
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Layout para o botão de voltar e título
+        header_layout = QHBoxLayout()
+        
+        # Botão de voltar (diminuído horizontalmente)
+        self.btn_voltar = QPushButton("Voltar")
+        self.btn_voltar.setFixedWidth(80)  # Largura fixa reduzida
+        self.btn_voltar.setStyleSheet("""
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 10px;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        self.btn_voltar.clicked.connect(self.voltar)
+        
+        # Título
+        titulo_layout = QVBoxLayout()
+        titulo = QLabel("Cadastro de Pessoa")
+        titulo.setFont(QFont("Arial", 16, QFont.Bold))
+        titulo.setStyleSheet("color: white; margin-bottom: 20px;")
+        titulo.setAlignment(Qt.AlignCenter)
+        titulo_layout.addWidget(titulo)
+        
+        # Adicionar botão de voltar e título ao header
+        header_layout.addWidget(self.btn_voltar)
+        header_layout.addLayout(titulo_layout)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Estilo para os labels
+        label_style = "QLabel { color: white; font-size: 14px; font-weight: bold; }"
+        
+        # Estilo para os inputs (reduzidos)
+        input_style = """
+            QLineEdit {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+        """
+        
+        # Estilo específico para ComboBox (fundo branco)
+        combo_style = """
+            QComboBox {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            QComboBox::drop-down {
+                border: 0px;
+            }
+            QComboBox::down-arrow {
+                image: url(down_arrow.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                border: 1px solid #cccccc;
+                selection-background-color: #e6e6e6;
+            }
+        """
+        
+        # Estilo específico para DateEdit (fundo branco)
+        date_style = """
+            QDateEdit {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            /* Estilo para deixar o botão dropdown visível com fundo cinza */
+            QDateEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #cccccc;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+                background-color: #e0e0e0;
+            }
+            QDateEdit::down-arrow {
+                image: none;
+                width: 12px;
+                height: 12px;
+                background-color: #888888;
+                margin-right: 4px;
+                margin-top: 1px;
+            }
+            /* Estilo para o calendário em si */
+            QCalendarWidget {
+                background-color: white;
+            }
+            QCalendarWidget QWidget {
+                background-color: white;
+            }
+            QCalendarWidget QAbstractItemView:enabled {
+                background-color: white;
+                color: black;
+            }
+            QCalendarWidget QToolButton {
+                background-color: white;
+                color: black;
+            }
+            QCalendarWidget QMenu {
+                background-color: white;
+            }
+        """
+        
+        # Layout para Código e Telefone (lado a lado)
+        codigo_telefone_layout = QHBoxLayout()
+        
+        # Campo Código
+        self.codigo_label = QLabel("Código:")
+        self.codigo_label.setStyleSheet(label_style)
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet(input_style)
+        self.codigo_input.setFixedWidth(100)  # Largura fixa reduzida
+        self.codigo_input.setReadOnly(True)  # Código é gerado automaticamente
+        
+        codigo_layout = QFormLayout()
+        codigo_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        codigo_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        codigo_layout.addRow(self.codigo_label, self.codigo_input)
+        
+        # Campo Telefone
+        self.telefone_label = QLabel("Telefone:")
+        self.telefone_label.setStyleSheet(label_style)
+        self.telefone_input = QLineEdit()
+        self.telefone_input.setStyleSheet(input_style)
+        self.telefone_input.setFixedWidth(200)  # Largura fixa reduzida
+        self.telefone_input.textChanged.connect(self.formatar_telefone)
+        self.telefone_input.setPlaceholderText("(00) 00000-0000")
+        
+        telefone_layout = QFormLayout()
+        telefone_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        telefone_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        telefone_layout.addRow(self.telefone_label, self.telefone_input)
+        
+        codigo_telefone_layout.addLayout(codigo_layout)
+        codigo_telefone_layout.addLayout(telefone_layout)
+        
+        # Campo Nome
+        self.nome_label = QLabel("Nome:")
+        self.nome_label.setStyleSheet(label_style)
+        self.nome_input = QLineEdit()
+        self.nome_input.setStyleSheet(input_style)
+        self.nome_input.setMaximumHeight(30)  # Altura máxima reduzida
+        
+        nome_layout = QFormLayout()
+        nome_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        nome_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        nome_layout.addRow(self.nome_label, self.nome_input)
+        
+        # Layout para Tipo de Pessoa e Data de Cadastro (lado a lado)
+        tipo_data_layout = QHBoxLayout()
+        
+        # Campo Tipo de Pessoa
+        self.tipo_label = QLabel("Tipo de Pessoa:")
+        self.tipo_label.setStyleSheet(label_style)
+        self.tipo_combo = QComboBox()
+        self.tipo_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox
+        self.tipo_combo.setFixedWidth(200)  # Largura fixa reduzida
+        self.tipo_combo.addItems(["Jurídica", "Física"])
+        self.tipo_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
+        
+        tipo_layout = QFormLayout()
+        tipo_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        tipo_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tipo_layout.addRow(self.tipo_label, self.tipo_combo)
+        
+        # Campo Data de Cadastro
+        self.data_label = QLabel("Data de Cadastro:")
+        self.data_label.setStyleSheet(label_style)
+        self.data_input = QDateEdit()
+        self.data_input.setStyleSheet(date_style)  # Estilo específico para DateEdit
+        self.data_input.setFixedWidth(150)  # Largura fixa reduzida
+        self.data_input.setCalendarPopup(True)
+        self.data_input.setDate(QDate.currentDate())
+        
+        data_layout = QFormLayout()
+        data_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        data_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        data_layout.addRow(self.data_label, self.data_input)
+        
+        tipo_data_layout.addLayout(tipo_layout)
+        tipo_data_layout.addLayout(data_layout)
+        
+        # Campo CNPJ/CPF
+        self.documento_label = QLabel("CNPJ / CPF:")
+        self.documento_label.setStyleSheet(label_style)
+        self.documento_input = QLineEdit()
+        self.documento_input.setStyleSheet(input_style)
+        self.documento_input.setFixedWidth(250)  # Largura fixa reduzida
+        self.documento_input.textChanged.connect(self.formatar_documento)
+        self.documento_input.setPlaceholderText("00.000.000/0001-00")
+        
+        documento_layout = QFormLayout()
+        documento_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        documento_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        documento_layout.addRow(self.documento_label, self.documento_input)
+        
+        # Título do Endereço
+        endereco_titulo = QLabel("Endereço")
+        endereco_titulo.setFont(QFont("Arial", 14, QFont.Bold))
+        endereco_titulo.setStyleSheet("color: white; margin-top: 20px;")
+        endereco_titulo.setAlignment(Qt.AlignCenter)
+        
+        # Layout para CEP e botão de busca
+        cep_layout = QHBoxLayout()
+        
+        # Campo CEP
+        self.cep_label = QLabel("CEP:")
+        self.cep_label.setStyleSheet(label_style)
+        self.cep_input = QLineEdit()
+        self.cep_input.setStyleSheet(input_style)
+        self.cep_input.textChanged.connect(self.formatar_cep)
+        self.cep_input.setPlaceholderText("00000-000")
+        
+        # Botão de Busca CEP
+        self.btn_buscar_cep = QPushButton("Buscar CEP")
+        self.btn_buscar_cep.setStyleSheet("""
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                font-size: 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        self.btn_buscar_cep.clicked.connect(self.buscar_endereco_por_cep)
+        
+        cep_form_layout = QFormLayout()
+        cep_form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        cep_form_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        cep_form_layout.addRow(self.cep_label, self.cep_input)
+        
+        cep_layout.addLayout(cep_form_layout)
+        cep_layout.addWidget(self.btn_buscar_cep)
+        
+        # Campo Rua
+        self.rua_label = QLabel("Rua:")
+        self.rua_label.setStyleSheet(label_style)
+        self.rua_input = QLineEdit()
+        self.rua_input.setStyleSheet(input_style)
+        
+        rua_layout = QFormLayout()
+        rua_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        rua_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        rua_layout.addRow(self.rua_label, self.rua_input)
+        
+        # Campo Bairro
+        self.bairro_label = QLabel("Bairro:")
+        self.bairro_label.setStyleSheet(label_style)
+        self.bairro_input = QLineEdit()
+        self.bairro_input.setStyleSheet(input_style)
+        
+        bairro_layout = QFormLayout()
+        bairro_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        bairro_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        bairro_layout.addRow(self.bairro_label, self.bairro_input)
+        
+        # Campo Cidade e Estado (lado a lado)
+        cidade_estado_layout = QHBoxLayout()
+        
+        # Campo Cidade
+        self.cidade_label = QLabel("Cidade:")
+        self.cidade_label.setStyleSheet(label_style)
+        self.cidade_input = QLineEdit()
+        self.cidade_input.setStyleSheet(input_style)
+        
+        cidade_layout = QFormLayout()
+        cidade_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        cidade_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        cidade_layout.addRow(self.cidade_label, self.cidade_input)
+        
+        # Campo Estado (novo)
+        self.estado_label = QLabel("Estado (UF):")
+        self.estado_label.setStyleSheet(label_style)
+        self.estado_input = QLineEdit()
+        self.estado_input.setStyleSheet(input_style)
+        self.estado_input.setMaxLength(2)
+        
+        estado_layout = QFormLayout()
+        estado_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        estado_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        estado_layout.addRow(self.estado_label, self.estado_input)
+        
+        cidade_estado_layout.addLayout(cidade_layout)
+        cidade_estado_layout.addLayout(estado_layout)
+        
+        # Botão Incluir
+        incluir_layout = QHBoxLayout()
+        incluir_layout.setAlignment(Qt.AlignCenter)
+        
+        self.btn_incluir = QPushButton("Incluir")
+        self.btn_incluir.setStyleSheet("""
+            QPushButton {
+                background-color: #01fd9a;
+                color: black;
+                border: none;
+                font-weight: bold;
+                padding: 12px 40px;
+                font-size: 16px;
+                border-radius: 4px;
+                min-width: 200px;
+            }
+            QPushButton:hover {
+                background-color: #00e088;
+            }
+        """)
+        self.btn_incluir.clicked.connect(self.salvar_pessoa)
+        
+        incluir_layout.addWidget(self.btn_incluir)
+        
+        # Adicionar layouts ao layout principal
+        main_layout.addLayout(codigo_telefone_layout)
+        main_layout.addLayout(nome_layout)
+        main_layout.addLayout(tipo_data_layout)
+        main_layout.addLayout(documento_layout)
+        main_layout.addWidget(endereco_titulo)
+        main_layout.addLayout(cep_layout)
+        main_layout.addLayout(rua_layout)
+        main_layout.addLayout(bairro_layout)
+        main_layout.addLayout(cidade_estado_layout)
+        main_layout.addSpacing(20)
+        main_layout.addLayout(incluir_layout)
+        
+        # Definir estilo do widget principal
+        self.setStyleSheet("background-color: #043b57;")
+        
+        # Atualizar o tipo de documento com base no tipo de pessoa inicial
+        self.atualizar_tipo_documento()
+        
+        # Verificar e avisar se o módulo requests não estiver disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
+            # Desabilitar botões de consulta
+            self.btn_buscar_cep.setEnabled(False)
+        
+    def voltar(self):
+        """Volta para a tela anterior fechando esta janela"""
+        if self.janela_parent:
+            self.janela_parent.close()
+    
+    def atualizar_tipo_documento(self):
+        """Atualiza o label e placeholder do campo de documento conforme o tipo de pessoa"""
+        tipo_pessoa = self.tipo_combo.currentText()
+        if tipo_pessoa == "Física":
+            self.documento_label.setText("CPF:")
+            self.documento_input.setPlaceholderText("000.000.000-00")
+            # Limpar o campo se já tiver um CNPJ digitado
+            texto = self.documento_input.text()
+            if texto and len(''.join(filter(str.isdigit, texto))) > 11:
+                self.documento_input.clear()
+        else:
+            self.documento_label.setText("CNPJ:")
+            self.documento_input.setPlaceholderText("00.000.000/0001-00")
+            # Limpar o campo se já tiver um CPF digitado
+            texto = self.documento_input.text()
+            if texto and len(''.join(filter(str.isdigit, texto))) <= 11 and len(''.join(filter(str.isdigit, texto))) > 0:
+                self.documento_input.clear()
+    
+    def formatar_telefone(self, texto):
+        """Formata o telefone para (XX) XXXXX-XXXX"""
+        # Remover caracteres não numéricos
+        texto_limpo = ''.join(filter(str.isdigit, texto))
+        
+        # Limitar a 11 dígitos
+        if len(texto_limpo) > 11:
+            texto_limpo = texto_limpo[:11]
+        
+        # Formatar o telefone
+        if len(texto_limpo) == 0:
+            texto_formatado = ""
+        elif len(texto_limpo) <= 2:
+            texto_formatado = f"({texto_limpo}"
+        elif len(texto_limpo) <= 7:
+            texto_formatado = f"({texto_limpo[:2]}) {texto_limpo[2:]}"
+        else:
+            texto_formatado = f"({texto_limpo[:2]}) {texto_limpo[2:7]}-{texto_limpo[7:]}"
+        
+        # Verifica se o texto realmente mudou para evitar loops
+        if texto_formatado != texto:
+            # Bloqueia sinais para evitar recursão
+            self.telefone_input.blockSignals(True)
+            self.telefone_input.setText(texto_formatado)
+            
+            # Posiciona o cursor com base apenas no número de dígitos
+            if len(texto_limpo) == 0:
+                nova_pos = 0
+            elif len(texto_limpo) == 1:
+                nova_pos = 2  # Após o primeiro dígito no formato "(1"
+            elif len(texto_limpo) == 2:
+                nova_pos = 3  # Após o DDD no formato "(12"
+            elif len(texto_limpo) <= 7:
+                nova_pos = 5 + len(texto_limpo) - 2  # Posição na parte central do telefone
+            else:
+                nova_pos = 11 + len(texto_limpo) - 7  # Posição após o hífen
+            
+            # Define a nova posição do cursor
+            self.telefone_input.setCursorPosition(nova_pos)
+            self.telefone_input.blockSignals(False)
+    
+    def formatar_documento(self, texto):
+        """Formata o CNPJ/CPF durante a digitação"""
+        # Implementação completa de formatação de documento
+        pass
+        
+    def formatar_cep(self, texto):
+        """Formata o CEP durante a digitação"""
+        # Implementação completa de formatação de CEP
+        pass
+        
+    def buscar_endereco_por_cep(self):
+        """Busca o endereço pelo CEP usando a API ViaCEP"""
+        # Esta função depende do módulo requests
+        # Implementação completa de busca de CEP
+        pass
+    
+    def salvar_pessoa(self):
+        """Salva os dados da pessoa na tabela da tela de cadastro"""
+        nome = self.nome_input.text()
+        
+        # Validação básica para o nome
+        if not nome:
+            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe pelo menos o nome da pessoa.")
+            return
+            
+        # Gerar código
+        ultimo_codigo = 0
+        if self.cadastro_tela.table.rowCount() > 0:
+            for row in range(self.cadastro_tela.table.rowCount()):
+                codigo = int(self.cadastro_tela.table.item(row, 0).text())
+                if codigo > ultimo_codigo:
+                    ultimo_codigo = codigo
+        
+        novo_codigo = ultimo_codigo + 1
+        
+        # Obter tipo de pessoa
+        tipo_pessoa = self.tipo_combo.currentText()
+        
+        # Adicionar à tabela
+        row_position = self.cadastro_tela.table.rowCount()
+        self.cadastro_tela.table.insertRow(row_position)
+        self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
+        self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
+        self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
+        
+        # Mensagem de sucesso
+        QMessageBox.information(self, "Sucesso", 
+                              f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
+        
+        # Fechar a janela
+        if self.janela_parent:
+            self.janela_parent.close()
+''')
+        except Exception as e:
+            print(f"Erro ao criar arquivo formulario_pessoa.py: {str(e)}")
+    
     def cadastrar_pessoa(self):
         """Abre o formulário para cadastro de pessoa"""
-        from formulario_pessoa import FormularioPessoa
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, apenas ativá-la em vez de criar uma nova
+            self.form_window.setWindowState(self.form_window.windowState() & ~Qt.WindowMinimized)
+            self.form_window.activateWindow()
+            self.form_window.raise_()
+            return
         
         # Criar uma nova janela para o formulário
         self.form_window = QMainWindow()
@@ -467,16 +1032,20 @@ class CadastroPessoa(QWidget):
                                  QMessageBox.Warning)
 
 
+# Classe para executar o módulo como script principal
+class CadastroPessoaWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cadastro de Pessoa")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #043b57;")
+        
+        cadastro_widget = CadastroPessoa()
+        self.setCentralWidget(cadastro_widget)
+
 # Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Cadastro de Pessoa")
-    window.setGeometry(100, 100, 800, 600)
-    window.setStyleSheet("background-color: #043b57;")
-    
-    cadastro_widget = CadastroPessoa()
-    window.setCentralWidget(cadastro_widget)
-    
+    window = CadastroPessoaWindow()
     window.show()
     sys.exit(app.exec_())

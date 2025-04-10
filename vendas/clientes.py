@@ -1,14 +1,14 @@
 import sys
 import os
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QPushButton, QLabel, QLineEdit,
                            QTableWidget, QTableWidgetItem, QHeaderView,
-                           QAbstractItemView, QFrame, QStyle)
+                           QAbstractItemView, QFrame, QStyle, QMessageBox)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
-
-class TelaClientes(QWidget):
+class ClientesWindow(QWidget):
     def __init__(self, janela_parent=None):
         super().__init__()
         self.janela_parent = janela_parent
@@ -201,16 +201,16 @@ class TelaClientes(QWidget):
         main_layout.addLayout(acoes_layout)
         
         # Tabela de clientes
-        self.tabela = QTableWidget()
-        self.tabela.setColumnCount(3)
-        self.tabela.setHorizontalHeaderLabels(["Código", "Nome", "Vendedor"])
-        self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.tabela.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.tabela.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.tabela.verticalHeader().setVisible(False)
-        self.tabela.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tabela.setStyleSheet("""
+        self.table = QTableWidget()  # Troquei o nome para 'table' para manter consistência
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Código", "Nome", "Vendedor"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setStyleSheet("""
             QTableWidget {
                 background-color: #fffff0;
                 gridline-color: #cccccc;
@@ -233,7 +233,7 @@ class TelaClientes(QWidget):
             }
         """)
         
-        main_layout.addWidget(self.tabela)
+        main_layout.addWidget(self.table)
         
         # Adicionar alguns dados de exemplo na tabela
         self.carregar_dados_exemplo()
@@ -250,11 +250,11 @@ class TelaClientes(QWidget):
             ("005", "Mercado Central", "Maria")
         ]
         
-        self.tabela.setRowCount(len(dados))
+        self.table.setRowCount(len(dados))
         for row, (codigo, nome, vendedor) in enumerate(dados):
-            self.tabela.setItem(row, 0, QTableWidgetItem(codigo))
-            self.tabela.setItem(row, 1, QTableWidgetItem(nome))
-            self.tabela.setItem(row, 2, QTableWidgetItem(vendedor))
+            self.table.setItem(row, 0, QTableWidgetItem(codigo))
+            self.table.setItem(row, 1, QTableWidgetItem(nome))
+            self.table.setItem(row, 2, QTableWidgetItem(vendedor))
     
     def voltar(self):
         """Ação do botão voltar"""
@@ -279,16 +279,16 @@ class TelaClientes(QWidget):
     
     def alterar(self):
         """Ação do botão alterar"""
-        selected_items = self.tabela.selectedItems()
+        selected_items = self.table.selectedItems()
         if not selected_items:
             self.mostrar_mensagem("Atenção", "Selecione um cliente para alterar!")
             return
         
         # Obter a linha selecionada
-        row = self.tabela.currentRow()
-        codigo = self.tabela.item(row, 0).text()
-        nome = self.tabela.item(row, 1).text()
-        vendedor = self.tabela.item(row, 2).text()
+        row = self.table.currentRow()
+        codigo = self.table.item(row, 0).text()
+        nome = self.table.item(row, 1).text()
+        vendedor = self.table.item(row, 2).text()
         
         print(f"Alterando cliente: {codigo} - {nome} - {vendedor}")
         # Aqui você poderia abrir o formulário de pessoas preenchido com os dados
@@ -296,45 +296,115 @@ class TelaClientes(QWidget):
     
     def excluir(self):
         """Ação do botão excluir"""
-        selected_items = self.tabela.selectedItems()
+        selected_items = self.table.selectedItems()
         if not selected_items:
             self.mostrar_mensagem("Atenção", "Selecione um cliente para excluir!")
             return
         
         # Obter a linha selecionada
-        row = self.tabela.currentRow()
-        self.tabela.removeRow(row)
+        row = self.table.currentRow()
+        self.table.removeRow(row)
         print(f"Cliente excluído da linha {row}")
+
+    def load_formulario_pessoa(self):
+        """Carrega dinamicamente o módulo FormularioPessoa"""
+        try:
+            # Tente primeiro com importação direta 
+            try:
+                from formulario_pessoa import FormularioPessoa
+                print("Importação direta de FormularioPessoa bem-sucedida")
+                return FormularioPessoa
+            except ImportError as e:
+                print(f"Importação direta falhou: {str(e)}, tentando método alternativo...")
+                
+                # Tente importar usando caminhos diferentes
+                possibilidades = [
+                    'FormularioPessoa', 
+                    'geral.formulario_pessoa', 
+                    'clientes.formulario_pessoa'
+                ]
+                
+                for modulo in possibilidades:
+                    try:
+                        mod = __import__(modulo, fromlist=['FormularioPessoa'])
+                        if hasattr(mod, 'FormularioPessoa'):
+                            print(f"Importação bem-sucedida via {modulo}")
+                            return getattr(mod, 'FormularioPessoa')
+                    except ImportError:
+                        continue
+                
+                # Se chegou aqui, nenhuma importação funcionou.
+                # Vamos tentar carregar o arquivo diretamente
+                
+                # Lista de possíveis locais para o arquivo
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(script_dir)
+                
+                possibilidades_caminhos = [
+                    os.path.join(script_dir, "formulario_pessoa.py"),
+                    os.path.join(script_dir, "FormularioPessoa.py"),
+                    os.path.join(project_root, "formulario_pessoa.py"),
+                    os.path.join(project_root, "FormularioPessoa.py"),
+                    os.path.join(project_root, "geral", "formulario_pessoa.py"),
+                    os.path.join(project_root, "clientes", "formulario_pessoa.py")
+                ]
+                
+                for caminho in possibilidades_caminhos:
+                    if os.path.exists(caminho):
+                        print(f"Arquivo encontrado em: {caminho}")
+                        # Carregar o módulo dinamicamente
+                        module_name = os.path.basename(caminho).split('.')[0]
+                        spec = importlib.util.spec_from_file_location(module_name, caminho)
+                        if spec is None:
+                            continue
+                            
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        
+                        # Retornar a classe FormularioPessoa
+                        if hasattr(module, "FormularioPessoa"):
+                            return getattr(module, "FormularioPessoa")
+                
+                raise ImportError("Não foi possível encontrar o módulo FormularioPessoa")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Não foi possível carregar o formulário: {str(e)}")
+            return None
     
     def cadastrar(self):
         """Ação do botão cadastrar"""
         print("Abrindo formulário para cadastro de pessoa")
+        
+        # Carregar o FormularioPessoa dinamicamente
+        FormularioPessoa = self.load_formulario_pessoa()
+        
+        if FormularioPessoa is None:
+            self.mostrar_mensagem("Erro", "Não foi possível carregar o formulário de pessoas")
+            return
+            
+        # Criar uma nova janela
+        self.janela_formulario = QMainWindow()
+        self.janela_formulario.setWindowTitle("Cadastro de Pessoa")
+        self.janela_formulario.setGeometry(100, 100, 700, 600)
+        self.janela_formulario.setStyleSheet("background-color: #003b57;")
+        
         try:
-            # Importar o módulo dinamicamente
-            import formulario_pessoa
-            
-            # Criar uma nova janela
-            self.janela_formulario = QMainWindow()
-            self.janela_formulario.setWindowTitle("Cadastro de Pessoa")
-            self.janela_formulario.setGeometry(100, 100, 700, 600)
-            self.janela_formulario.setStyleSheet("background-color: #003b57;")
-            
             # Instanciar o formulário de pessoa
-            formulario_pessoa_widget = formulario_pessoa.FormularioPessoa(janela_parent=self.janela_formulario)
+            formulario_pessoa_widget = FormularioPessoa(cadastro_tela=self, janela_parent=self.janela_formulario)
             self.janela_formulario.setCentralWidget(formulario_pessoa_widget)
             
             # Mostrar a janela
             self.janela_formulario.show()
         except Exception as e:
-            self.mostrar_mensagem("Erro", f"Não foi possível abrir o formulário: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Erro ao criar o formulário: {str(e)}")
     
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
-        from PyQt5.QtWidgets import QMessageBox
-        
         msg_box = QMessageBox()
         if "Atenção" in titulo:
             msg_box.setIcon(QMessageBox.Warning)
+        elif "Erro" in titulo:
+            msg_box.setIcon(QMessageBox.Critical)
         else:
             msg_box.setIcon(QMessageBox.Information)
         
@@ -359,16 +429,19 @@ class TelaClientes(QWidget):
         msg_box.exec_()
 
 
+class ClientesMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Sistema - Clientes")
+        self.setGeometry(100, 100, 1000, 600)
+        self.setStyleSheet("background-color: #003b57;")
+        
+        clientes_widget = ClientesWindow(self)  # Passa a janela como parent
+        self.setCentralWidget(clientes_widget)
+
 # Para testar a aplicação
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Sistema - Clientes")
-    window.setGeometry(100, 100, 1000, 600)
-    window.setStyleSheet("background-color: #003b57;")
-    
-    clientes_widget = TelaClientes(window)  # Passa a janela como parent
-    window.setCentralWidget(clientes_widget)
-    
+    window = ClientesMainWindow()
     window.show()
     sys.exit(app.exec_())

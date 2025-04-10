@@ -1,3 +1,4 @@
+#formulario_recebimento_clientes.py
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 

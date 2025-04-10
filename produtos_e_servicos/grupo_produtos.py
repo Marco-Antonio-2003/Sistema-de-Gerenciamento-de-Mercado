@@ -1,4 +1,6 @@
 import sys
+import os
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
@@ -10,6 +12,13 @@ class GrupoProdutos(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
+        # Dados locais para armazenar grupos de produtos
+        self.grupos_data = [
+            {"codigo": "001", "nome": "Alimentos", "grupo": "Grupo 1"},
+            {"codigo": "002", "nome": "Bebidas", "grupo": "Grupo 2"},
+            {"codigo": "003", "nome": "Limpeza", "grupo": "Grupo 1"},
+            {"codigo": "004", "nome": "Higiene", "grupo": "Grupo 3"}
+        ]
         self.initUI()
         
     def create_palette(self):
@@ -165,6 +174,30 @@ class GrupoProdutos(QWidget):
         btn_excluir.clicked.connect(self.excluir)
         buttons_layout.addWidget(btn_excluir)
         
+        # Botão Cadastrar
+        btn_cadastrar = QPushButton("Cadastrar")
+        # Adicionar ícone para o botão Cadastrar usando ícones do sistema
+        try:
+            btn_cadastrar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogNewFolder))
+        except:
+            pass
+        btn_cadastrar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                padding: 10px;
+                font-size: 14px;
+                border-radius: 4px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #e6e6d9;
+            }
+        """)
+        btn_cadastrar.clicked.connect(self.cadastrar)
+        buttons_layout.addWidget(btn_cadastrar)
+        
         actions_layout.addLayout(buttons_layout)
         
         # Campo Grupo de Produtos (dropdown)
@@ -187,7 +220,7 @@ class GrupoProdutos(QWidget):
                 border: none;
             }
         """)
-        # Adicionar itens ao ComboBox (você deve adaptar para seus dados reais)
+        # Adicionar itens ao ComboBox
         self.grupo_combo.addItem("Selecione um grupo")
         self.grupo_combo.addItem("Grupo 1")
         self.grupo_combo.addItem("Grupo 2")
@@ -233,30 +266,22 @@ class GrupoProdutos(QWidget):
         self.tabela.setSelectionMode(QTableWidget.SingleSelection)
         self.tabela.itemSelectionChanged.connect(self.selecionar_item)
         
-        # Adicionar alguns exemplos de dados
-        self.carregar_dados_exemplo()
+        # Carregar dados
+        self.carregar_dados()
         
         main_layout.addWidget(self.tabela)
     
-    def carregar_dados_exemplo(self):
-        """Carrega dados de exemplo na tabela"""
+    def carregar_dados(self):
+        """Carrega dados na tabela a partir da lista local"""
         # Limpar tabela
         self.tabela.setRowCount(0)
         
-        # Dados de exemplo (código, nome, grupo)
-        dados = [
-            ("001", "Produto A", "Grupo 1"),
-            ("002", "Produto B", "Grupo 2"),
-            ("003", "Produto C", "Grupo 1"),
-            ("004", "Produto D", "Grupo 3")
-        ]
-        
         # Adicionar linhas
-        for row, (codigo, nome, grupo) in enumerate(dados):
+        for row, produto in enumerate(self.grupos_data):
             self.tabela.insertRow(row)
-            self.tabela.setItem(row, 0, QTableWidgetItem(codigo))
-            self.tabela.setItem(row, 1, QTableWidgetItem(nome))
-            self.tabela.setItem(row, 2, QTableWidgetItem(grupo))
+            self.tabela.setItem(row, 0, QTableWidgetItem(produto["codigo"]))
+            self.tabela.setItem(row, 1, QTableWidgetItem(produto["nome"]))
+            self.tabela.setItem(row, 2, QTableWidgetItem(produto["grupo"]))
     
     def selecionar_item(self):
         """Preenche os campos quando uma linha é selecionada"""
@@ -297,10 +322,17 @@ class GrupoProdutos(QWidget):
             self.mostrar_mensagem("Atenção", "Preencha todos os campos!")
             return
         
-        # Atualizar na tabela
+        # Atualizar na tabela e na lista de dados
         self.tabela.setItem(row, 0, QTableWidgetItem(codigo))
         self.tabela.setItem(row, 1, QTableWidgetItem(nome))
         self.tabela.setItem(row, 2, QTableWidgetItem(grupo))
+        
+        # Atualizar na lista de dados
+        old_codigo = self.grupos_data[row]["codigo"]
+        for i, item in enumerate(self.grupos_data):
+            if item["codigo"] == old_codigo:
+                self.grupos_data[i] = {"codigo": codigo, "nome": nome, "grupo": grupo}
+                break
         
         self.mostrar_mensagem("Sucesso", "Produto alterado com sucesso!")
     
@@ -311,7 +343,27 @@ class GrupoProdutos(QWidget):
             self.mostrar_mensagem("Atenção", "Selecione um produto para excluir!")
             return
         
+        # Confirmar exclusão
+        confirmacao = QMessageBox.question(
+            self, 
+            "Confirmar exclusão", 
+            "Deseja realmente excluir este item?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if confirmacao == QMessageBox.No:
+            return
+        
         row = selected_rows[0].row()
+        codigo = self.tabela.item(row, 0).text()
+        
+        # Remover da lista de dados
+        for i, item in enumerate(self.grupos_data):
+            if item["codigo"] == codigo:
+                del self.grupos_data[i]
+                break
+        
+        # Remover da tabela
         self.tabela.removeRow(row)
         
         # Limpar os campos
@@ -321,13 +373,261 @@ class GrupoProdutos(QWidget):
         
         self.mostrar_mensagem("Sucesso", "Produto excluído com sucesso!")
     
-    def mostrar_mensagem(self, titulo, texto):
+    def load_formulario_grupo(self):
+        """
+        Carrega dinamicamente o módulo formulario_grupo.py
+        Isso permite que o arquivo seja encontrado mesmo quando compilado para .exe
+        """
+        try:
+            # Tente primeiro com importação direta (para ambiente de desenvolvimento)
+            try:
+                # Importação direta usando o módulo
+                from geral.formulario_grupo import FormularioGrupo
+                print("Importação direta de FormularioGrupo bem-sucedida")
+                return FormularioGrupo
+            except ImportError as e:
+                print(f"Importação direta falhou: {str(e)}, tentando método alternativo...")
+                
+                # Caminho para o módulo formulario_grupo.py
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                module_path = os.path.join(script_dir, "formulario_grupo.py")
+                
+                # Se o arquivo não existir, vamos criar um básico
+                if not os.path.exists(module_path):
+                    self.criar_formulario_grupo_padrao(module_path)
+                
+                # Carregar o módulo dinamicamente
+                module_name = "formulario_grupo"
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                if spec is None:
+                    raise ImportError(f"Não foi possível carregar o módulo {module_name}")
+                    
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # Retornar a classe FormularioGrupo
+                if hasattr(module, "FormularioGrupo"):
+                    return getattr(module, "FormularioGrupo")
+                else:
+                    raise ImportError(f"A classe FormularioGrupo não foi encontrada no módulo {module_name}")
+        except Exception as e:
+            print(f"Erro ao carregar FormularioGrupo: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Não foi possível carregar o formulário: {str(e)}", QMessageBox.Critical)
+            return None
+    
+    def criar_formulario_grupo_padrao(self, filepath):
+        """Cria um arquivo formulario_grupo.py básico se não existir"""
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('''
+import sys
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+                             QLineEdit, QComboBox, QPushButton, QMessageBox, QFormLayout)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+
+class FormularioGrupo(QWidget):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.initUI()
+        
+    def initUI(self):
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        
+        # Título
+        titulo = QLabel("Cadastro de Grupo de Produtos")
+        titulo.setFont(QFont("Arial", 20, QFont.Bold))
+        titulo.setStyleSheet("color: white;")
+        titulo.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(titulo)
+        
+        # Formulário
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setVerticalSpacing(15)
+        form_layout.setHorizontalSpacing(20)
+        
+        # Estilo para os labels
+        label_style = "QLabel { color: white; font-size: 14px; }"
+        
+        # Estilo para os inputs
+        input_style = """
+            QLineEdit, QComboBox {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 10px;
+                font-size: 14px;
+                border-radius: 4px;
+                color: black;
+                min-height: 30px;
+            }
+        """
+        
+        # Campo Código
+        self.codigo_label = QLabel("Código:")
+        self.codigo_label.setStyleSheet(label_style)
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet(input_style)
+        form_layout.addRow(self.codigo_label, self.codigo_input)
+        
+        # Campo Nome
+        self.nome_label = QLabel("Nome:")
+        self.nome_label.setStyleSheet(label_style)
+        self.nome_input = QLineEdit()
+        self.nome_input.setStyleSheet(input_style)
+        form_layout.addRow(self.nome_label, self.nome_input)
+        
+        # Campo Grupo
+        self.grupo_label = QLabel("Grupo:")
+        self.grupo_label.setStyleSheet(label_style)
+        self.grupo_combo = QComboBox()
+        self.grupo_combo.setStyleSheet(input_style)
+        self.grupo_combo.addItem("Selecione um grupo")
+        self.grupo_combo.addItem("Grupo 1")
+        self.grupo_combo.addItem("Grupo 2")
+        self.grupo_combo.addItem("Grupo 3")
+        form_layout.addRow(self.grupo_label, self.grupo_combo)
+        
+        main_layout.addLayout(form_layout)
+        
+        # Botões
+        botoes_layout = QHBoxLayout()
+        botoes_layout.setSpacing(15)
+        
+        # Estilo para os botões
+        btn_style = """
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 12px 25px;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 4px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """
+        
+        # Botão Voltar
+        self.btn_voltar = QPushButton("Voltar")
+        self.btn_voltar.setStyleSheet(btn_style)
+        self.btn_voltar.clicked.connect(self.voltar)
+        
+        # Botão Salvar
+        self.btn_salvar = QPushButton("Salvar")
+        self.btn_salvar.setStyleSheet(btn_style)
+        self.btn_salvar.clicked.connect(self.salvar)
+        
+        botoes_layout.addWidget(self.btn_voltar)
+        botoes_layout.addWidget(self.btn_salvar)
+        
+        botoes_container = QHBoxLayout()
+        botoes_container.addStretch()
+        botoes_container.addLayout(botoes_layout)
+        botoes_container.addStretch()
+        
+        main_layout.addLayout(botoes_container)
+        
+        # Definir estilo do widget principal
+        self.setStyleSheet("background-color: #043b57;")
+        
+    def voltar(self):
+        """Fecha a janela e volta para a tela anterior"""
+        if self.parent and hasattr(self.parent, 'form_window'):
+            self.parent.form_window.close()
+    
+    def salvar(self):
+        """Salva os dados do grupo de produtos"""
+        # Validação básica
+        codigo = self.codigo_input.text()
+        nome = self.nome_input.text()
+        grupo = self.grupo_combo.currentText()
+        
+        if not codigo or not nome or grupo == "Selecione um grupo":
+            QMessageBox.warning(self, "Campos obrigatórios", "Todos os campos são obrigatórios.")
+            return
+        
+        # Verificar se o código já existe
+        for produto in self.parent.grupos_data:
+            if produto["codigo"] == codigo:
+                QMessageBox.warning(self, "Código duplicado", "Já existe um grupo com este código.")
+                return
+        
+        # Adicionar novo grupo à lista
+        novo_grupo = {
+            "codigo": codigo,
+            "nome": nome,
+            "grupo": grupo
+        }
+        
+        # Adicionar à lista de dados
+        self.parent.grupos_data.append(novo_grupo)
+        
+        # Atualizar a tabela
+        self.parent.carregar_dados()
+        
+        # Mostrar mensagem de sucesso
+        QMessageBox.information(self, "Sucesso", "Grupo de produtos cadastrado com sucesso!")
+        
+        # Fechar o formulário
+        if self.parent and hasattr(self.parent, 'form_window'):
+            self.parent.form_window.close()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = FormularioGrupo()
+    window.show()
+    sys.exit(app.exec_())
+''')
+        except Exception as e:
+            print(f"Erro ao criar arquivo formulario_grupo.py: {str(e)}")
+    
+    def cadastrar(self):
+        """Abre a tela de cadastro de grupo de produtos"""
+        try:
+            # Verificar se já existe uma janela de formulário aberta
+            if hasattr(self, 'form_window') and self.form_window.isVisible():
+                # Se existir, apenas ativá-la em vez de criar uma nova
+                self.form_window.setWindowState(self.form_window.windowState() & ~Qt.WindowMinimized)
+                self.form_window.activateWindow()
+                self.form_window.raise_()
+                return
+            
+            # Carregar dinamicamente a classe FormularioGrupo
+            FormularioGrupo = self.load_formulario_grupo()
+            if FormularioGrupo is None:
+                return
+            
+            # Criar uma nova janela para o formulário
+            self.form_window = QMainWindow()
+            self.form_window.setWindowTitle("Cadastro de Grupo de Produtos")
+            self.form_window.setGeometry(100, 100, 800, 600)
+            self.form_window.setStyleSheet("background-color: #043b57;")
+            
+            # Configurar o widget central
+            formulario_grupo_widget = FormularioGrupo(self)
+            self.form_window.setCentralWidget(formulario_grupo_widget)
+            
+            # Mostrar a janela de formulário
+            self.form_window.show()
+        except AttributeError as e:
+            self.mostrar_mensagem("Erro", f"Módulo de formulários carregado, mas há um problema com a classe: {str(e)}")
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Ocorreu um erro ao abrir o formulário: {str(e)}")
+    
+    def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
         """Exibe uma caixa de mensagem"""
         msg_box = QMessageBox()
-        if "Atenção" in titulo:
-            msg_box.setIcon(QMessageBox.Warning)
-        else:
-            msg_box.setIcon(QMessageBox.Information)
+        msg_box.setIcon(tipo)
         
         msg_box.setWindowTitle(titulo)
         msg_box.setText(texto)
@@ -350,16 +650,22 @@ class GrupoProdutos(QWidget):
         msg_box.exec_()
 
 
+class GrupoProdutosWindow(QMainWindow):
+    """Classe para gerenciar a janela de grupo de produtos quando executado como script principal"""
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Grupo de Produtos")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #043b57;")
+        
+        # Configurando o widget central
+        self.grupo_produtos_widget = GrupoProdutos(self)
+        self.setCentralWidget(self.grupo_produtos_widget)
+
+
 # Para testar a aplicação
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Grupo de Produtos")
-    window.setGeometry(100, 100, 800, 600)
-    window.setStyleSheet("background-color: #043b57;")
-    
-    grupo_produtos_widget = GrupoProdutos(window)
-    window.setCentralWidget(grupo_produtos_widget)
-    
+    window = GrupoProdutosWindow()
     window.show()
     sys.exit(app.exec_())

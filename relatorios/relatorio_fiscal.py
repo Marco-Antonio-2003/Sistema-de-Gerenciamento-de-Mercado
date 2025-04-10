@@ -1,3 +1,4 @@
+#relatorio_fiscal.py
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -9,7 +10,8 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize, QDate
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
 
-class RelatorioFiscal(QWidget):
+
+class RelatorioFiscalWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
@@ -540,7 +542,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 650, 500)
     window.setStyleSheet("QMainWindow { background-color: #003353; }")
     
-    relatorio_fiscal = RelatorioFiscal()
+    relatorio_fiscal = RelatorioFiscalWindow()
     window.setCentralWidget(relatorio_fiscal)
     
     window.show()

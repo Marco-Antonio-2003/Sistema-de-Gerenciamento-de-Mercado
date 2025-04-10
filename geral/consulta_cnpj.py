@@ -1,5 +1,10 @@
 import sys
-import requests
+# Importação condicional do requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QLineEdit,
@@ -18,6 +23,11 @@ class CNPJConsultaThread(QThread):
         self.cnpj = cnpj
 
     def run(self):
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            self.erro_consulta.emit("O módulo 'requests' não está disponível. A consulta de CNPJ não é possível.")
+            return
+            
         try:
             # Método de consulta mais robusto
             headers = {
@@ -73,6 +83,7 @@ class CNPJConsultaThread(QThread):
         except Exception as e:
             self.erro_consulta.emit(f"Erro inesperado: {str(e)}")
 
+
 class ConsultaCNPJForm(QWidget):
     def __init__(self, cadastro_tela=None, janela_parent=None):
         super().__init__()
@@ -81,31 +92,13 @@ class ConsultaCNPJForm(QWidget):
         self.initUI()
         
     def initUI(self):
-        # Layout principal
+        # Layout principal com margens reduzidas
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        # Dentro do método initUI() da classe ConsultaCNPJForm, adicione após o layout de opções de inclusão:
+        main_layout.setContentsMargins(20, 10, 20, 10)  # Reduzido o espaço vertical
+        main_layout.setSpacing(5)  # Espaçamento reduzido entre elementos
         
-        # Grupo de opções de inclusão (já existente)
-        opcoes_inclusao_layout = QHBoxLayout()
-        
-        # # Grupo de botões de rádio
-        # self.btn_group = QButtonGroup()
-        
-        # self.radio_cliente = QRadioButton("Incluir com novo Cliente")
-        # self.radio_cliente.setStyleSheet("color: white;")
-        # self.radio_fornecedor = QRadioButton("Como Fornecedor")
-        # self.radio_fornecedor.setStyleSheet("color: white;")
-        
-        # self.btn_group.addButton(self.radio_cliente)
-        # self.btn_group.addButton(self.radio_fornecedor)
-        
-        # opcoes_inclusao_layout.addWidget(self.radio_cliente)
-        # opcoes_inclusao_layout.addWidget(self.radio_fornecedor)
-        
-        # main_layout.addLayout(opcoes_inclusao_layout)
-        
-       
+        # Botão de voltar e título em linha horizontal
+        header_layout = QHBoxLayout()
         
         # Botão de voltar
         self.btn_voltar = QPushButton("Voltar")
@@ -115,8 +108,8 @@ class ConsultaCNPJForm(QWidget):
                 background-color: #005079;
                 color: white;
                 border: none;
-                padding: 8px 10px;
-                font-size: 14px;
+                padding: 5px 8px;  /* Padding reduzido */
+                font-size: 13px;   /* Fonte reduzida */
                 font-weight: bold;
                 border-radius: 4px;
             }
@@ -124,34 +117,39 @@ class ConsultaCNPJForm(QWidget):
                 background-color: #003d5c;
             }
         """)
+        # Conectar o botão voltar ao método voltar
         self.btn_voltar.clicked.connect(self.voltar)
         
         # Título
-        titulo_layout = QVBoxLayout()
         titulo = QLabel("Consulta CNPJ")
-        titulo.setFont(QFont("Arial", 16, QFont.Bold))
-        titulo.setStyleSheet("color: white; margin-bottom: 20px;")
+        titulo.setFont(QFont("Arial", 14, QFont.Bold))  # Fonte reduzida
+        titulo.setStyleSheet("color: white; margin-bottom: 5px;")  # Margem reduzida
         titulo.setAlignment(Qt.AlignCenter)
-        titulo_layout.addWidget(titulo)
         
-        # Estilo para os labels
-        label_style = "QLabel { color: white; font-size: 14px; font-weight: bold; }"
+        header_layout.addWidget(self.btn_voltar)
+        header_layout.addWidget(titulo, 1)
         
-        # Estilo para os inputs
+        main_layout.addLayout(header_layout)
+        
+        # Estilo para os labels - tamanho da fonte reduzido
+        label_style = "QLabel { color: white; font-size: 12px; font-weight: bold; }"
+        
+        # Estilo para os inputs - menor altura
         input_style = """
             QLineEdit {
                 background-color: white;
                 border: 1px solid #cccccc;
-                padding: 6px;
-                font-size: 13px;
-                min-height: 20px;
-                max-height: 30px;
-                border-radius: 4px;
+                padding: 3px;  /* Padding reduzido */
+                font-size: 12px;  /* Fonte reduzida */
+                min-height: 18px;  /* Altura mínima reduzida */
+                max-height: 24px;  /* Altura máxima reduzida */
+                border-radius: 3px;
             }
         """
         
         # Campo CNPJ
         cnpj_layout = QHBoxLayout()
+        cnpj_layout.setSpacing(5)  # Espaçamento reduzido
         
         self.cnpj_label = QLabel("Digite o CNPJ:")
         self.cnpj_label.setStyleSheet(label_style)
@@ -160,7 +158,7 @@ class ConsultaCNPJForm(QWidget):
         self.cnpj_input.setPlaceholderText("00.000.000/0001-00")
         self.cnpj_input.textChanged.connect(self.formatar_cnpj)
         
-        # Botão Consultar
+        # Botão Consultar com tamanho reduzido
         self.btn_consultar = QPushButton("Consultar")
         self.btn_consultar.setStyleSheet("""
             QPushButton {
@@ -168,10 +166,10 @@ class ConsultaCNPJForm(QWidget):
                 color: black;
                 border: none;
                 font-weight: bold;
-                padding: 8px 16px;
-                font-size: 14px;
-                border-radius: 4px;
-                min-width: 120px;
+                padding: 4px 12px;  /* Padding reduzido */
+                font-size: 12px;  /* Fonte reduzida */
+                border-radius: 3px;
+                min-width: 100px;  /* Largura mínima reduzida */
             }
             QPushButton:hover {
                 background-color: #00e088;
@@ -185,8 +183,8 @@ class ConsultaCNPJForm(QWidget):
         
         main_layout.addLayout(cnpj_layout)
         
-        # Campos de informação
-        campos = [
+        # Campos de informação organizados em duas colunas
+        campos_esquerda = [
             ("Nome:", "nome_input"),
             ("Tipo de Empresa:", "tipo_empresa_input"),
             ("Fantasia:", "fantasia_input"),
@@ -194,7 +192,10 @@ class ConsultaCNPJForm(QWidget):
             ("Número:", "numero_input"),
             ("Complemento:", "complemento_input"),
             ("Bairro:", "bairro_input"),
-            ("Cidade:", "cidade_input"),
+            ("Cidade:", "cidade_input")
+        ]
+        
+        campos_direita = [
             ("UF:", "uf_input"),
             ("CEP:", "cep_input"),
             ("Situação:", "situacao_input"),
@@ -205,82 +206,119 @@ class ConsultaCNPJForm(QWidget):
             ("CNEA Sec:", "cnea_sec_input")
         ]
         
-        # Layout de formulário para os campos
-        form_layout = QFormLayout()
-        form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # Layout para as duas colunas
+        duas_colunas_layout = QHBoxLayout()
         
-        for label_text, attr_name in campos:
+        # Layout de formulário para a coluna esquerda
+        form_esquerda = QFormLayout()
+        form_esquerda.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        form_esquerda.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form_esquerda.setVerticalSpacing(3)  # Espaçamento vertical reduzido
+        form_esquerda.setHorizontalSpacing(5)  # Espaçamento horizontal reduzido
+        
+        for label_text, attr_name in campos_esquerda:
             label = QLabel(label_text)
             label.setStyleSheet(label_style)
             input_field = QLineEdit()
             input_field.setStyleSheet(input_style)
             input_field.setReadOnly(True)
             setattr(self, attr_name, input_field)
-            form_layout.addRow(label, input_field)
+            form_esquerda.addRow(label, input_field)
         
-        main_layout.addLayout(form_layout)
+        # Layout de formulário para a coluna direita
+        form_direita = QFormLayout()
+        form_direita.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        form_direita.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form_direita.setVerticalSpacing(3)  # Espaçamento vertical reduzido
+        form_direita.setHorizontalSpacing(5)  # Espaçamento horizontal reduzido
         
-        # Grupo de opções de inclusão
-        opcoes_inclusao_layout = QHBoxLayout()
-         # Botão "Incluir"
+        for label_text, attr_name in campos_direita:
+            label = QLabel(label_text)
+            label.setStyleSheet(label_style)
+            input_field = QLineEdit()
+            input_field.setStyleSheet(input_style)
+            input_field.setReadOnly(True)
+            setattr(self, attr_name, input_field)
+            form_direita.addRow(label, input_field)
+        
+        duas_colunas_layout.addLayout(form_esquerda)
+        duas_colunas_layout.addLayout(form_direita)
+        
+        main_layout.addLayout(duas_colunas_layout)
+        
+        # Botão "Incluir" com tamanho reduzido
         self.btn_incluir = QPushButton("Incluir")
         self.btn_incluir.setStyleSheet("""
             QPushButton {
                 background-color: #01fd9a;
                 color: black;
                 border: none;
-                padding: 8px 16px;
-                font-size: 14px;
+                padding: 4px 12px;  /* Padding reduzido */
+                font-size: 12px;  /* Fonte reduzida */
                 font-weight: bold;
-                border-radius: 4px;
+                border-radius: 3px;
             }
             QPushButton:hover {
                 background-color: #00e088;
             }
         """)
         self.btn_incluir.clicked.connect(self.incluir_registro)
-        main_layout.addWidget(self.btn_incluir)
-
-        # Grupo de botões de rádio
+        
+        # Grupo de opções de inclusão com layout compacto
+        opcoes_inclusion_btns = QHBoxLayout()
+        opcoes_inclusion_btns.setAlignment(Qt.AlignCenter)
+        opcoes_inclusion_btns.addWidget(self.btn_incluir)
+        
+        main_layout.addLayout(opcoes_inclusion_btns)
+        
+        # Grupo de botões de rádio em layout horizontal com espaçamento reduzido
+        radio_layout = QHBoxLayout()
+        radio_layout.setSpacing(10)  # Espaçamento reduzido
+        radio_layout.setAlignment(Qt.AlignCenter)
+        
         self.btn_group = QButtonGroup()
         
-        self.radio_cliente = QRadioButton("Incluir com novo Cliente")
-        self.radio_cliente.setStyleSheet("color: white;")
+        self.radio_cliente = QRadioButton("Incluir como Cliente")
+        self.radio_cliente.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
         self.radio_fornecedor = QRadioButton("Como Fornecedor")
-        self.radio_fornecedor.setStyleSheet("color: white;")
+        self.radio_fornecedor.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
         
         self.btn_group.addButton(self.radio_cliente)
         self.btn_group.addButton(self.radio_fornecedor)
         
-        opcoes_inclusao_layout.addWidget(self.radio_cliente)
-        opcoes_inclusao_layout.addWidget(self.radio_fornecedor)
+        radio_layout.addWidget(self.radio_cliente)
+        radio_layout.addWidget(self.radio_fornecedor)
         
-        main_layout.addLayout(opcoes_inclusao_layout)
+        main_layout.addLayout(radio_layout)
         
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
         
+        # Verificar e avisar se o módulo requests não estiver disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Atenção", 
+                "O módulo 'requests' não está disponível. A consulta de CNPJ não será possível.")
+            # Desabilitar botão de consulta
+            self.btn_consultar.setEnabled(False)
+            self.btn_consultar.setStyleSheet("""
+                QPushButton {
+                    background-color: #888888;
+                    color: #dddddd;
+                    border: none;
+                    font-weight: bold;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    border-radius: 3px;
+                    min-width: 100px;
+                }
+            """)
 
-    # [Restante dos métodos mantidos iguais ao código anterior]
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
         if self.janela_parent:
             self.janela_parent.close()
-    
-    def incluir_registro(self):
-        """
-        Método para incluir os dados consultados no banco de dados.
-        Atualmente, apenas exibe uma mensagem de sucesso.
-        """
-        # Aqui você pode adicionar a lógica para inserir os dados no banco de dados.
-        # Exemplo: if self.radio_cliente.isChecked(): inserir_cliente() else: inserir_fornecedor()
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Inclusão")
-        msg.setText("Registro incluído com sucesso!")
-        msg.setStyleSheet("background-color: white;")
-        msg.exec_()
-
+        elif isinstance(self.parent(), QMainWindow):
+            self.parent().close()
 
     def formatar_cnpj(self, texto):
         """Formata o CNPJ durante a digitação"""
@@ -327,6 +365,12 @@ class ConsultaCNPJForm(QWidget):
     
     def consultar_cnpj(self):
         """Consulta os dados do CNPJ"""
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Funcionalidade indisponível", 
+                               "A consulta de CNPJ requer o módulo 'requests' que não está disponível.")
+            return
+            
         # Remover caracteres não numéricos
         cnpj = ''.join(filter(str.isdigit, self.cnpj_input.text()))
         
@@ -337,7 +381,6 @@ class ConsultaCNPJForm(QWidget):
             msg.setText("Por favor, digite um CNPJ válido.")
             msg.setStyleSheet("background-color: white;")
             msg.exec_()
-
             return
         
         # Validar formato do CNPJ
@@ -347,7 +390,6 @@ class ConsultaCNPJForm(QWidget):
             msg.setText("O CNPJ digitado não é válido.")
             msg.setStyleSheet("background-color: white;")
             msg.exec_()
-
             return
         
         # Desabilitar botão durante consulta
@@ -400,7 +442,6 @@ class ConsultaCNPJForm(QWidget):
         msg.setText("Dados do CNPJ consultados com sucesso!")
         msg.setStyleSheet("background-color: white;")
         msg.exec_()
-
     
     def processar_erro_consulta(self, mensagem):
         """Processa erros na consulta de CNPJ"""
@@ -443,17 +484,34 @@ class ConsultaCNPJForm(QWidget):
         # Verifica o segundo dígito verificador
         return dv2 == digitos[13]
     
+    def incluir_registro(self):
+        """
+        Método para incluir os dados consultados no banco de dados.
+        Atualmente, apenas exibe uma mensagem de sucesso.
+        """
+        # Aqui você pode adicionar a lógica para inserir os dados no banco de dados.
+        # Exemplo: if self.radio_cliente.isChecked(): inserir_cliente() else: inserir_fornecedor()
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Inclusão")
+        msg.setText("Registro incluído com sucesso!")
+        msg.setStyleSheet("background-color: white;")
+        msg.exec_()
+
+
+class ConsultaCNPJWindow(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Consulta CNPJ")
+        self.setGeometry(100, 100, 800, 480)  # Altura reduzida de 600 para 480
+        self.setStyleSheet("background-color: #043b57;")
+        
+        form_widget = ConsultaCNPJForm(janela_parent=self)
+        self.setCentralWidget(form_widget)
+
 
 # Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Consulta CNPJ")
-    window.setGeometry(100, 100, 800, 600)
-    window.setStyleSheet("background-color: #043b57;")
-    
-    form_widget = ConsultaCNPJForm()
-    window.setCentralWidget(form_widget)
-    
+    window = ConsultaCNPJWindow()
     window.show()
     sys.exit(app.exec_())

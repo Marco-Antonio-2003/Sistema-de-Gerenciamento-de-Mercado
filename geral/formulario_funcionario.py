@@ -1,5 +1,11 @@
+#formulario_funcionario.py
 import sys
-import requests
+# Importação condicional do requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -377,6 +383,13 @@ class FormularioFuncionario(QWidget):
         
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
+        
+        # Verificar e avisar se o módulo requests não estiver disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
+            # Desabilitar botões de consulta
+            self.btn_buscar_cep.setEnabled(False)
     
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
@@ -526,11 +539,17 @@ class FormularioFuncionario(QWidget):
             self.cep_input.blockSignals(False)
         
         # Se o CEP estiver completo (8 dígitos), buscar endereço automaticamente
-        if len(texto_limpo) == 8:
+        if len(texto_limpo) == 8 and REQUESTS_AVAILABLE:
             self.buscar_endereco_por_cep()
     
     def buscar_endereco_por_cep(self):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            return
+            
         # Obter o CEP sem formatação
         cep = ''.join(filter(str.isdigit, self.cep_input.text()))
         

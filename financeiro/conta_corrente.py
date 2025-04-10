@@ -1,4 +1,6 @@
 import sys
+import os
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
@@ -7,7 +9,32 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
-class ContasCorretes(QWidget):
+# Função para importar a classe FormularioContaCorrente de forma dinâmica
+def importar_formulario_conta_corrente():
+    try:
+        # Tente importar normalmente
+        from formulario_conta_corrente import FormularioContaCorrente
+        return FormularioContaCorrente
+    except ImportError:
+        try:
+            # Se falhar, importe dinamicamente do arquivo no mesmo diretório
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            module_path = os.path.join(current_dir, 'formulario_conta_corrente.py')
+            
+            if not os.path.exists(module_path):
+                print(f"Arquivo 'formulario_conta_corrente.py' não encontrado em: {current_dir}")
+                return None
+                
+            spec = importlib.util.spec_from_file_location("formulario_conta_corrente", module_path)
+            formulario_conta_corrente_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(formulario_conta_corrente_module)
+            
+            return formulario_conta_corrente_module.FormularioContaCorrente
+        except Exception as e:
+            print(f"Erro ao importar 'formulario_conta_corrente.py': {e}")
+            return None
+
+class ContaCorrenteWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
@@ -130,7 +157,6 @@ class ContasCorretes(QWidget):
         
         # Botões de filtro e limpar
         self.btn_filtrar = QPushButton("Filtrar")
-        self.btn_filtrar.setIcon(QIcon("ico-img/filter-outline.svg"))
         self.btn_filtrar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -152,7 +178,6 @@ class ContasCorretes(QWidget):
         filtro_superior.addWidget(self.btn_filtrar)
         
         self.btn_limpar = QPushButton("Limpar")
-        self.btn_limpar.setIcon(QIcon("ico-img/trash-outline.svg"))
         self.btn_limpar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -229,7 +254,6 @@ class ContasCorretes(QWidget):
         
         # Botão Cadastrar
         self.btn_cadastrar = QPushButton("+ Cadastrar")
-        self.btn_cadastrar.setIcon(QIcon("ico-img/plus-circle-outline.svg"))
         self.btn_cadastrar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -251,7 +275,6 @@ class ContasCorretes(QWidget):
         
         # Botão Alterar
         self.btn_alterar = QPushButton("✎ Alterar")
-        self.btn_alterar.setIcon(QIcon("ico-img/pencil-outline.svg"))
         self.btn_alterar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -273,7 +296,6 @@ class ContasCorretes(QWidget):
         
         # Botão Excluir
         self.btn_excluir = QPushButton("✖ Excluir")
-        self.btn_excluir.setIcon(QIcon("ico-img/trash-outline.svg"))
         self.btn_excluir.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -369,8 +391,53 @@ class ContasCorretes(QWidget):
     def cadastrar_conta(self):
         """Abre o formulário para cadastrar nova conta corrente"""
         try:
-            # Importa o módulo formulario_conta_corrente.py
-            from formulario_conta_corrente import FormularioContaCorrente
+            # Importar a classe FormularioContaCorrente dinamicamente
+            FormularioContaCorrente = importar_formulario_conta_corrente()
+            
+            if FormularioContaCorrente is None:
+                # Se não conseguir importar, exibe mensagem de erro
+                msg_box = QMessageBox(
+                    QMessageBox.Warning,
+                    "Arquivo não encontrado",
+                    "O arquivo 'formulario_conta_corrente.py' não foi encontrado.",
+                    QMessageBox.Ok,
+                    self
+                )
+                
+                # Aplicar estilo com texto branco
+                msg_box.setStyleSheet("""
+                    QMessageBox {
+                        background-color: #003353;
+                    }
+                    QMessageBox QLabel {
+                        color: white;
+                        font-weight: bold;
+                    }
+                """)
+                
+                # Obter o botão OK e aplicar estilo diretamente nele
+                ok_button = msg_box.button(QMessageBox.Ok)
+                if ok_button:
+                    ok_button.setStyleSheet("""
+                        QPushButton {
+                            color: white;
+                            background-color: #004465;
+                            border: none;
+                            border-radius: 3px;
+                            min-width: 80px;
+                            min-height: 25px;
+                            font-weight: bold;
+                        }
+                        QPushButton:hover {
+                            background-color: #00354f;
+                        }
+                        QPushButton:pressed {
+                            background-color: #0078d7;
+                        }
+                    """)
+                
+                msg_box.exec_()
+                return
             
             # Criar uma nova janela para o formulário
             self.form_window = QMainWindow()
@@ -385,12 +452,12 @@ class ContasCorretes(QWidget):
             # Mostrar a janela
             self.form_window.show()
             
-        except ImportError:
-            # Se o módulo não existir, exibe uma mensagem
+        except Exception as e:
+            # Se ocorrer qualquer erro, exibe uma mensagem
             msg_box = QMessageBox(
                 QMessageBox.Warning,
-                "Arquivo não encontrado",
-                "O arquivo 'formulario_conta_corrente.py' não foi encontrado.",
+                "Erro",
+                f"Ocorreu um erro ao abrir o formulário: {str(e)}",
                 QMessageBox.Ok,
                 self
             )
@@ -428,6 +495,25 @@ class ContasCorretes(QWidget):
                 """)
             
             msg_box.exec_()
+            ok_button.setStyleSheet("""
+                    QPushButton {
+                        color: white;
+                        background-color: #004465;
+                        border: none;
+                        border-radius: 3px;
+                        min-width: 80px;
+                        min-height: 25px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #00354f;
+                    }
+                    QPushButton:pressed {
+                        background-color: #0078d7;
+                    }
+                """)
+            
+            msg_box.exec_()
     
     def alterar_conta(self):
         """Abre o formulário para alterar conta selecionada"""
@@ -440,8 +526,53 @@ class ContasCorretes(QWidget):
             caixa_pdv = self.table.item(row, 4).checkState() == Qt.Checked
             
             try:
-                # Importa o módulo formulario_conta_corrente.py
-                from formulario_conta_corrente import FormularioContaCorrente
+                # Importar a classe FormularioContaCorrente dinamicamente
+                FormularioContaCorrente = importar_formulario_conta_corrente()
+                
+                if FormularioContaCorrente is None:
+                    # Se não conseguir importar, exibe mensagem de erro
+                    msg_box = QMessageBox(
+                        QMessageBox.Warning,
+                        "Arquivo não encontrado",
+                        "O arquivo 'formulario_conta_corrente.py' não foi encontrado.",
+                        QMessageBox.Ok,
+                        self
+                    )
+                    
+                    # Aplicar estilo com texto branco
+                    msg_box.setStyleSheet("""
+                        QMessageBox {
+                            background-color: #003353;
+                        }
+                        QMessageBox QLabel {
+                            color: white;
+                            font-weight: bold;
+                        }
+                    """)
+                    
+                    # Obter o botão OK e aplicar estilo diretamente nele
+                    ok_button = msg_box.button(QMessageBox.Ok)
+                    if ok_button:
+                        ok_button.setStyleSheet("""
+                            QPushButton {
+                                color: white;
+                                background-color: #004465;
+                                border: none;
+                                border-radius: 3px;
+                                min-width: 80px;
+                                min-height: 25px;
+                                font-weight: bold;
+                            }
+                            QPushButton:hover {
+                                background-color: #00354f;
+                            }
+                            QPushButton:pressed {
+                                background-color: #0078d7;
+                            }
+                        """)
+                    
+                    msg_box.exec_()
+                    return
                 
                 # Criar uma nova janela para o formulário
                 self.form_window = QMainWindow()
@@ -455,9 +586,10 @@ class ContasCorretes(QWidget):
                     self.form_window, 
                     codigo=conta,
                     descricao=descricao,
-                    banco=banco,
-                    banco_desc=banco_desc,
-                    caixa_pdv=caixa_pdv,
+                    agencia=banco,
+                    numero_conta="",
+                    empresa=banco_desc,
+                    saldo="0.00",
                     modo_edicao=True
                 )
                 self.form_window.setCentralWidget(form_widget)
@@ -465,12 +597,12 @@ class ContasCorretes(QWidget):
                 # Mostrar a janela
                 self.form_window.show()
                 
-            except ImportError:
-                # Se o módulo não existir, exibe uma mensagem
+            except Exception as e:
+                # Se ocorrer qualquer erro, exibe uma mensagem
                 msg_box = QMessageBox(
                     QMessageBox.Warning,
-                    "Arquivo não encontrado",
-                    "O arquivo 'formulario_conta_corrente.py' não foi encontrado.",
+                    "Erro",
+                    f"Ocorreu um erro ao abrir o formulário: {str(e)}",
                     QMessageBox.Ok,
                     self
                 )
@@ -720,7 +852,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 800, 500)
     window.setStyleSheet("QMainWindow { background-color: #043b57; }")
     
-    contas_correntes = ContasCorretes()
+    contas_correntes = ContaCorrenteWindow()
     window.setCentralWidget(contas_correntes)
     
     window.show()

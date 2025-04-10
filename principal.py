@@ -1,6 +1,7 @@
+#principal.py
 import sys
 import os
-import subprocess
+import importlib.util
 import unicodedata
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
@@ -45,7 +46,6 @@ class MenuButton(QPushButton):
                 background-color: #e6e6e6;
             }
         """)
-        
         self.setMenu(self.menu)
 
     def add_menu_actions(self, action_titles, window):
@@ -60,61 +60,53 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.usuario = usuario if usuario else "Usuário"
         self.empresa = empresa if empresa else "Empresa"
+        self.opened_windows = []
         self.initUI()
+        
+        # Definir janela para maximizada (não tela cheia)
+        self.showMaximized()
         
     def initUI(self):
         self.setWindowTitle("MB Sistema - Sistema de Gerenciamento")
         self.setGeometry(100, 100, 1200, 700)
         self.setStyleSheet("background-color: #272525;")
         
-        # Widget central
+        # central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
-        # Layout principal
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Barra de ferramentas para botões de menu
+        # menu bar
         menu_frame = QFrame()
         menu_frame.setStyleSheet("background-color: #272525;")
         menu_layout = QHBoxLayout(menu_frame)
         menu_layout.setSpacing(5)
         
-        # Botões do menu
         btn_geral = MenuButton("GERAL")
         btn_produtos = MenuButton("PRODUTOS E\nSERVIÇOS")
         btn_compras = MenuButton("COMPRAS")
         btn_vendas = MenuButton("VENDAS")
         btn_financeiro = MenuButton("FINANCEIRO")
         btn_relatorios = MenuButton("RELATÓRIOS")
-        btn_notas = MenuButton("NOTAS FISCAIS")
+        #btn_notas = MenuButton("NOTAS FISCAIS")
         btn_ferramentas = MenuButton("FERRAMENTAS")
         
-        # Adicionar ações aos botões de menu
         btn_geral.add_menu_actions([
             "Cadastro de empresa",
             "Cadastro Pessoas (clientes)",
             "Cadastro Funcionários",
-            "Consulta CNPJ",
-            "Cadastro de Email",
+            "Consulta CNPJ"
         ], self)
         
         btn_produtos.add_menu_actions([
+            "Produtos",
             "Grupo de produtos",
-            "Un - unidade de medida",
-            "Produtos"
+            "Un - unidade de medida"
         ], self)
         
-        btn_compras.add_menu_actions([
-            "Fornecedores"
-        ], self)
-        
-        btn_vendas.add_menu_actions([
-            "Clientes",
-            "Pedido de vendas"
-        ], self)
-        
+        btn_compras.add_menu_actions(["Fornecedores"], self)
+        btn_vendas.add_menu_actions(["Clientes", "Pedido de vendas"], self)
         btn_financeiro.add_menu_actions([
             "Recebimento de clientes",
             "Gerar lançamento Financeiro",
@@ -122,31 +114,13 @@ class MainWindow(QMainWindow):
             "Conta corrente",
             "Classes financeiras"
         ], self)
+        btn_relatorios.add_menu_actions(["Fiscal NF-e, SAT, NFC-e", "Estoque"], self)
+        #btn_notas.add_menu_actions(["Manutenção de notas"], self)
+        btn_ferramentas.add_menu_actions(["Configuração de estação"], self)
         
-        btn_relatorios.add_menu_actions([
-            "Fiscal NF-e, SAT, NFC-e",
-            "Estoque",
-        ], self)
-        
-        btn_notas.add_menu_actions([
-            "Manutenção de notas"
-        ], self)
-
-        btn_ferramentas.add_menu_actions([
-            "Configuração de estação"
-        ], self)
-        
-        # Adicionar botões ao layout
-        menu_layout.addWidget(btn_geral)
-        menu_layout.addWidget(btn_produtos)
-        menu_layout.addWidget(btn_compras)
-        menu_layout.addWidget(btn_vendas)
-        menu_layout.addWidget(btn_financeiro)
-        menu_layout.addWidget(btn_relatorios)
-        menu_layout.addWidget(btn_notas)
-        menu_layout.addWidget(btn_ferramentas)
-        
-        # Adicionar barra de menu ao layout principal
+        for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas,
+                    btn_financeiro, btn_relatorios, btn_ferramentas):
+            menu_layout.addWidget(btn)
         main_layout.addWidget(menu_frame)
         
         # Área de conteúdo com tela inicial
@@ -154,180 +128,244 @@ class MainWindow(QMainWindow):
         home_screen.setStyleSheet("background-color: #005079;")
         home_layout = QVBoxLayout(home_screen)
         home_layout.setAlignment(Qt.AlignCenter)
-        
-        # Logo e título
-        title_layout = QVBoxLayout()
-        title_layout.setAlignment(Qt.AlignCenter)
-        
+
         # Logo
         logo_label = QLabel()
-        # Caminho absoluto para o logo
         logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "logo.png")
         logo_pixmap = QPixmap(logo_path)
         if not logo_pixmap.isNull():
-            logo_label.setPixmap(logo_pixmap.scaled(400, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo_label.setPixmap(logo_pixmap.scaled(400, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            # Se o logo não for encontrado, cria um texto alternativo
-            logo_label = QLabel("MB SISTEMA\nSOLUÇÕES TECNOLÓGICAS")
+            logo_label.setText("erro logo")
             logo_label.setFont(QFont("Arial", 24, QFont.Bold))
-            logo_label.setStyleSheet("color: #00E676; text-align: center;")
+            logo_label.setStyleSheet("color: #00E676;")
             logo_label.setAlignment(Qt.AlignCenter)
-            print(f"Logo não encontrado em {logo_path}. Usando texto alternativo.")
-        
-        logo_label.setStyleSheet("margin-top: 30px; margin-bottom: 30px;")
-        logo_label.setAlignment(Qt.AlignCenter)
-        
+
+        home_layout.addWidget(logo_label)
+
+        # Título principal
         system_title = QLabel("MB Sistema")
         system_title.setFont(QFont("Arial", 36, QFont.Bold))
-        system_title.setStyleSheet("color: white; margin-top: 20px;")
+        system_title.setStyleSheet("color: white;")
         system_title.setAlignment(Qt.AlignCenter)
-        
+        home_layout.addWidget(system_title)
+
+        # Subtítulo
         system_subtitle = QLabel("Sistema de gerenciamento")
         system_subtitle.setFont(QFont("Arial", 26))
         system_subtitle.setStyleSheet("color: white;")
         system_subtitle.setAlignment(Qt.AlignCenter)
-        
+        home_layout.addWidget(system_subtitle)
+
         # Informações do usuário
         user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
         user_info.setFont(QFont("Arial", 14))
         user_info.setStyleSheet("color: white; margin-top: 40px;")
         user_info.setAlignment(Qt.AlignCenter)
-        
-        title_layout.addWidget(logo_label)
-        title_layout.addWidget(system_title)
-        title_layout.addWidget(system_subtitle)
-        title_layout.addWidget(user_info)
-        home_layout.addLayout(title_layout)
-        
-        # Adicionar tela inicial ao layout principal
+        home_layout.addWidget(user_info)
+
+        # finalmente adiciona ao main_layout
         main_layout.addWidget(home_screen, 1)
         
-        # Dicionário para mapear os títulos de ações para os arquivos .py correspondentes
+        # mapeamentos
         self.action_to_py_file = {
-            # Módulos de GERAL
             "Cadastro de empresa": os.path.join("geral", "cadastro_empresa.py"),
             "Cadastro Pessoas (clientes)": os.path.join("geral", "cadastro_pessoa.py"),
             "Cadastro Funcionários": os.path.join("geral", "cadastro_funcionarios.py"),
             "Consulta CNPJ": os.path.join("geral", "consulta_cnpj.py"),
-            "Cadastro de Email": os.path.join("geral", "cadastro_email.py"),
-            
-            # Módulos de PRODUTOS E SERVIÇOS
+            "Produtos": os.path.join("produtos_e_servicos", "produtos.py"),
             "Grupo de produtos": os.path.join("produtos_e_servicos", "grupo_produtos.py"),
             "Un - unidade de medida": os.path.join("produtos_e_servicos", "unidade_medida.py"),
-            "Produtos": os.path.join("produtos_e_servicos", "produtos.py"),
-            
-            # Módulos de COMPRAS
             "Fornecedores": os.path.join("compras", "fornecedores.py"),
-            
-            # Módulos de VENDAS
             "Clientes": os.path.join("vendas", "clientes.py"),
             "Pedido de vendas": os.path.join("vendas", "pedido_vendas.py"),
-            
-            # Módulos de FINANCEIRO
             "Recebimento de clientes": os.path.join("financeiro", "recebimento_clientes.py"),
             "Gerar lançamento Financeiro": os.path.join("financeiro", "lancamento_financeiro.py"),
             "Controle de caixa (PDV)": os.path.join("financeiro", "controle_caixa.py"),
             "Conta corrente": os.path.join("financeiro", "conta_corrente.py"),
             "Classes financeiras": os.path.join("financeiro", "classes_financeiras.py"),
-            
-            # Módulos de RELATÓRIOS
             "Fiscal NF-e, SAT, NFC-e": os.path.join("relatorios", "relatorio_fiscal.py"),
             "Estoque": os.path.join("relatorios", "estoque.py"),
-            
-            # Módulos de NOTAS FISCAIS
-            "Manutenção de notas": os.path.join("notas_fiscais", "manutencao_notas.py"),
-            
-            # Módulos de FERRAMENTAS
+            #"Manutenção de notas": os.path.join("notas_fiscais", "manutencao_notas.py"),
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py")
         }
-        
+        # casos especiais de nome de classe
+        self.action_to_class = {
+            # GERAL
+            "Cadastro de empresa":          "CadastroEmpresaWindow",
+            "Cadastro Pessoas (clientes)":  "CadastroPessoaWindow",
+            "Cadastro Funcionários":        "CadastroFuncionariosWindow",
+            "Consulta CNPJ":                "ConsultaCNPJWindow",
+            # PRODUTOS E SERVIÇOS
+            "Produtos":                     "ProdutosWindow",           # se você tiver um QMainWindow ProdutosWindow
+            "Grupo de produtos":            "GrupoProdutosWindow",
+            "Un - unidade de medida":       "UnidadeMedidaWindow",
+            # COMPRAS
+            "Fornecedores":                 "FornecedoresWindow",
+            # VENDAS
+            "Clientes":                     "ClientesWindow",
+            "Pedido de vendas":             "PedidoVendasWindow",
+            # FINANCEIRO
+            "Recebimento de clientes":      "RecebimentoClientesWindow",
+            "Gerar lançamento Financeiro":  "LancamentoFinanceiroWindow",
+            "Controle de caixa (PDV)":      "ControleCaixaWindow",
+            "Conta corrente":               "ContaCorrenteWindow",
+            "Classes financeiras":          "ClassesFinanceirasWindow",
+            # RELATÓRIOS
+            "Fiscal NF-e, SAT, NFC-e":      "RelatorioFiscalWindow",
+            "Estoque":                      "EstoqueWindow",
+            # NOTAS FISCAIS
+            "Manutenção de notas":          "ManutencaoNotasWindow",
+            # FERRAMENTAS
+            "Configuração de estação":      "ConfiguracaoImpressoraWindow"
+        }
+
     def normalize_text(self, text):
-        """
-        Normaliza texto removendo acentos e caracteres especiais.
-        """
-        # Primeiro normaliza para separar caracteres de base e combinados
         normalized = unicodedata.normalize('NFD', text)
-        # Remove diacríticos (acentos)
-        normalized = ''.join([c for c in normalized if not unicodedata.combining(c)])
-        return normalized
-        
+        return ''.join(c for c in normalized if not unicodedata.combining(c))
+
+    def load_module_dynamically(self, module_path, class_name):
+        try:
+            spec = importlib.util.spec_from_file_location("mod", module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return getattr(module, class_name, None)
+        except Exception as e:
+            print(f"Erro ao carregar dinamicamente {module_path}: {e}")
+            return None
+
     def menu_action_triggered(self, action_title):
         print(f"Menu action triggered: {action_title}")
         
-        # Verificar se existe um arquivo .py correspondente à ação
-        if action_title in self.action_to_py_file:
-            py_file = self.action_to_py_file[action_title]
+        # Tratamento especial para módulos conhecidos com problemas de importação
+        special_modules = ["Fiscal NF-e, SAT, NFC-e", "Configuração de estação", "Estoque"]
+        
+        # Para todos os módulos, use uma abordagem mais direta
+        # Primeiro, verifica se já há uma janela aberta
+        self.opened_windows = [w for w in self.opened_windows if w.isVisible()]
+        for w in self.opened_windows:
+            if w.windowTitle() == action_title:
+                w.setWindowState(w.windowState() & ~Qt.WindowMinimized)
+                w.activateWindow()
+                return
+        
+        # Se o módulo faz parte da lista especial, use importação direta com tratamento de erros
+        if action_title in special_modules:
             try:
-                # Obter caminho absoluto para o arquivo
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                py_file_path = os.path.join(script_dir, py_file)
+                if action_title == "Fiscal NF-e, SAT, NFC-e":
+                    # Importação direta para o módulo de relatório fiscal
+                    rel_path = self.action_to_py_file[action_title]
+                    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), rel_path)
+                    
+                    # Importação explícita do módulo de impressão
+                    from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
+                    
+                    # Carregamento do módulo
+                    spec = importlib.util.spec_from_file_location("relatorio_fiscal", abs_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    WindowClass = getattr(module, "RelatorioFiscalWindow")
+                    
+                elif action_title == "Configuração de estação":
+                    # Importação direta para configuração de impressora
+                    rel_path = self.action_to_py_file[action_title]
+                    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), rel_path)
+                    
+                    # Importação explícita do módulo de impressão
+                    from PyQt5.QtPrintSupport import QPrinterInfo, QPrintDialog, QPrinter
+                    
+                    # Carregamento do módulo
+                    spec = importlib.util.spec_from_file_location("configuracao_impressora", abs_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    WindowClass = getattr(module, "ConfiguracaoImpressoraWindow")
+                    
+                elif action_title == "Estoque":
+                    # Importação direta para o módulo de estoque
+                    rel_path = self.action_to_py_file[action_title]
+                    abs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), rel_path)
+                    
+                    # Carregamento do módulo
+                    spec = importlib.util.spec_from_file_location("estoque", abs_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    WindowClass = getattr(module, "EstoqueWindow")
                 
-                # Verificar se o arquivo existe
-                if os.path.exists(py_file_path):
-                    # Executar o arquivo Python correspondente como um processo separado
-                    print(f"Executando arquivo: {py_file_path}")
-                    subprocess.Popen([sys.executable, py_file_path])
-                else:
-                    print(f"Arquivo não encontrado: {py_file_path}")
-                    # Verificar se o diretório existe e criar o arquivo se necessário
-                    directory = os.path.dirname(py_file_path)
-                    if not os.path.exists(directory):
-                        os.makedirs(directory)
-                        print(f"Diretório criado: {directory}")
-                    
-                    # Criar um nome de classe a partir do título da ação - removendo acentos e caracteres especiais
-                    class_name = self.normalize_text(action_title)
-                    # Remover todos os espaços, hífens, parênteses e vírgulas
-                    class_name = ''.join(c for c in class_name if c.isalnum())
-                    
-                    # Criar um arquivo Python básico
-                    with open(py_file_path, 'w', encoding='utf-8') as f:
-                        f.write(f"""import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
-
-class {class_name}Window(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("{action_title}")
-        self.setGeometry(200, 200, 800, 600)
-        self.initUI()
-        
-    def initUI(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        layout = QVBoxLayout(central_widget)
-        
-        title = QLabel("{action_title}")
-        title.setFont(QFont("Arial", 18, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
-        
-        info = QLabel("Esta funcionalidade ainda está em desenvolvimento.")
-        info.setFont(QFont("Arial", 14))
-        info.setAlignment(Qt.AlignCenter)
-        
-        layout.addWidget(title)
-        layout.addWidget(info)
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = {class_name}Window()
-    window.show()
-    sys.exit(app.exec_())
-""")
-                    print(f"Arquivo criado: {py_file_path}")
-                    # Executar o arquivo recém-criado
-                    subprocess.Popen([sys.executable, py_file_path])
+                # Criar e exibir a janela
+                win = WindowClass()
+                win.setWindowTitle(action_title)
+                win.show()
+                self.opened_windows.append(win)
+                return
+                
             except Exception as e:
-                print(f"Erro ao manipular o arquivo {py_file}: {str(e)}")
+                print(f"Erro ao abrir {action_title}: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Para os módulos não especiais, use o método original
+        if action_title not in self.action_to_py_file:
+            print("Ação não mapeada:", action_title)
+            return
+            
+        rel = self.action_to_py_file[action_title]
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), rel)
+        
+        if not os.path.exists(path):
+            print(f"ERRO: Arquivo não existe: {path}")
+            return
+            
+        # Definir nome da classe
+        if action_title in self.action_to_class:
+            cls_name = self.action_to_class[action_title]
         else:
-            print(f"Nenhum arquivo .py encontrado para a ação: {action_title}")
+            base = ''.join(c for c in self.normalize_text(action_title) if c.isalnum())
+            cls_name = base + "Window"
+            
+        # Tentar importação direta (abordagem modificada para ser mais robusta)
+        try:
+            # Determinando o caminho do módulo para importação
+            rel_path = rel.replace(os.sep, '.')
+            module_name = os.path.splitext(rel_path)[0]
+            
+            # Tentar importação direta como pacote primeiro
+            try:
+                module_parts = module_name.split('.')
+                if len(module_parts) > 1:
+                    package = module_parts[0]
+                    module = __import__(module_name, fromlist=[cls_name])
+                    WindowClass = getattr(module, cls_name, None)
+                else:
+                    # Fallback para importação com importlib
+                    raise ImportError("Não é um pacote")
+            except ImportError:
+                # Importação com importlib como fallback
+                spec = importlib.util.spec_from_file_location(module_name, path)
+                if not spec:
+                    raise ImportError(f"Não foi possível criar spec para {path}")
+                    
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                WindowClass = getattr(module, cls_name, None)
+                
+            if not WindowClass:
+                raise ImportError(f"Classe {cls_name} não encontrada no módulo {module_name}")
+                
+            # Criar e exibir a janela
+            win = WindowClass()
+            win.setWindowTitle(action_title)
+            win.show()
+            self.opened_windows.append(win)
+            
+        except Exception as e:
+            print(f"ERRO ao importar/iniciar o módulo {action_title}: {e}")
+            import traceback
+            traceback.print_exc()
+            print("Não foi possível abrir a janela solicitada.")
 
-# Se este arquivo for executado diretamente, abra a janela principal
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow(usuario="Marco", empresa="MB Sistemas")
     window.show()
     sys.exit(app.exec_())

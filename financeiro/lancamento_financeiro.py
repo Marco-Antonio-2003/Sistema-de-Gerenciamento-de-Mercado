@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize, QDate
 
 
-class LancamentoFinanceiro(QWidget):
+class LancamentoFinanceiroWindow(QWidget):
     def __init__(self, janela_parent=None):
         super().__init__()
         self.janela_parent = janela_parent
@@ -458,7 +458,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 1000, 600)
     window.setStyleSheet("background-color: #003b57;")
     
-    lancamento_widget = LancamentoFinanceiro(window)  # Passa a janela como parent
+    lancamento_widget = LancamentoFinanceiroWindow(window)  # Passa a janela como parent
     window.setCentralWidget(lancamento_widget)
     
     window.show()

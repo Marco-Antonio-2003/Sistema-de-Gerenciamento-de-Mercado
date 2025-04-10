@@ -1,4 +1,3 @@
-#abrir caixa
 import sys
 from PyQt5.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton, QFormLayout, 
@@ -298,3 +297,14 @@ class AbrirCaixa(QDialog):
         
         # Fechar o diálogo retornando Accepted
         self.accept()
+
+# Para teste individual
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')  # Estilo mais moderno
+    
+    # Testar com valores de exemplo
+    janela = AbrirCaixa(codigo="001", tipo_operacao="Entrada")
+    janela.show()
+    
+    sys.exit(app.exec_())

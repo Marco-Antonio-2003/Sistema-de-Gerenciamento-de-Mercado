@@ -1,5 +1,11 @@
+#formulario_pessoa.py
 import sys
-import requests
+# Importação condicional do requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
 import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -218,12 +224,6 @@ class FormularioPessoa(QWidget):
         self.data_input.setCalendarPopup(True)
         self.data_input.setDate(QDate.currentDate())
         
-        # Mostrar botão do calendário com texto
-        try:
-            self.data_input.calendarWidget().setAutoFillBackground(True)
-        except:
-            pass
-        
         data_layout = QFormLayout()
         data_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         data_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -245,7 +245,7 @@ class FormularioPessoa(QWidget):
         documento_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         documento_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         documento_layout.addRow(self.documento_label, self.documento_input)
-        
+
         # Título do Endereço
         endereco_titulo = QLabel("Endereço")
         endereco_titulo.setFont(QFont("Arial", 14, QFont.Bold))
@@ -381,6 +381,13 @@ class FormularioPessoa(QWidget):
         
         # Atualizar o tipo de documento com base no tipo de pessoa inicial
         self.atualizar_tipo_documento()
+        
+        # Verificar e avisar se o módulo requests não estiver disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
+            # Desabilitar botões de consulta
+            self.btn_buscar_cep.setEnabled(False)
     
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
@@ -622,11 +629,17 @@ class FormularioPessoa(QWidget):
             self.cep_input.blockSignals(False)
         
         # Se o CEP estiver completo (8 dígitos), buscar endereço automaticamente
-        if len(texto_limpo) == 8:
+        if len(texto_limpo) == 8 and REQUESTS_AVAILABLE:
             self.buscar_endereco_por_cep()
     
     def buscar_endereco_por_cep(self):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
+        # Verificar se o módulo requests está disponível
+        if not REQUESTS_AVAILABLE:
+            QMessageBox.warning(self, "Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            return
+            
         # Obter o CEP sem formatação
         cep = ''.join(filter(str.isdigit, self.cep_input.text()))
         

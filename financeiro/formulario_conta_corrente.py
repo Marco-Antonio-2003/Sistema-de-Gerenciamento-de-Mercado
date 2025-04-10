@@ -1,22 +1,21 @@
-# formulario_conta_corrente.py
 import sys
 from PyQt5.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton, QFormLayout, 
-                            QWidget, QMessageBox, QGridLayout)
+                            QWidget, QMessageBox, QGridLayout, QCheckBox)
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 
 class FormularioContaCorrente(QDialog):
     def __init__(self, parent=None, main_window=None, codigo="", descricao="", 
-                agencia="", numero_conta="", empresa="", saldo="0.00", modo_edicao=False):
+                agencia="", numero_conta="", empresa="", saldo="0.00", caixa_pdv=False, modo_edicao=False):
         super().__init__(parent)
         self.parent = parent
         self.main_window = main_window
         self.modo_edicao = modo_edicao
         self.codigo_original = codigo
-        self.initUI(codigo, descricao, agencia, numero_conta, empresa, saldo)
+        self.initUI(codigo, descricao, agencia, numero_conta, empresa, saldo, caixa_pdv)
         
-    def initUI(self, codigo, descricao, agencia, numero_conta, empresa, saldo):
+    def initUI(self, codigo, descricao, agencia, numero_conta, empresa, saldo, caixa_pdv):
         # Configuração da janela
         self.setWindowTitle("Cadastro de Conta Corrente")
         self.setMinimumWidth(500)  # Reduzido de 550
@@ -122,7 +121,7 @@ class FormularioContaCorrente(QDialog):
         grid_layout.addWidget(self.agencia_edit, 1, 1)
         
         # Número da conta (na mesma linha que agência)
-        numero_conta_label = QLabel("Numero da conta")
+        numero_conta_label = QLabel("Numero da conta:")
         numero_conta_label.setFont(QFont("Arial", 11))  # Reduzido de 12
         numero_conta_label.setStyleSheet("color: white;")
         grid_layout.addWidget(numero_conta_label, 1, 2)
@@ -153,6 +152,13 @@ class FormularioContaCorrente(QDialog):
         self.saldo_edit.setStyleSheet(input_style)
         self.saldo_edit.setFixedWidth(120)  # Reduzido de 150
         grid_layout.addWidget(self.saldo_edit, 2, 3)
+        
+        # Quarta linha - Caixa PDV Checkbox
+        self.caixa_pdv_check = QCheckBox("Caixa PDV")
+        self.caixa_pdv_check.setFont(QFont("Arial", 11))
+        self.caixa_pdv_check.setStyleSheet("color: white;")
+        self.caixa_pdv_check.setChecked(caixa_pdv)
+        grid_layout.addWidget(self.caixa_pdv_check, 3, 0, 1, 2)  # Posição na grade: linha 3, coluna 0, altura 1, largura 2
         
         main_layout.addLayout(grid_layout)
         
@@ -195,6 +201,7 @@ class FormularioContaCorrente(QDialog):
         numero_conta = self.numero_conta_edit.text().strip()
         empresa = self.empresa_edit.text().strip()
         saldo = self.saldo_edit.text().strip()
+        caixa_pdv = self.caixa_pdv_check.isChecked()
         
         # Validações
         if not codigo:

@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
-class ClasseFinanceira(QWidget):
+class ClassesFinanceirasWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()

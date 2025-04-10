@@ -1,4 +1,6 @@
 import sys
+import os
+import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
@@ -236,9 +238,187 @@ class CadastroEmpresa(QWidget):
         # Para uma validação mais completa, implementar algoritmo de validação de dígitos verificadores
         return True
         
+    def load_formulario_empresa(self):
+        try:
+            # Tente primeiro com importação direta (para ambiente de desenvolvimento)
+            try:
+                # Importação direta usando o módulo
+                from geral.formulario_empresa import FormularioEmpresa
+                print("Importação direta de FormularioEmpresa bem-sucedida")
+                return FormularioEmpresa
+            except ImportError as e:
+                print(f"Importação direta falhou: {str(e)}, tentando método alternativo...")
+                
+                # Caminho para o módulo formulario_empresa.py
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                module_path = os.path.join(script_dir, "formulario_empresa.py")
+                
+                # Se o arquivo não existir, vamos criar um básico
+                if not os.path.exists(module_path):
+                    self.criar_formulario_empresa_padrao(module_path)
+                
+                # Carregar o módulo dinamicamente
+                module_name = "formulario_empresa"
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                if spec is None:
+                    raise ImportError(f"Não foi possível carregar o módulo {module_name}")
+                    
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # Retornar a classe FormularioEmpresa
+                if hasattr(module, "FormularioEmpresa"):
+                    return getattr(module, "FormularioEmpresa")
+                else:
+                    raise ImportError(f"A classe FormularioEmpresa não foi encontrada no módulo {module_name}")
+        except Exception as e:
+            print(f"Erro ao carregar FormularioEmpresa: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Não foi possível carregar o formulário: {str(e)}", QMessageBox.Critical)
+            return None
+            
+    def criar_formulario_empresa_padrao(self, filepath):
+        """Cria um arquivo formulario_empresa.py básico se não existir"""
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('''from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QLabel, 
+                                         QLineEdit, QPushButton, QMessageBox)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+
+class FormularioEmpresa(QWidget):
+    def __init__(self, parent_window, form_window=None):
+        super().__init__()
+        self.parent_window = parent_window
+        self.form_window = form_window
+        self.initUI()
+        
+    def initUI(self):
+        # Layout principal
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Título
+        titulo = QLabel("Cadastro de Empresa")
+        titulo.setFont(QFont("Arial", 16, QFont.Bold))
+        titulo.setStyleSheet("color: white;")
+        titulo.setAlignment(Qt.AlignCenter)
+        layout.addWidget(titulo)
+        
+        # Formulário
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setVerticalSpacing(15)
+        form_layout.setHorizontalSpacing(20)
+        
+        # Estilo comum para QLineEdit
+        lineedit_style = """
+            QLineEdit {
+                background-color: #fffff0;
+                padding: 8px;
+                font-size: 12px;
+                min-height: 35px;
+            }
+        """
+        
+        # Campo Nome
+        self.nome_label = QLabel("Nome:")
+        self.nome_label.setFont(QFont("Arial", 12))
+        self.nome_label.setStyleSheet("color: white;")
+        self.nome_input = QLineEdit()
+        self.nome_input.setStyleSheet(lineedit_style)
+        form_layout.addRow(self.nome_label, self.nome_input)
+        
+        # Campo CNPJ
+        self.cnpj_label = QLabel("CNPJ:")
+        self.cnpj_label.setFont(QFont("Arial", 12))
+        self.cnpj_label.setStyleSheet("color: white;")
+        self.cnpj_input = QLineEdit()
+        self.cnpj_input.setStyleSheet(lineedit_style)
+        form_layout.addRow(self.cnpj_label, self.cnpj_input)
+        
+        # Botão Salvar
+        self.btn_salvar = QPushButton("Salvar")
+        self.btn_salvar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                padding: 10px 20px;
+                border: 1px solid #cccccc;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        self.btn_salvar.clicked.connect(self.salvar_empresa)
+        
+        layout.addLayout(form_layout)
+        layout.addSpacing(20)
+        layout.addWidget(self.btn_salvar, 0, Qt.AlignCenter)
+        
+        # Estilo de fundo
+        self.setStyleSheet("background-color: #043b57;")
+        
+    def salvar_empresa(self):
+        nome = self.nome_input.text()
+        cnpj = self.cnpj_input.text()
+        
+        # Validação básica
+        if not nome or not cnpj:
+            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, preencha todos os campos.")
+            return
+        
+        # Obter o próximo código disponível (exemplo simplificado)
+        ultimo_codigo = 0
+        for row in range(self.parent_window.table.rowCount()):
+            codigo = int(self.parent_window.table.item(row, 0).text())
+            if codigo > ultimo_codigo:
+                ultimo_codigo = codigo
+        
+        novo_codigo = ultimo_codigo + 1
+        
+        # Adicionar à tabela
+        row = self.parent_window.table.rowCount()
+        self.parent_window.table.insertRow(row)
+        self.parent_window.table.setItem(row, 0, QTableWidgetItem(str(novo_codigo)))
+        self.parent_window.table.setItem(row, 1, QTableWidgetItem(nome))
+        self.parent_window.table.setItem(row, 2, QTableWidgetItem(cnpj))
+        
+        # Mostrar mensagem de sucesso
+        QMessageBox.information(self, "Sucesso", "Empresa cadastrada com sucesso!")
+        
+        # Limpar campos
+        self.nome_input.clear()
+        self.cnpj_input.clear()
+        
+        # Fechar o formulário, se necessário
+        if self.form_window:
+            self.form_window.close()
+''')
+            print(f"Arquivo formulario_empresa.py criado em {filepath}")
+            
+        except Exception as e:
+            print(f"Erro ao criar arquivo formulario_empresa.py: {str(e)}")
+            
+    # Substitua o método cadastrar_empresa no arquivo cadastro_empresa.py
+
     def cadastrar_empresa(self):
-        """Abre o formulário de cadastro de empresa"""
-        from formulario_empresa import FormularioEmpresa
+        """Abre o formulário para cadastro de empresa"""
+        # Carregar dinamicamente a classe FormularioEmpresa
+        FormularioEmpresa = self.load_formulario_empresa()
+        if FormularioEmpresa is None:
+            return
+        
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, apenas ativá-la em vez de criar uma nova
+            self.form_window.setWindowState(self.form_window.windowState() & ~Qt.WindowMinimized)
+            self.form_window.activateWindow()
+            self.form_window.raise_()
+            return
         
         # Criar uma nova janela para o formulário
         self.form_window = QMainWindow()
@@ -351,16 +531,20 @@ class CadastroEmpresa(QWidget):
             self.mostrar_mensagem("Não encontrado", f"Empresa com código {codigo} não encontrada", QMessageBox.Warning)
 
 
+# Se este arquivo for executado como script principal
+class CadastroEmpresaWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cadastro de Empresa")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("QMainWindow, QWidget { background-color: #043b57; }")
+        
+        cadastro_widget = CadastroEmpresa()
+        self.setCentralWidget(cadastro_widget)
+
 # Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Cadastro de Empresa")
-    window.setGeometry(100, 100, 800, 600)
-    window.setStyleSheet("QMainWindow, QWidget { background-color: #043b57; }")
-    
-    cadastro_widget = CadastroEmpresa()
-    window.setCentralWidget(cadastro_widget)
-    
+    window = CadastroEmpresaWindow()
     window.show()
     sys.exit(app.exec_())

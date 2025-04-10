@@ -1,12 +1,63 @@
 import sys
+import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QMessageBox, QComboBox, QStyle)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
-from formulario_fornecedores import FormularioFornecedores
 
-class CadastroFornecedores(QWidget):
+# Definir classe placeholder para o caso de falha na importação
+class FormularioFornecedoresDummy(QWidget):
+    def __init__(self, cadastro_tela=None, janela_parent=None):
+        super().__init__()
+        self.cadastro_tela = cadastro_tela
+        self.janela_parent = janela_parent
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Formulário de Fornecedores não disponível"))
+        self.codigo_input = QLineEdit()
+        self.nome_input = QLineEdit()
+        self.fantasia_input = QLineEdit()
+        self.tipo_combo = QComboBox()
+        self.tipo_combo.addItems(["Selecione um tipo", "Fabricante", "Distribuidor", "Atacadista", "Varejista", "Importador"])
+
+# Tentar diferentes caminhos de importação
+def importar_formulario_fornecedores():
+    # Lista de possíveis caminhos de importação
+    caminhos_tentativa = [
+        # Importação direta
+        "from formulario_fornecedores import FormularioFornecedores",
+        # Com prefixo da pasta
+        "from geral.formulario_fornecedores import FormularioFornecedores",
+        # Um nível acima
+        "import sys, os; sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from formulario_fornecedores import FormularioFornecedores",
+        # Tentar a pasta específica "compras"
+        "from compras.formulario_fornecedores import FormularioFornecedores"
+    ]
+    
+    # Classe que será retornada, inicialmente é a dummy
+    formulario_class = FormularioFornecedoresDummy
+    
+    for tentativa in caminhos_tentativa:
+        try:
+            # Usar um namespace local para evitar conflitos
+            local_vars = {}
+            exec(tentativa, globals(), local_vars)
+            print(f"Importação de FormularioFornecedores bem-sucedida com: {tentativa}")
+            # Se chegou aqui, a importação funcionou - obter a classe do namespace local
+            formulario_class = local_vars.get('FormularioFornecedores')
+            break
+        except ImportError:
+            continue
+        except Exception as e:
+            print(f"Erro ao tentar importação: {tentativa} - {str(e)}")
+            continue
+    
+    return formulario_class
+
+# Importar a classe FormularioFornecedores
+FormularioFornecedores = importar_formulario_fornecedores()
+
+class FornecedoresWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
@@ -368,6 +419,14 @@ class CadastroFornecedores(QWidget):
                                 QMessageBox.Warning)
             return
         
+        # Verificar se FormularioFornecedores está disponível
+        global FormularioFornecedores
+        if FormularioFornecedores is None or FormularioFornecedores == FormularioFornecedoresDummy:
+            self.mostrar_mensagem("Erro", 
+                                "Não foi possível carregar o formulário de fornecedores.", 
+                                QMessageBox.Critical)
+            return
+        
         self.janela_formulario = QMainWindow()
         self.janela_formulario.setWindowTitle("Alterar Cadastro de Fornecedor")
         self.janela_formulario.setGeometry(150, 150, 600, 500)
@@ -438,6 +497,14 @@ class CadastroFornecedores(QWidget):
     
     def cadastrar(self):
         """Abre a tela de cadastro de fornecedores"""
+        # Verificar se FormularioFornecedores está disponível
+        global FormularioFornecedores
+        if FormularioFornecedores is None or FormularioFornecedores == FormularioFornecedoresDummy:
+            self.mostrar_mensagem("Erro", 
+                                "Não foi possível carregar o formulário de fornecedores.", 
+                                QMessageBox.Critical)
+            return
+            
         self.janela_formulario = QMainWindow()
         self.janela_formulario.setWindowTitle("Cadastro de Fornecedores")
         self.janela_formulario.setGeometry(150, 150, 600, 500)
@@ -459,16 +526,20 @@ class CadastroFornecedores(QWidget):
         msg_box.exec_()
 
 
+# Classe principal para janela independente
+class FornecedoresMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Sistema de Cadastro de Fornecedores")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #003b57;")
+        
+        cadastro_widget = FornecedoresWindow(self)
+        self.setCentralWidget(cadastro_widget)
+
 # Para testar a aplicação
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Sistema de Cadastro de Fornecedores")
-    window.setGeometry(100, 100, 800, 600)
-    window.setStyleSheet("background-color: #003b57;")
-    
-    cadastro_widget = CadastroFornecedores(window)
-    window.setCentralWidget(cadastro_widget)
-    
+    window = FornecedoresMainWindow()
     window.show()
     sys.exit(app.exec_())

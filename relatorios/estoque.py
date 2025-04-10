@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
 
-class Estoque(QWidget):
+class EstoqueWindow(QWidget):
     def __init__(self, janela_parent=None):
         super().__init__()
         self.janela_parent = janela_parent
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 1000, 600)
     window.setStyleSheet("background-color: #003b57;")
     
-    estoque_widget = Estoque(window)  # Passa a janela como parent
+    estoque_widget = EstoqueWindow(window)  # Passa a janela como parent
     window.setCentralWidget(estoque_widget)
     
     window.show()

@@ -1,3 +1,4 @@
+#configuração de impressora
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
@@ -6,7 +7,8 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtPrintSupport import QPrinterInfo, QPrintDialog, QPrinter
 
-class ConfiguracaoImpressora(QWidget):
+
+class ConfiguracaoImpressoraWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
@@ -270,7 +272,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 800, 500)
     window.setStyleSheet("background-color: #043b57;")
     
-    configuracao_widget = ConfiguracaoImpressora()
+    configuracao_widget = ConfiguracaoImpressoraWindow()
     window.setCentralWidget(configuracao_widget)
     
     window.show()
