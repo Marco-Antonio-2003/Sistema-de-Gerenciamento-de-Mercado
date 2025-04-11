@@ -15,11 +15,17 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QDate
 
 class FormularioPessoa(QWidget):
-    def __init__(self, cadastro_tela=None, janela_parent=None):
+    def __init__(self, cadastro_tela=None, janela_parent=None, dados_cliente=None, modo_edicao=False):
         super().__init__()
-        self.cadastro_tela = cadastro_tela  # Referência para a tela de cadastro
-        self.janela_parent = janela_parent  # Referência para a janela que contém este widget
+        self.cadastro_tela = cadastro_tela
+        self.janela_parent = janela_parent
+        self.dados_cliente = dados_cliente
+        self.modo_edicao = modo_edicao
         self.initUI()
+        
+        # Preencher o formulário com os dados do cliente se for uma edição
+        if self.modo_edicao and self.dados_cliente:
+            self.preencher_formulario()
         
     def initUI(self):
         # Layout principal
@@ -78,7 +84,7 @@ class FormularioPessoa(QWidget):
             }
         """
         
-        # Estilo específico para ComboBox (fundo branco)
+        # Estilo específico para ComboBox (fundo branco e seleção azul)
         combo_style = """
             QComboBox {
                 background-color: white;
@@ -100,56 +106,8 @@ class FormularioPessoa(QWidget):
             QComboBox QAbstractItemView {
                 background-color: white;
                 border: 1px solid #cccccc;
-                selection-background-color: #e6e6e6;
-            }
-        """
-        
-        # Estilo específico para DateEdit (fundo branco)
-        date_style = """
-            QDateEdit {
-                background-color: white;
-                border: 1px solid #cccccc;
-                padding: 6px;
-                font-size: 13px;
-                min-height: 20px;
-                max-height: 30px;
-                border-radius: 4px;
-            }
-            /* Estilo para deixar o botão dropdown visível com fundo cinza */
-            QDateEdit::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left: 1px solid #cccccc;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-                background-color: #e0e0e0;
-            }
-            QDateEdit::down-arrow {
-                image: none;
-                width: 12px;
-                height: 12px;
-                background-color: #888888;
-                margin-right: 4px;
-                margin-top: 1px;
-            }
-            /* Estilo para o calendário em si */
-            QCalendarWidget {
-                background-color: white;
-            }
-            QCalendarWidget QWidget {
-                background-color: white;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                background-color: white;
-                color: black;
-            }
-            QCalendarWidget QToolButton {
-                background-color: white;
-                color: black;
-            }
-            QCalendarWidget QMenu {
-                background-color: white;
+                selection-background-color: #1a5f96;
+                selection-color: white;
             }
         """
         
@@ -205,7 +163,7 @@ class FormularioPessoa(QWidget):
         self.tipo_label = QLabel("Tipo de Pessoa:")
         self.tipo_label.setStyleSheet(label_style)
         self.tipo_combo = QComboBox()
-        self.tipo_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox
+        self.tipo_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox com seleção azul
         self.tipo_combo.setFixedWidth(200)  # Largura fixa reduzida
         self.tipo_combo.addItems(["Jurídica", "Física"])
         self.tipo_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
@@ -215,11 +173,59 @@ class FormularioPessoa(QWidget):
         tipo_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         tipo_layout.addRow(self.tipo_label, self.tipo_combo)
         
-        # Campo Data de Cadastro
+        # Campo Data de Cadastro (VERSÃO CORRIGIDA COM ÍCONE)
         self.data_label = QLabel("Data de Cadastro:")
         self.data_label.setStyleSheet(label_style)
         self.data_input = QDateEdit()
-        self.data_input.setStyleSheet(date_style)  # Estilo específico para DateEdit
+        
+        # Aplicar estilo com ícone de calendário
+        self.data_input.setStyleSheet("""
+            QDateEdit {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            QDateEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #cccccc;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+                background-color: #e0e0e0;
+            }
+            /* Usar icone personalizado */
+            QDateEdit::down-arrow {
+                image: url(ico-img/calendar-outline.svg);
+                width: 16px;
+                height: 16px;
+            }
+            /* Estilo para o calendário em si */
+            QCalendarWidget {
+                background-color: white;
+            }
+            QCalendarWidget QWidget {
+                background-color: white;
+            }
+            QCalendarWidget QAbstractItemView:enabled {
+                background-color: white;
+                color: black;
+                selection-background-color: #1a5f96;
+                selection-color: white;
+            }
+            QCalendarWidget QToolButton {
+                background-color: white;
+                color: black;
+            }
+            QCalendarWidget QMenu {
+                background-color: white;
+            }
+        """)
+        
         self.data_input.setFixedWidth(150)  # Largura fixa reduzida
         self.data_input.setCalendarPopup(True)
         self.data_input.setDate(QDate.currentDate())
@@ -376,19 +382,78 @@ class FormularioPessoa(QWidget):
         main_layout.addSpacing(20)
         main_layout.addLayout(incluir_layout)
         
-        # Definir estilo do widget principal
-        self.setStyleSheet("background-color: #043b57;")
+        # Definir estilo do widget principal e QMessageBox
+        self.setStyleSheet("""
+            background-color: #043b57;
+            QTableWidget::item:selected {
+                background-color: #1a5f96;
+                color: white;
+            }
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QMessageBox QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
         
         # Atualizar o tipo de documento com base no tipo de pessoa inicial
         self.atualizar_tipo_documento()
         
         # Verificar e avisar se o módulo requests não estiver disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Atenção", 
-                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
+            self.mostrar_mensagem("Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.",
+                QMessageBox.Warning)
             # Desabilitar botões de consulta
             self.btn_buscar_cep.setEnabled(False)
     
+    def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
+        """Exibe uma mensagem para o usuário com estilo personalizado"""
+        msg_box = QMessageBox()
+        msg_box.setIcon(tipo)
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(mensagem)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        
+        # Aplicar estilo personalizado para texto branco e botões personalizados
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        
+        return msg_box.exec_()
+
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
         if self.janela_parent:
@@ -636,8 +701,9 @@ class FormularioPessoa(QWidget):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
         # Verificar se o módulo requests está disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Funcionalidade indisponível", 
-                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            self.mostrar_mensagem("Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.",
+                               QMessageBox.Warning)
             return
             
         # Obter o CEP sem formatação
@@ -645,7 +711,7 @@ class FormularioPessoa(QWidget):
         
         # Verificar se o CEP tem 8 dígitos
         if len(cep) != 8:
-            QMessageBox.warning(self, "CEP inválido", "O CEP deve ter 8 dígitos.")
+            self.mostrar_mensagem("CEP inválido", "O CEP deve ter 8 dígitos.", QMessageBox.Warning)
             return
             
         try:
@@ -659,7 +725,7 @@ class FormularioPessoa(QWidget):
                 
                 # Verificar se há erro no CEP
                 if "erro" in data and data["erro"]:
-                    QMessageBox.warning(self, "CEP não encontrado", "O CEP informado não foi encontrado.")
+                    self.mostrar_mensagem("CEP não encontrado", "O CEP informado não foi encontrado.", QMessageBox.Warning)
                     return
                     
                 # Preencher os campos de endereço
@@ -678,10 +744,10 @@ class FormularioPessoa(QWidget):
                     self.cidade_input.setFocus()
                 
             else:
-                QMessageBox.warning(self, "Erro na consulta", "Não foi possível consultar o CEP. Verifique sua conexão.")
+                self.mostrar_mensagem("Erro na consulta", "Não foi possível consultar o CEP. Verifique sua conexão.", QMessageBox.Warning)
                 
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao buscar o endereço: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Ocorreu um erro ao buscar o endereço: {str(e)}", QMessageBox.Critical)
     
     def validar_documento(self):
         """Valida o CNPJ ou CPF informado"""
@@ -693,24 +759,24 @@ class FormularioPessoa(QWidget):
         if self.documento_label.text() == "CPF:":
             # Verificar se tem 11 dígitos
             if len(doc_nums) != 11:
-                QMessageBox.warning(self, "CPF inválido", "O CPF deve ter 11 dígitos.")
+                self.mostrar_mensagem("CPF inválido", "O CPF deve ter 11 dígitos.", QMessageBox.Warning)
                 return False
             
             # Verificar se todos os dígitos são iguais
             if len(set(doc_nums)) == 1:
-                QMessageBox.warning(self, "CPF inválido", "CPF com dígitos repetidos é inválido.")
+                self.mostrar_mensagem("CPF inválido", "CPF com dígitos repetidos é inválido.", QMessageBox.Warning)
                 return False
             
             return True
         else:
             # Verificar se tem 14 dígitos
             if len(doc_nums) != 14:
-                QMessageBox.warning(self, "CNPJ inválido", "O CNPJ deve ter 14 dígitos.")
+                self.mostrar_mensagem("CNPJ inválido", "O CNPJ deve ter 14 dígitos.", QMessageBox.Warning)
                 return False
             
             # Verificar se todos os dígitos são iguais
             if len(set(doc_nums)) == 1:
-                QMessageBox.warning(self, "CNPJ inválido", "CNPJ com dígitos repetidos é inválido.")
+                self.mostrar_mensagem("CNPJ inválido", "CNPJ com dígitos repetidos é inválido.", QMessageBox.Warning)
                 return False
             
             return True
@@ -727,15 +793,16 @@ class FormularioPessoa(QWidget):
         cep = self.cep_input.text()
         cidade = self.cidade_input.text()
         estado = self.estado_input.text()
+        codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
         # Validação básica
         if not nome:
-            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe pelo menos o nome da pessoa.")
+            self.mostrar_mensagem("Campos obrigatórios", "Por favor, informe pelo menos o nome da pessoa.", QMessageBox.Warning)
             return
             
         if not documento:
             tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-            QMessageBox.warning(self, "Campos obrigatórios", f"Por favor, informe o {tipo_doc}.")
+            self.mostrar_mensagem("Campos obrigatórios", f"Por favor, informe o {tipo_doc}.", QMessageBox.Warning)
             return
         
         # Validar documento
@@ -744,40 +811,58 @@ class FormularioPessoa(QWidget):
         
         # Verificar acesso à tabela
         if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
-            QMessageBox.critical(self, "Erro", "Não foi possível acessar a tabela de pessoas.")
+            self.mostrar_mensagem("Erro", "Não foi possível acessar a tabela de pessoas.", QMessageBox.Critical)
             return
         
-        # Verificar documento duplicado
-        for row in range(self.cadastro_tela.table.rowCount()):
-            # Comparar apenas se o documento estiver no cadastro
-            if hasattr(self.cadastro_tela, 'documento_input') and self.cadastro_tela.documento_input.text() == documento:
-                tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-                QMessageBox.warning(self, f"{tipo_doc} duplicado", 
-                                   f"Já existe uma pessoa cadastrada com este {tipo_doc}.")
+        # Verificar se é uma atualização ou novo cadastro
+        if self.btn_incluir.text() == "Atualizar" and codigo:
+            # Modo de atualização - procurar o item na tabela pelo código
+            encontrado = False
+            for row in range(self.cadastro_tela.table.rowCount()):
+                if self.cadastro_tela.table.item(row, 0).text() == codigo:
+                    # Atualizar os dados na tabela
+                    self.cadastro_tela.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.cadastro_tela.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
+                    
+                    # Mensagem de sucesso
+                    self.mostrar_mensagem("Sucesso", f"Pessoa atualizada com sucesso!\nNome: {nome}\nTipo: {tipo_pessoa}")
+                    
+                    encontrado = True
+                    break
+            
+            if not encontrado:
+                self.mostrar_mensagem("Erro", "Pessoa não encontrada para atualização.", QMessageBox.Warning)
                 return
+        else:
+            # Novo cadastro - verificar documento duplicado
+            for row in range(self.cadastro_tela.table.rowCount()):
+                # Aqui não verificamos o documento na tabela, pois precisamos de uma coluna específica
+                # A verificação pode ser implementada se a coluna de documento for adicionada à tabela
+                pass
+                
+            # Gerar código para nova pessoa
+            ultimo_codigo = 0
+            if self.cadastro_tela.table.rowCount() > 0:
+                for row in range(self.cadastro_tela.table.rowCount()):
+                    codigo_atual = int(self.cadastro_tela.table.item(row, 0).text())
+                    if codigo_atual > ultimo_codigo:
+                        ultimo_codigo = codigo_atual
+            
+            novo_codigo = ultimo_codigo + 1
+            
+            # Adicionar à tabela
+            row_position = self.cadastro_tela.table.rowCount()
+            self.cadastro_tela.table.insertRow(row_position)
+            self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
+            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
+            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
+            
+            # Mensagem de sucesso
+            self.mostrar_mensagem("Sucesso", f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
         
-        # Gerar código
-        ultimo_codigo = 0
-        if self.cadastro_tela.table.rowCount() > 0:
-            ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
-        
-        novo_codigo = ultimo_codigo + 1
-        
-        # Adicionar à tabela
-        row_position = self.cadastro_tela.table.rowCount()
-        self.cadastro_tela.table.insertRow(row_position)
-        self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-        self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
-        self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
-        
-        # Mensagem de sucesso
-        QMessageBox.information(self, "Sucesso", 
-                              f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
-        
-        # Fechar a janela
+        # Fechar a janela em ambos os casos
         if self.janela_parent:
             self.janela_parent.close()
-
     
     def abrir_calendario(self):
         """Abre o calendário quando o botão ou o campo de data é clicado"""
@@ -805,13 +890,13 @@ class FormularioPessoa(QWidget):
             QCalendarWidget QSpinBox {
                 background-color: white;
                 color: black;
-                selection-background-color: #005079;
+                selection-background-color: #1a5f96;
                 selection-color: white;
             }
             QCalendarWidget QAbstractItemView:enabled {
                 background-color: white;
                 color: black;
-                selection-background-color: #005079;
+                selection-background-color: #1a5f96;
                 selection-color: white;
             }
             QCalendarWidget QWidget#qt_calendar_navigationbar {
@@ -842,9 +927,34 @@ class FormularioPessoa(QWidget):
             self.calendario_popup.close()
             self.calendario_popup = None
 
+
 # Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Aplicar estilo global para QMessageBox
+    app.setStyleSheet("""
+        QMessageBox {
+            background-color: #043b57;
+        }
+        QMessageBox QLabel {
+            color: white;
+            font-size: 14px;
+        }
+        QMessageBox QPushButton {
+            background-color: #fffff0;
+            color: black;
+            border: 1px solid #cccccc;
+            min-width: 80px;
+            min-height: 25px;
+            padding: 3px;
+            font-size: 13px;
+        }
+        QMessageBox QPushButton:hover {
+            background-color: #e6e6e6;
+        }
+    """)
+    
     window = QMainWindow()
     window.setWindowTitle("Formulário de Cadastro de Pessoa")
     window.setGeometry(100, 100, 800, 600)

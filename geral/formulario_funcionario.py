@@ -1,5 +1,6 @@
 #formulario_funcionario.py
 import sys
+import os
 # Importação condicional do requests
 try:
     import requests
@@ -10,16 +11,47 @@ import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QFormLayout, QComboBox, QMessageBox, QTableWidgetItem,
-                             QDateEdit, QCalendarWidget)
-from PyQt5.QtGui import QFont, QIcon, QPixmap
+                             QDateEdit, QCalendarWidget, QStyleFactory)
+from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor
 from PyQt5.QtCore import Qt, QDate
 
+class CustomMessageBox(QMessageBox):
+    """Classe personalizada para QMessageBox com cores customizadas"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Aplicar estilo para os botões do MessageBox
+        self.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+                color: white;
+            }
+            QLabel {
+                color: white;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: 1px solid #007ab3;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+
 class FormularioFuncionario(QWidget):
-    def __init__(self, cadastro_tela=None, janela_parent=None):
+    def __init__(self, cadastro_tela=None, janela_parent=None, dados_funcionario=None):
         super().__init__()
         self.cadastro_tela = cadastro_tela  # Referência para a tela de cadastro
         self.janela_parent = janela_parent  # Referência para a janela que contém este widget
+        self.dados_funcionario = dados_funcionario  # Dados do funcionário para edição
         self.initUI()
+        
+        # Se tiver dados para edição, preencher o formulário
+        if self.dados_funcionario:
+            self.preencher_formulario()
         
     def initUI(self):
         # Layout principal
@@ -78,7 +110,7 @@ class FormularioFuncionario(QWidget):
             }
         """
         
-        # Estilo específico para ComboBox (fundo branco)
+        # Estilo específico para ComboBox (fundo branco e seleção azul)
         combo_style = """
             QComboBox {
                 background-color: white;
@@ -100,11 +132,12 @@ class FormularioFuncionario(QWidget):
             QComboBox QAbstractItemView {
                 background-color: white;
                 border: 1px solid #cccccc;
-                selection-background-color: #e6e6e6;
+                selection-background-color: #043b57;
+                selection-color: white;
             }
         """
         
-        # Estilo específico para DateEdit (fundo branco)
+        # Estilo específico para DateEdit (fundo branco e texto branco no calendário)
         date_style = """
             QDateEdit {
                 background-color: white;
@@ -125,29 +158,41 @@ class FormularioFuncionario(QWidget):
                 background-color: #e0e0e0;
             }
             QDateEdit::down-arrow {
-                image: none;
-                width: 12px;
-                height: 12px;
-                background-color: #888888;
-                margin-right: 4px;
-                margin-top: 1px;
+                width: 16px;
+                height: 16px;
+                image: url(ico-img/calendar-outline.svg);
             }
             QCalendarWidget {
-                background-color: white;
+                background-color: #043b57;
             }
             QCalendarWidget QWidget {
-                background-color: white;
+                background-color: #043b57;
             }
             QCalendarWidget QAbstractItemView:enabled {
-                background-color: white;
-                color: black;
+                background-color: #043b57;
+                color: white;
+                selection-background-color: #005079;
+                selection-color: white;
             }
             QCalendarWidget QToolButton {
-                background-color: white;
-                color: black;
+                background-color: #043b57;
+                color: white;
             }
             QCalendarWidget QMenu {
-                background-color: white;
+                background-color: #043b57;
+                color: white;
+            }
+            QCalendarWidget QSpinBox {
+                background-color: #043b57;
+                color: white;
+                selection-background-color: #005079;
+                selection-color: white;
+            }
+            QCalendarWidget QTableView {
+                alternate-background-color: #032a40;
+            }
+            QCalendarWidget QTableView::item:hover {
+                background-color: #005079;
             }
         """
         
@@ -213,6 +258,22 @@ class FormularioFuncionario(QWidget):
         tipo_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         tipo_layout.addRow(self.tipo_label, self.tipo_combo)
         
+        # Campo Tipo de Vendedor
+        self.tipo_vendedor_label = QLabel("Tipo de Vendedor:")
+        self.tipo_vendedor_label.setStyleSheet(label_style)
+        self.tipo_vendedor_combo = QComboBox()
+        self.tipo_vendedor_combo.setStyleSheet(combo_style)
+        self.tipo_vendedor_combo.setFixedWidth(200)
+        self.tipo_vendedor_combo.addItems(["Interno", "Externo", "Representante"])
+        
+        tipo_vendedor_layout = QFormLayout()
+        tipo_vendedor_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        tipo_vendedor_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tipo_vendedor_layout.addRow(self.tipo_vendedor_label, self.tipo_vendedor_combo)
+        
+        tipo_data_layout.addLayout(tipo_layout)
+        tipo_data_layout.addLayout(tipo_vendedor_layout)
+        
         # Campo Data de Cadastro
         self.data_label = QLabel("Data de Cadastro:")
         self.data_label.setStyleSheet(label_style)
@@ -222,9 +283,11 @@ class FormularioFuncionario(QWidget):
         self.data_input.setCalendarPopup(True)
         self.data_input.setDate(QDate.currentDate())
         
-        # Mostrar botão do calendário com texto
+        # Configurar o calendário
         try:
-            self.data_input.calendarWidget().setAutoFillBackground(True)
+            calendar = self.data_input.calendarWidget()
+            calendar.setStyleSheet(date_style)
+            calendar.setGridVisible(True)
         except:
             pass
         
@@ -232,9 +295,6 @@ class FormularioFuncionario(QWidget):
         data_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         data_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         data_layout.addRow(self.data_label, self.data_input)
-        
-        tipo_data_layout.addLayout(tipo_layout)
-        tipo_data_layout.addLayout(data_layout)
         
         # Campo CPF (conforme a imagem, não mais CNPJ/CPF)
         self.cpf_label = QLabel("CPF:")
@@ -344,11 +404,13 @@ class FormularioFuncionario(QWidget):
         cidade_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         cidade_layout.addRow(self.cidade_label, self.cidade_input)
         
-        # Botão Incluir
+        # Botão Salvar (renomeado de "Incluir" para "Salvar" quando em modo de edição)
+        botao_salvar_texto = "Atualizar" if self.dados_funcionario else "Incluir"
+        
         incluir_layout = QHBoxLayout()
         incluir_layout.setAlignment(Qt.AlignCenter)
         
-        self.btn_incluir = QPushButton("Incluir")
+        self.btn_incluir = QPushButton(botao_salvar_texto)
         self.btn_incluir.setStyleSheet("""
             QPushButton {
                 background-color: #01fd9a;
@@ -372,6 +434,7 @@ class FormularioFuncionario(QWidget):
         main_layout.addLayout(codigo_telefone_layout)
         main_layout.addLayout(nome_layout)
         main_layout.addLayout(tipo_data_layout)
+        main_layout.addLayout(data_layout)
         main_layout.addLayout(sexo_cpf_layout)
         main_layout.addWidget(endereco_titulo)
         main_layout.addLayout(rua_layout)
@@ -386,10 +449,42 @@ class FormularioFuncionario(QWidget):
         
         # Verificar e avisar se o módulo requests não estiver disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Atenção", 
-                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
+            self.mostrar_mensagem("Atenção", 
+                "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.",
+                QMessageBox.Warning)
             # Desabilitar botões de consulta
             self.btn_buscar_cep.setEnabled(False)
+    
+    def preencher_formulario(self):
+        """Preenche o formulário com os dados do funcionário para edição"""
+        if not self.dados_funcionario:
+            return
+            
+        # Preencher dados do funcionário
+        self.codigo_input.setText(self.dados_funcionario.get('codigo', ''))
+        self.nome_input.setText(self.dados_funcionario.get('nome', ''))
+        self.telefone_input.setText(self.dados_funcionario.get('telefone', ''))
+        
+        # Tipo de vendedor
+        tipo_vendedor = self.dados_funcionario.get('tipo_vendedor', 'Interno')
+        index = 0  # Padrão: Interno
+        if tipo_vendedor == "Externo":
+            index = 1
+        elif tipo_vendedor == "Representante":
+            index = 2
+        self.tipo_vendedor_combo.setCurrentIndex(index)
+        
+        # Cidade (se disponível)
+        self.cidade_input.setText(self.dados_funcionario.get('cidade', ''))
+    
+    def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
+        """Exibe uma mensagem personalizada com estilos ajustados"""
+        msg_box = CustomMessageBox()
+        msg_box.setIcon(tipo)
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(mensagem)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec_()
     
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
@@ -546,8 +641,9 @@ class FormularioFuncionario(QWidget):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
         # Verificar se o módulo requests está disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Funcionalidade indisponível", 
-                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            self.mostrar_mensagem("Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.",
+                               QMessageBox.Warning)
             return
             
         # Obter o CEP sem formatação
@@ -555,7 +651,7 @@ class FormularioFuncionario(QWidget):
         
         # Verificar se o CEP tem 8 dígitos
         if len(cep) != 8:
-            QMessageBox.warning(self, "CEP inválido", "O CEP deve ter 8 dígitos.")
+            self.mostrar_mensagem("CEP inválido", "O CEP deve ter 8 dígitos.", QMessageBox.Warning)
             return
             
         try:
@@ -569,7 +665,9 @@ class FormularioFuncionario(QWidget):
                 
                 # Verificar se há erro no CEP
                 if "erro" in data and data["erro"]:
-                    QMessageBox.warning(self, "CEP não encontrado", "O CEP informado não foi encontrado.")
+                    self.mostrar_mensagem("CEP não encontrado", 
+                                       "O CEP informado não foi encontrado.", 
+                                       QMessageBox.Warning)
                     return
                     
                 # Preencher os campos de endereço
@@ -585,11 +683,18 @@ class FormularioFuncionario(QWidget):
                 elif not self.cidade_input.text():
                     self.cidade_input.setFocus()
                 
+                # Mensagem de sucesso
+                self.mostrar_mensagem("Sucesso", "Endereço encontrado e preenchido com sucesso!")
+                
             else:
-                QMessageBox.warning(self, "Erro na consulta", "Não foi possível consultar o CEP. Verifique sua conexão.")
+                self.mostrar_mensagem("Erro na consulta", 
+                                   "Não foi possível consultar o CEP. Verifique sua conexão.", 
+                                   QMessageBox.Warning)
                 
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao buscar o endereço: {str(e)}")
+            self.mostrar_mensagem("Erro", 
+                               f"Ocorreu um erro ao buscar o endereço: {str(e)}", 
+                               QMessageBox.Critical)
     
     def validar_cpf(self, cpf):
         """Valida o CPF informado"""
@@ -598,14 +703,44 @@ class FormularioFuncionario(QWidget):
         
         # Verificar se tem 11 dígitos
         if len(cpf_nums) != 11:
-            QMessageBox.warning(self, "CPF inválido", "O CPF deve ter 11 dígitos.")
+            self.mostrar_mensagem("CPF inválido", "O CPF deve ter 11 dígitos.", QMessageBox.Warning)
             return False
         
         # Verificar se todos os dígitos são iguais
         if len(set(cpf_nums)) == 1:
-            QMessageBox.warning(self, "CPF inválido", "CPF com dígitos repetidos é inválido.")
+            self.mostrar_mensagem("CPF inválido", 
+                               "CPF com dígitos repetidos é inválido.", 
+                               QMessageBox.Warning)
+            return False
+            
+        # Calcular o primeiro dígito verificador
+        soma = 0
+        for i in range(9):
+            soma += int(cpf_nums[i]) * (10 - i)
+        resto = soma % 11
+        dv1 = 0 if resto < 2 else 11 - resto
+        
+        # Verificar o primeiro dígito verificador
+        if dv1 != int(cpf_nums[9]):
+            self.mostrar_mensagem("CPF inválido", 
+                               "O CPF informado não é válido.", 
+                               QMessageBox.Warning)
             return False
         
+        # Calcular o segundo dígito verificador
+        soma = 0
+        for i in range(10):
+            soma += int(cpf_nums[i]) * (11 - i)
+        resto = soma % 11
+        dv2 = 0 if resto < 2 else 11 - resto
+        
+        # Verificar o segundo dígito verificador
+        if dv2 != int(cpf_nums[10]):
+            self.mostrar_mensagem("CPF inválido", 
+                               "O CPF informado não é válido.", 
+                               QMessageBox.Warning)
+            return False
+            
         return True
     
     def salvar_funcionario(self):
@@ -616,6 +751,7 @@ class FormularioFuncionario(QWidget):
         telefone = self.telefone_input.text()
         data_cadastro = self.data_input.date().toString("dd/MM/yyyy")
         sexo = self.sexo_combo.currentText()
+        tipo_vendedor = self.tipo_vendedor_combo.currentText()
         rua = self.rua_input.text()
         bairro = self.bairro_input.text()
         cep = self.cep_input.text()
@@ -623,52 +759,79 @@ class FormularioFuncionario(QWidget):
         
         # Validação básica
         if not nome:
-            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe o nome do funcionário.")
+            self.mostrar_mensagem("Campos obrigatórios", 
+                               "Por favor, informe o nome do funcionário.", 
+                               QMessageBox.Warning)
+            self.nome_input.setFocus()
             return
             
         if not cpf:
-            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe o CPF.")
+            self.mostrar_mensagem("Campos obrigatórios", 
+                               "Por favor, informe o CPF/CNPJ.", 
+                               QMessageBox.Warning)
+            self.cpf_input.setFocus()
             return
         
-        # Validar CPF
-        if not self.validar_cpf(cpf):
+        # Validar CPF/CNPJ
+        if self.cpf_label.text() == "CPF:" and not self.validar_cpf(cpf):
+            self.cpf_input.setFocus()
             return
         
-        # Verificar acesso à tabela
-        if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
-            QMessageBox.critical(self, "Erro", "Não foi possível acessar a tabela de funcionários.")
-            return
-        
-        # Verificar CPF duplicado
-        for row in range(self.cadastro_tela.table.rowCount()):
-            # Comparar apenas se o CPF estiver no cadastro
-            doc_cell = self.cadastro_tela.table.item(row, 2)
-            if doc_cell and doc_cell.text() == cpf:
-                QMessageBox.warning(self, "CPF duplicado", 
-                                   "Já existe um funcionário cadastrado com este CPF.")
-                return
-        
-        # Gerar código
-        ultimo_codigo = 0
-        if self.cadastro_tela.table.rowCount() > 0:
-            ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
-        
-        novo_codigo = ultimo_codigo + 1
-        
-        # Adicionar à tabela
-        row_position = self.cadastro_tela.table.rowCount()
-        self.cadastro_tela.table.insertRow(row_position)
-        self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-        self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
-        self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
-        
-        # Mensagem de sucesso
-        QMessageBox.information(self, "Sucesso", 
-                              f"Funcionário cadastrado com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
-        
-        # Fechar a janela
-        if self.janela_parent:
-            self.janela_parent.close()
+        # Código para salvar na tabela principal
+        if self.cadastro_tela and hasattr(self.cadastro_tela, 'table'):
+            # Se é uma edição, localiza o item na tabela
+            modo_edicao = False
+            row_position = -1
+            
+            if self.dados_funcionario and 'codigo' in self.dados_funcionario:
+                codigo = self.dados_funcionario['codigo']
+                for row in range(self.cadastro_tela.table.rowCount()):
+                    if self.cadastro_tela.table.item(row, 0).text() == codigo:
+                        row_position = row
+                        modo_edicao = True
+                        break
+            
+            # Se não for edição, adicionar nova linha
+            if not modo_edicao:
+                # Gerar código
+                novo_codigo = 1
+                if self.cadastro_tela.table.rowCount() > 0:
+                    ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
+                    novo_codigo = ultimo_codigo + 1
+                
+                codigo = str(novo_codigo)
+                row_position = self.cadastro_tela.table.rowCount()
+                self.cadastro_tela.table.insertRow(row_position)
+                self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(codigo))
+            else:
+                codigo = self.dados_funcionario['codigo']
+            
+            # Atualizar ou adicionar dados à tabela
+            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
+            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_vendedor))
+            
+            # Adicionar telefone se a coluna existir
+            if self.cadastro_tela.table.columnCount() > 3:
+                self.cadastro_tela.table.setItem(row_position, 3, QTableWidgetItem(telefone))
+            
+            # Mensagem de sucesso
+            acao = "atualizado" if modo_edicao else "cadastrado"
+            
+            self.mostrar_mensagem("Sucesso", 
+                               f"Funcionário {acao} com sucesso!\nNome: {nome}\nCódigo: {codigo}")
+            
+            # Fechar a janela
+            if self.janela_parent:
+                self.janela_parent.close()
+        else:
+            # Caso não tenha referência à tabela principal
+            self.mostrar_mensagem("Teste", 
+                               "Funcionário seria cadastrado com os seguintes dados:\n" +
+                               f"Nome: {nome}\n" +
+                               f"Telefone: {telefone}\n" +
+                               f"Tipo de pessoa: {tipo_pessoa}\n" +
+                               f"Tipo de vendedor: {tipo_vendedor}\n" +
+                               f"Data de cadastro: {data_cadastro}")
 
 
 # Para testar a tela individualmente
@@ -678,6 +841,9 @@ if __name__ == "__main__":
     window.setWindowTitle("Formulário de Cadastro de Funcionário")
     window.setGeometry(100, 100, 800, 600)
     window.setStyleSheet("background-color: #043b57;")
+    
+    # Configuração global para MessageBox
+    app.setStyle(QStyleFactory.create("Fusion"))
     
     form_widget = FormularioFuncionario()
     window.setCentralWidget(form_widget)

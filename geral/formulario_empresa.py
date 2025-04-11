@@ -1,3 +1,4 @@
+#formulario_empresa.py
 import sys
 # Importação condicional do requests
 try:
@@ -84,7 +85,7 @@ class FormularioEmpresa(QWidget):
             }
         """
         
-        # Estilo específico para ComboBox (fundo branco)
+        # Estilo específico para ComboBox (fundo branco e seleção azul)
         combo_style = """
             QComboBox {
                 background-color: white;
@@ -106,7 +107,8 @@ class FormularioEmpresa(QWidget):
             QComboBox QAbstractItemView {
                 background-color: white;
                 border: 1px solid #cccccc;
-                selection-background-color: #e6e6e6;
+                selection-background-color: #1a5f96;
+                selection-color: white;
             }
         """
         
@@ -214,7 +216,7 @@ class FormularioEmpresa(QWidget):
         self.regime_label = QLabel("Tipo de Regime:")
         self.regime_label.setStyleSheet(label_style)
         self.regime_combo = QComboBox()
-        self.regime_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox
+        self.regime_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox com seleção azul
         self.regime_combo.setFixedWidth(200)  # Largura fixa reduzida
         self.regime_combo.addItems(["Simples Nacional", "Lucro Presumido", "Lucro Real", "MEI"])
         self.regime_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
@@ -401,8 +403,33 @@ class FormularioEmpresa(QWidget):
         # Adicionar espaço na parte inferior
         main_layout.addStretch(1)
         
-        # Definir estilo do widget principal
-        self.setStyleSheet("background-color: #043b57;")
+        # Definir estilo do widget principal com estilo para QTableWidget e QMessageBox
+        self.setStyleSheet("""
+            background-color: #043b57;
+            QTableWidget::item:selected {
+                background-color: #1a5f96;
+                color: white;
+            }
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QMessageBox QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
         
         # Verificar e avisar se o módulo requests não estiver disponível
         if not REQUESTS_AVAILABLE:
@@ -411,6 +438,39 @@ class FormularioEmpresa(QWidget):
             # Desabilitar botões de consulta
             self.btn_consultar.setEnabled(False)
             self.btn_buscar_cep.setEnabled(False)
+    
+    def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
+        """Exibe uma mensagem para o usuário com estilo personalizado"""
+        msg_box = QMessageBox()
+        msg_box.setIcon(tipo)
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(mensagem)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        
+        # Aplicar estilo personalizado
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        
+        return msg_box.exec_()
         
     def atualizar_tipo_documento(self):
         """Atualiza o label CNPJ/CPF baseado no tipo de regime selecionado"""
@@ -658,8 +718,9 @@ class FormularioEmpresa(QWidget):
         """Busca o endereço pelo CEP usando a API ViaCEP"""
         # Verificar se o módulo requests está disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Funcionalidade indisponível", 
-                               "A consulta de CEP requer o módulo 'requests' que não está disponível.")
+            self.mostrar_mensagem("Funcionalidade indisponível", 
+                               "A consulta de CEP requer o módulo 'requests' que não está disponível.",
+                               QMessageBox.Warning)
             return
             
         # Obter o CEP sem formatação
@@ -667,7 +728,7 @@ class FormularioEmpresa(QWidget):
         
         # Verificar se o CEP tem 8 dígitos
         if len(cep) != 8:
-            QMessageBox.warning(self, "CEP inválido", "O CEP deve ter 8 dígitos.")
+            self.mostrar_mensagem("CEP inválido", "O CEP deve ter 8 dígitos.", QMessageBox.Warning)
             return
             
         try:
@@ -681,7 +742,7 @@ class FormularioEmpresa(QWidget):
                 
                 # Verificar se há erro no CEP
                 if "erro" in data and data["erro"]:
-                    QMessageBox.warning(self, "CEP não encontrado", "O CEP informado não foi encontrado.")
+                    self.mostrar_mensagem("CEP não encontrado", "O CEP informado não foi encontrado.", QMessageBox.Warning)
                     return
                     
                 # Preencher os campos de endereço
@@ -694,17 +755,18 @@ class FormularioEmpresa(QWidget):
                 self.numero_input.setFocus()
                 
             else:
-                QMessageBox.warning(self, "Erro na consulta", "Não foi possível consultar o CEP. Verifique sua conexão.")
+                self.mostrar_mensagem("Erro na consulta", "Não foi possível consultar o CEP. Verifique sua conexão.", QMessageBox.Warning)
                 
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao buscar o endereço: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Ocorreu um erro ao buscar o endereço: {str(e)}", QMessageBox.Critical)
     
     def consultar_documento(self):
         """Consulta informações da empresa pelo CNPJ ou pessoa pelo CPF"""
         # Verificar se o módulo requests está disponível
         if not REQUESTS_AVAILABLE:
-            QMessageBox.warning(self, "Funcionalidade indisponível", 
-                               "A consulta de CNPJ/CPF requer o módulo 'requests' que não está disponível.")
+            self.mostrar_mensagem("Funcionalidade indisponível", 
+                               "A consulta de CNPJ/CPF requer o módulo 'requests' que não está disponível.",
+                               QMessageBox.Warning)
             return
             
         # Obter o documento sem formatação
@@ -713,12 +775,12 @@ class FormularioEmpresa(QWidget):
         # Verificar se é CPF ou CNPJ
         if self.documento_label.text() == "CPF:":
             # Para CPF, implementação depende de integração com banco de dados
-            QMessageBox.information(self, "Informação", "Consulta de CPF requer integração com banco de dados interno.")
+            self.mostrar_mensagem("Informação", "Consulta de CPF requer integração com banco de dados interno.", QMessageBox.Information)
             return
         else:
             # Verificar se o CNPJ tem 14 dígitos
             if len(doc_limpo) != 14:
-                QMessageBox.warning(self, "CNPJ inválido", "O CNPJ deve ter 14 dígitos.")
+                self.mostrar_mensagem("CNPJ inválido", "O CNPJ deve ter 14 dígitos.", QMessageBox.Warning)
                 return
             
             try:
@@ -768,15 +830,15 @@ class FormularioEmpresa(QWidget):
                     self.cidade_input.setText(data.get("municipio", ""))
                     self.estado_input.setText(data.get("uf", ""))
                     
-                    QMessageBox.information(self, "Sucesso", f"Dados da empresa '{data.get('razao_social')}' foram carregados.")
+                    self.mostrar_mensagem("Sucesso", f"Dados da empresa '{data.get('razao_social')}' foram carregados.")
                     
                 elif response.status_code == 404:
-                    QMessageBox.warning(self, "CNPJ não encontrado", "O CNPJ informado não foi encontrado na base de dados.")
+                    self.mostrar_mensagem("CNPJ não encontrado", "O CNPJ informado não foi encontrado na base de dados.", QMessageBox.Warning)
                 else:
-                    QMessageBox.warning(self, "Erro na consulta", "Não foi possível consultar o CNPJ. Verifique sua conexão.")
+                    self.mostrar_mensagem("Erro na consulta", "Não foi possível consultar o CNPJ. Verifique sua conexão.", QMessageBox.Warning)
                     
             except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao consultar o CNPJ: {str(e)}")
+                self.mostrar_mensagem("Erro", f"Ocorreu um erro ao consultar o CNPJ: {str(e)}", QMessageBox.Critical)
     
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
@@ -793,24 +855,24 @@ class FormularioEmpresa(QWidget):
         if self.documento_label.text() == "CPF:":
             # Verificar se tem 11 dígitos
             if len(doc_nums) != 11:
-                QMessageBox.warning(self, "CPF inválido", "O CPF deve ter 11 dígitos.")
+                self.mostrar_mensagem("CPF inválido", "O CPF deve ter 11 dígitos.", QMessageBox.Warning)
                 return False
             
             # Verificar se todos os dígitos são iguais
             if len(set(doc_nums)) == 1:
-                QMessageBox.warning(self, "CPF inválido", "CPF com dígitos repetidos é inválido.")
+                self.mostrar_mensagem("CPF inválido", "CPF com dígitos repetidos é inválido.", QMessageBox.Warning)
                 return False
             
             return True
         else:
             # Verificar se tem 14 dígitos
             if len(doc_nums) != 14:
-                QMessageBox.warning(self, "CNPJ inválido", "O CNPJ deve ter 14 dígitos.")
+                self.mostrar_mensagem("CNPJ inválido", "O CNPJ deve ter 14 dígitos.", QMessageBox.Warning)
                 return False
             
             # Verificar se todos os dígitos são iguais
             if len(set(doc_nums)) == 1:
-                QMessageBox.warning(self, "CNPJ inválido", "CNPJ com dígitos repetidos é inválido.")
+                self.mostrar_mensagem("CNPJ inválido", "CNPJ com dígitos repetidos é inválido.", QMessageBox.Warning)
                 return False
             
             return True
@@ -822,15 +884,16 @@ class FormularioEmpresa(QWidget):
         telefone = self.telefone_input.text()
         documento = self.documento_input.text()
         regime = self.regime_combo.currentText()
+        codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
         # Validação básica
         if not nome_empresa:
-            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe o nome da empresa.")
+            self.mostrar_mensagem("Campos obrigatórios", "Por favor, informe o nome da empresa.", QMessageBox.Warning)
             return
             
         if not documento:
             tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-            QMessageBox.warning(self, "Campos obrigatórios", f"Por favor, informe o {tipo_doc}.")
+            self.mostrar_mensagem("Campos obrigatórios", f"Por favor, informe o {tipo_doc}.", QMessageBox.Warning)
             return
         
         # Validar documento
@@ -839,37 +902,75 @@ class FormularioEmpresa(QWidget):
         
         # Verificar acesso à tabela
         if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
-            QMessageBox.critical(self, "Erro", "Não foi possível acessar a tabela de empresas.")
+            self.mostrar_mensagem("Erro", "Não foi possível acessar a tabela de empresas.", QMessageBox.Critical)
             return
         
-        # Verificar documento duplicado
-        for row in range(self.cadastro_tela.table.rowCount()):
-            if self.cadastro_tela.table.item(row, 2).text() == documento:
-                tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-                QMessageBox.warning(self, f"{tipo_doc} duplicado", 
-                                  f"Já existe uma empresa cadastrada com este {tipo_doc}.")
+        # Verificar se é um cadastro novo ou uma atualização
+        if self.btn_incluir.text() == "Atualizar" and codigo:
+            # Modo de atualização - procurar o item na tabela pelo código
+            encontrado = False
+            for row in range(self.cadastro_tela.table.rowCount()):
+                if self.cadastro_tela.table.item(row, 0).text() == codigo:
+                    # Se o documento (CNPJ/CPF) foi alterado, verificar se não existe duplicado
+                    doc_atual = self.cadastro_tela.table.item(row, 2).text()
+                    if doc_atual != documento:
+                        # Verificar se o novo documento já existe em outro registro
+                        for check_row in range(self.cadastro_tela.table.rowCount()):
+                            if check_row != row and self.cadastro_tela.table.item(check_row, 2).text() == documento:
+                                tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
+                                self.mostrar_mensagem(f"{tipo_doc} duplicado", 
+                                                 f"Já existe outra empresa cadastrada com este {tipo_doc}.", 
+                                                 QMessageBox.Warning)
+                                return
+                    
+                    # Atualizar os dados na tabela
+                    self.cadastro_tela.table.setItem(row, 1, QTableWidgetItem(nome_empresa))
+                    self.cadastro_tela.table.setItem(row, 2, QTableWidgetItem(documento))
+                    
+                    # Mensagem de sucesso
+                    tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
+                    self.mostrar_mensagem("Sucesso", 
+                                      f"Empresa atualizada com sucesso!\nNome: {nome_empresa}\n{tipo_doc}: {documento}")
+                    
+                    encontrado = True
+                    break
+            
+            if not encontrado:
+                self.mostrar_mensagem("Erro", "Empresa não encontrada para atualização.", QMessageBox.Warning)
                 return
-        
-        # Gerar código
-        ultimo_codigo = 0
-        if self.cadastro_tela.table.rowCount() > 0:
-            ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
-        
-        novo_codigo = ultimo_codigo + 1
-        
-        # Adicionar à tabela
-        row_position = self.cadastro_tela.table.rowCount()
-        self.cadastro_tela.table.insertRow(row_position)
-        self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-        self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome_empresa))
-        self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(documento))
-        
-        # Mensagem de sucesso
-        tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-        QMessageBox.information(self, "Sucesso", 
+        else:
+            # Modo de inclusão - verificar documento duplicado
+            for row in range(self.cadastro_tela.table.rowCount()):
+                if self.cadastro_tela.table.item(row, 2).text() == documento:
+                    tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
+                    self.mostrar_mensagem(f"{tipo_doc} duplicado", 
+                                       f"Já existe uma empresa cadastrada com este {tipo_doc}.", 
+                                       QMessageBox.Warning)
+                    return
+            
+            # Gerar código
+            ultimo_codigo = 0
+            if self.cadastro_tela.table.rowCount() > 0:
+                for row in range(self.cadastro_tela.table.rowCount()):
+                    row_codigo = int(self.cadastro_tela.table.item(row, 0).text())
+                    if row_codigo > ultimo_codigo:
+                        ultimo_codigo = row_codigo
+            
+            novo_codigo = ultimo_codigo + 1
+            
+            # Adicionar à tabela
+            row_position = self.cadastro_tela.table.rowCount()
+            self.cadastro_tela.table.insertRow(row_position)
+            self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
+            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome_empresa))
+            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(documento))
+            
+            # Mensagem de sucesso
+            tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
+            self.mostrar_mensagem("Sucesso", 
                               f"Empresa cadastrada com sucesso!\nNome: {nome_empresa}\n{tipo_doc}: {documento}")
         
-        # Fechar a janela
+        # Fechar a janela em ambos os casos
         if self.janela_parent:
             self.janela_parent.close()
 
@@ -877,6 +978,30 @@ class FormularioEmpresa(QWidget):
 # Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Aplicar estilo global para QMessageBox
+    app.setStyleSheet("""
+        QMessageBox {
+            background-color: #043b57;
+        }
+        QMessageBox QLabel {
+            color: white;
+            font-size: 14px;
+        }
+        QMessageBox QPushButton {
+            background-color: #fffff0;
+            color: black;
+            border: 1px solid #cccccc;
+            min-width: 80px;
+            min-height: 25px;
+            padding: 3px;
+            font-size: 13px;
+        }
+        QMessageBox QPushButton:hover {
+            background-color: #e6e6e6;
+        }
+    """)
+    
     window = QMainWindow()
     window.setWindowTitle("Formulário de Cadastro de Empresa")
     window.setGeometry(100, 100, 800, 600)  # Aumentado para acomodar campos de endereço

@@ -1,3 +1,4 @@
+#cadastro_empresa.py
 import sys
 import os
 import importlib.util
@@ -434,64 +435,60 @@ class FormularioEmpresa(QWidget):
         # Mostrar a janela
         self.form_window.show()
     
+    # Função alterar_empresa modificada no arquivo cadastro_empresa.py
     def alterar_empresa(self):
+        """Abre o formulário para alterar os dados da empresa selecionada"""
         codigo = self.codigo_input.text()
         nome = self.nome_input.text()
         cnpj = self.cnpj_input.text()
         
         if not codigo or not nome or not cnpj:
             self.mostrar_mensagem(
-                "Campos obrigatórios", 
-                "Por favor, selecione uma empresa e preencha todos os campos",
+                "Seleção necessária", 
+                "Por favor, selecione uma empresa para alterar",
                 QMessageBox.Warning
             )
             return
-            
-        # Validar formato do CNPJ
-        if not self.validar_cnpj(cnpj):
-            self.mostrar_mensagem(
-                "CNPJ inválido", 
-                "O CNPJ informado não é válido. Verifique o formato.", 
-                QMessageBox.Warning
-            )
-            return
-            
-        # Verificar se o CNPJ já existe em outra empresa
-        codigo_atual = int(codigo)
-        for row in range(self.table.rowCount()):
-            row_codigo = int(self.table.item(row, 0).text())
-            row_cnpj = self.table.item(row, 2).text()
-            
-            if row_cnpj == cnpj and row_codigo != codigo_atual:
-                self.mostrar_mensagem(
-                    "CNPJ duplicado", 
-                    "Já existe outra empresa cadastrada com este CNPJ.", 
-                    QMessageBox.Warning
-                )
-                return
         
-        # Busca a linha pelo código
-        encontrado = False
+        # Carregar dinamicamente a classe FormularioEmpresa
+        FormularioEmpresa = self.load_formulario_empresa()
+        if FormularioEmpresa is None:
+            return
+        
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, apenas ativá-la em vez de criar uma nova
+            self.form_window.setWindowState(self.form_window.windowState() & ~Qt.WindowMinimized)
+            self.form_window.activateWindow()
+            self.form_window.raise_()
+            return
+        
+        # Criar uma nova janela para o formulário
+        self.form_window = QMainWindow()
+        self.form_window.setWindowTitle("Alterar Cadastro de Empresa")
+        self.form_window.setGeometry(100, 100, 800, 600)
+        self.form_window.setStyleSheet("background-color: #043b57;")
+        
+        # Criar e definir o widget do formulário
+        form_widget = FormularioEmpresa(self, self.form_window)
+        self.form_window.setCentralWidget(form_widget)
+        
+        # Preencher os campos com os dados da empresa selecionada
+        form_widget.codigo_input.setText(codigo)
+        form_widget.documento_input.setText(cnpj)
+        form_widget.nome_empresa_input.setText(nome)
+        
+        # Encontrar os dados adicionais na tabela se necessário
         for row in range(self.table.rowCount()):
             if self.table.item(row, 0).text() == codigo:
-                self.table.setItem(row, 1, QTableWidgetItem(nome))
-                self.table.setItem(row, 2, QTableWidgetItem(cnpj))
-                
-                # Limpa os campos
-                self.codigo_input.clear()
-                self.nome_input.clear()
-                self.cnpj_input.clear()
-                
-                self.mostrar_mensagem("Sucesso", f"Empresa código {codigo} alterada com sucesso!")
-                encontrado = True
+                # Aqui você poderia obter mais dados da tabela se necessário
                 break
         
-        if not encontrado:
-            self.mostrar_mensagem(
-                "Não encontrado", 
-                f"Empresa com código {codigo} não encontrada", 
-                QMessageBox.Warning
-            )
+        # Alterando o título do botão para "Atualizar" em vez de "Incluir"
+        form_widget.btn_incluir.setText("Atualizar")
+        
+        # Mostrar a janela
+        self.form_window.show()
     
     def excluir_empresa(self):
         codigo = self.codigo_input.text()

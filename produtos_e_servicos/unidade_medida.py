@@ -4,17 +4,46 @@ import importlib.util
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QPushButton, QLabel, QLineEdit,
-    QComboBox, QMessageBox
+    QComboBox, QMessageBox, QListWidget, QListWidgetItem, 
+    QSplitter, QFrame
 )
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtCore import Qt
+
+
+class CustomMessageBox(QMessageBox):
+    """Classe personalizada para QMessageBox com cores customizadas"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Aplicar estilo para os botões do MessageBox
+        self.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+                color: white;
+            }
+            QLabel {
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: 1px solid #007ab3;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
 
 
 class UnidadeMedidaWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Unidade de Medida")
-        self.setGeometry(100, 100, 800, 400)
+        self.setGeometry(100, 100, 800, 600)  # Aumentei a altura para acomodar a lista
         self.setStyleSheet("background-color: #043b57;")
 
         # Widget central
@@ -78,23 +107,23 @@ class UnidadeMedida(QWidget):
         titulo.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(titulo, 1)
 
-        btn_cadastrar = QPushButton("Cadastrar")
-        # carregar ícone se existir
-        try:
-            icon_path = os.path.join(os.path.dirname(__file__), "ico-img", "add.png")
-            if os.path.exists(icon_path):
-                btn_cadastrar.setIcon(QIcon(icon_path))
-        except Exception:
-            pass
-        btn_cadastrar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079; color: white; border: none;
-                padding: 10px 20px; font-size: 14px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #003d5c; }
-        """)
-        btn_cadastrar.clicked.connect(self.cadastrar)
-        header_layout.addWidget(btn_cadastrar)
+        # # btn_cadastrar = QPushButton("Cadastrar")
+        # # carregar ícone se existir
+        # try:
+        #     icon_path = os.path.join(os.path.dirname(__file__), "ico-img", "add.png")
+        #     if os.path.exists(icon_path):
+        #         btn_cadastrar.setIcon(QIcon(icon_path))
+        # except Exception:
+        #     pass
+        # btn_cadastrar.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #005079; color: white; border: none;
+        #         padding: 10px 20px; font-size: 14px; border-radius: 4px;
+        #     }
+        #     QPushButton:hover { background-color: #003d5c; }
+        # """)
+        # btn_cadastrar.clicked.connect(self.cadastrar)
+        # header_layout.addWidget(btn_cadastrar)
 
         main_layout.addLayout(header_layout)
 
@@ -118,29 +147,23 @@ class UnidadeMedida(QWidget):
         codigo_layout.addWidget(self.codigo_input)
         fields_layout.addLayout(codigo_layout)
 
-        # Nome da Medida
+        # Nome da Medida (campo de texto em vez de ComboBox)
         nome_layout = QVBoxLayout()
         nome_label = QLabel("Nome da Medida:")
         nome_label.setStyleSheet("color: white; font-size: 14px;")
-        self.nome_combo = QComboBox()
-        self.nome_combo.setStyleSheet("""
-            QComboBox {
+        
+        # Substituir ComboBox por QLineEdit
+        self.nome_input = QLineEdit()
+        self.nome_input.setStyleSheet("""
+            QLineEdit {
                 background-color: white; border: 1px solid #cccccc;
                 padding: 10px; font-size: 14px; border-radius: 4px;
                 color: black;
             }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView {
-                background-color: white; color: black;
-                selection-background-color: #e6e6e6;
-            }
         """)
-        # adicionar opções
-        self.nome_combo.addItem("Selecione uma unidade")
-        for u in self.unidades_data:
-            self.nome_combo.addItem(u["descricao"])
+        
         nome_layout.addWidget(nome_label)
-        nome_layout.addWidget(self.nome_combo)
+        nome_layout.addWidget(self.nome_input)
         fields_layout.addLayout(nome_layout, 1)
 
         main_layout.addLayout(fields_layout)
@@ -150,12 +173,26 @@ class UnidadeMedida(QWidget):
         actions_layout.addStretch(1)
 
         btn_alterar = QPushButton("Alterar")
+        btn_alterar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0; color: black; border: 1px solid #cccccc;
+                padding: 10px 20px; font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #e6e6d9; }
+        """)
         btn_alterar.clicked.connect(self.alterar)
         actions_layout.addWidget(btn_alterar)
 
         actions_layout.addSpacing(20)
 
         btn_excluir = QPushButton("Excluir")
+        btn_excluir.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0; color: black; border: 1px solid #cccccc;
+                padding: 10px 20px; font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #e6e6d9; }
+        """)
         btn_excluir.clicked.connect(self.excluir)
         actions_layout.addWidget(btn_excluir)
 
@@ -175,7 +212,55 @@ class UnidadeMedida(QWidget):
         btn_incluir.clicked.connect(self.incluir)
         main_layout.addWidget(btn_incluir)
 
-        main_layout.addStretch()
+        # Adicionar um título para a lista de unidades
+        lista_label = QLabel("Unidades de Medida Cadastradas:")
+        lista_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold; margin-top: 10px;")
+        main_layout.addWidget(lista_label)
+
+        # Adicionar uma lista para mostrar as unidades cadastradas
+        self.lista_unidades = QListWidget()
+        self.lista_unidades.setStyleSheet("""
+            QListWidget {
+                background-color: #fffff0; border: 1px solid #cccccc;
+                font-size: 14px; border-radius: 4px; color: black;
+                padding: 5px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            QListWidget::item:selected {
+                background-color: #043b57;
+                color: white;
+            }
+            QListWidget::item:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        self.lista_unidades.itemClicked.connect(self.selecionar_unidade)
+        
+        # Carregar os dados na lista
+        self.carregar_unidades()
+        
+        main_layout.addWidget(self.lista_unidades)
+
+    def carregar_unidades(self):
+        """Carrega as unidades na lista"""
+        self.lista_unidades.clear()
+        for unidade in self.unidades_data:
+            item_text = f"{unidade['codigo']} - {unidade['descricao']}"
+            item = QListWidgetItem(item_text)
+            self.lista_unidades.addItem(item)
+
+    def selecionar_unidade(self, item):
+        """Preenche os campos quando um item é selecionado na lista"""
+        texto = item.text()
+        partes = texto.split(" - ", 1)
+        if len(partes) == 2:
+            codigo = partes[0]
+            descricao = partes[1]
+            self.codigo_input.setText(codigo)
+            self.nome_input.setText(descricao)
 
     def load_formulario_unidade(self):
         """
@@ -198,15 +283,44 @@ class UnidadeMedida(QWidget):
         """Cria um arquivo formulario_unidade.py básico se não existir"""
         template = '''import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                            QLabel, QLineEdit, QPushButton, QComboBox, QMessageBox)
+                            QLabel, QLineEdit, QPushButton, QMessageBox)
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
+
+class CustomMessageBox(QMessageBox):
+    """Classe personalizada para QMessageBox com cores customizadas"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Aplicar estilo para os botões do MessageBox
+        self.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+                color: white;
+            }
+            QLabel {
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: 1px solid #007ab3;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
 
 class FormularioUnidade(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.parent = parent
         self.setWindowTitle("Cadastro de Unidade de Medida")
         self.setMinimumSize(500, 300)
+        self.setStyleSheet("background-color: #043b57;")
         self.initUI()
     
     def initUI(self):
@@ -216,6 +330,7 @@ class FormularioUnidade(QWidget):
         
         titulo = QLabel("Cadastro de Unidade de Medida")
         titulo.setFont(QFont("Arial", 16, QFont.Bold))
+        titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(titulo)
         
@@ -224,7 +339,15 @@ class FormularioUnidade(QWidget):
         codigo_layout = QHBoxLayout()
         codigo_label = QLabel("Código:")
         codigo_label.setFixedWidth(100)
+        codigo_label.setStyleSheet("color: white; font-size: 14px;")
         self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white; border: 1px solid #cccccc;
+                padding: 10px; font-size: 14px; border-radius: 4px;
+                color: black;
+            }
+        """)
         codigo_layout.addWidget(codigo_label)
         codigo_layout.addWidget(self.codigo_input)
         form_layout.addLayout(codigo_layout)
@@ -232,14 +355,17 @@ class FormularioUnidade(QWidget):
         nome_layout = QHBoxLayout()
         nome_label = QLabel("Nome da Medida:")
         nome_label.setFixedWidth(100)
-        self.nome_combo = QComboBox()
-        unidades = ["Selecione uma unidade", "Quilograma (kg)", "Grama (g)", "Litro (L)",
-                   "Mililitro (mL)", "Unidade (un)", "Pacote (pct)", "Caixa (cx)",
-                   "Bandeja (bdj)", "Dúzia (dz)", "Fardo (fd)", "Garrafa (gf)"]
-        for u in unidades:
-            self.nome_combo.addItem(u)
+        nome_label.setStyleSheet("color: white; font-size: 14px;")
+        self.nome_input = QLineEdit()
+        self.nome_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white; border: 1px solid #cccccc;
+                padding: 10px; font-size: 14px; border-radius: 4px;
+                color: black;
+            }
+        """)
         nome_layout.addWidget(nome_label)
-        nome_layout.addWidget(self.nome_combo)
+        nome_layout.addWidget(self.nome_input)
         form_layout.addLayout(nome_layout)
         
         main_layout.addLayout(form_layout)
@@ -247,21 +373,68 @@ class FormularioUnidade(QWidget):
         
         buttons_layout = QHBoxLayout()
         self.btn_cancelar = QPushButton("Cancelar")
-        self.btn_cancelar.clicked.connect(self.close)
+        self.btn_cancelar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0; color: black; border: 1px solid #cccccc;
+                padding: 10px 20px; font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #e6e6d9; }
+        """)
+        self.btn_cancelar.clicked.connect(self.voltar)
+        
         self.btn_salvar = QPushButton("Salvar")
+        self.btn_salvar.setStyleSheet("""
+            QPushButton {
+                background-color: #00ff9d; color: black; border: none;
+                padding: 10px 20px; font-size: 14px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #00e088; }
+        """)
         self.btn_salvar.clicked.connect(self.salvar)
+        
         buttons_layout.addWidget(self.btn_cancelar)
         buttons_layout.addWidget(self.btn_salvar)
         main_layout.addLayout(buttons_layout)
     
+    def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
+        msg = CustomMessageBox(self)
+        msg.setIcon(tipo)
+        msg.setWindowTitle(titulo)
+        msg.setText(texto)
+        msg.exec_()
+    
+    def voltar(self):
+        """Fecha a janela e volta para a tela anterior"""
+        if self.parent and hasattr(self.parent, 'form_window'):
+            self.parent.form_window.close()
+        else:
+            self.close()
+    
     def salvar(self):
         codigo = self.codigo_input.text()
-        nome = self.nome_combo.currentText()
-        if not codigo or nome == "Selecione uma unidade":
-            QMessageBox.warning(self, "Atenção", "Preencha todos os campos!")
+        nome = self.nome_input.text()
+        if not codigo or not nome:
+            self.mostrar_mensagem("Atenção", "Preencha todos os campos!", QMessageBox.Warning)
             return
-        QMessageBox.information(self, "Sucesso", "Unidade de medida salva com sucesso!")
-        self.close()
+            
+        # Verificar se o código já existe
+        if self.parent and hasattr(self.parent, 'unidades_data'):
+            # Verificar duplicidade
+            for unidade in self.parent.unidades_data:
+                if unidade["codigo"] == codigo:
+                    self.mostrar_mensagem("Atenção", "Este código já está em uso!", QMessageBox.Warning)
+                    return
+            
+            # Adicionar a nova unidade
+            nova_unidade = {
+                "codigo": codigo,
+                "descricao": nome
+            }
+            self.parent.unidades_data.append(nova_unidade)
+            self.parent.carregar_unidades()
+            
+        self.mostrar_mensagem("Sucesso", "Unidade de medida salva com sucesso!")
+        self.voltar()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -298,40 +471,84 @@ if __name__ == "__main__":
 
     def alterar(self):
         codigo = self.codigo_input.text()
-        nome = self.nome_combo.currentText()
-        if not codigo or nome == "Selecione uma unidade":
-            self.mostrar_mensagem("Atenção", "Preencha todos os campos!")
+        nome = self.nome_input.text()
+        if not codigo or not nome:
+            self.mostrar_mensagem("Atenção", "Preencha todos os campos!", QMessageBox.Warning)
             return
-        self.mostrar_mensagem("Sucesso", "Unidade de medida alterada com sucesso!")
+            
+        # Verificar se o código existe
+        unidade_encontrada = False
+        for i, unidade in enumerate(self.unidades_data):
+            if unidade["codigo"] == codigo:
+                # Atualizar a unidade
+                self.unidades_data[i]["descricao"] = nome
+                unidade_encontrada = True
+                # Atualizar a lista
+                self.carregar_unidades()
+                self.mostrar_mensagem("Sucesso", "Unidade de medida alterada com sucesso!")
+                break
+        
+        if not unidade_encontrada:
+            self.mostrar_mensagem("Atenção", "Unidade não encontrada.", QMessageBox.Warning)
 
     def excluir(self):
         codigo = self.codigo_input.text()
         if not codigo:
-            self.mostrar_mensagem("Atenção", "Selecione uma unidade para excluir!")
+            self.mostrar_mensagem("Atenção", "Selecione uma unidade para excluir!", QMessageBox.Warning)
             return
 
-        resp = QMessageBox.question(
-            self, "Confirmar Exclusão",
-            f"Deseja realmente excluir a unidade de medida '{codigo}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
+        # Criar uma caixa de diálogo de confirmação personalizada com estilo
+        msg_box = CustomMessageBox(self)
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmar Exclusão")
+        msg_box.setText(f"Deseja realmente excluir a unidade de medida '{codigo}'?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+        
+        resp = msg_box.exec_()
+        
         if resp == QMessageBox.Yes:
+            # Remover a unidade da lista
+            for i, unidade in enumerate(self.unidades_data):
+                if unidade["codigo"] == codigo:
+                    del self.unidades_data[i]
+                    # Atualizar a lista
+                    self.carregar_unidades()
+                    break
+                    
             self.codigo_input.clear()
-            self.nome_combo.setCurrentIndex(0)
+            self.nome_input.clear()
             self.mostrar_mensagem("Sucesso", "Unidade de medida excluída com sucesso!")
 
     def incluir(self):
         codigo = self.codigo_input.text()
-        nome = self.nome_combo.currentText()
-        if not codigo or nome == "Selecione uma unidade":
-            self.mostrar_mensagem("Atenção", "Preencha todos os campos!")
+        nome = self.nome_input.text()
+        if not codigo or not nome:
+            self.mostrar_mensagem("Atenção", "Preencha todos os campos!", QMessageBox.Warning)
             return
+            
+        # Verificar se o código já existe
+        for unidade in self.unidades_data:
+            if unidade["codigo"] == codigo:
+                self.mostrar_mensagem("Atenção", "Este código já está em uso!", QMessageBox.Warning)
+                return
+        
+        # Adicionar a nova unidade
+        nova_unidade = {
+            "codigo": codigo,
+            "descricao": nome
+        }
+        self.unidades_data.append(nova_unidade)
+        
+        # Atualizar a lista
+        self.carregar_unidades()
+        
         self.codigo_input.clear()
-        self.nome_combo.setCurrentIndex(0)
+        self.nome_input.clear()
         self.mostrar_mensagem("Sucesso", "Unidade de medida incluída com sucesso!")
 
     def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
-        msg = QMessageBox(self)
+        msg = CustomMessageBox(self)
         msg.setIcon(tipo)
         msg.setWindowTitle(titulo)
         msg.setText(texto)

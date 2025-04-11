@@ -89,7 +89,7 @@ class FormularioPedidoVendas(QWidget):
             }
         """
         
-        # Estilo para DateEdit
+        # Estilo para DateEdit com ícone de calendário
         dateedit_style = """
             QDateEdit {
                 background-color: #fffff0;
@@ -105,6 +105,11 @@ class FormularioPedidoVendas(QWidget):
             }
             QDateEdit::drop-down {
                 border: none;
+            }
+            QDateEdit::down-arrow {
+                width: 16px;
+                height: 16px;
+                image: url(ico-img/calendar-outline.svg);
             }
         """
         
@@ -184,6 +189,35 @@ class FormularioPedidoVendas(QWidget):
         self.data_input.setCalendarPopup(True)
         self.data_input.setDate(QDate.currentDate())
         self.data_input.setStyleSheet(dateedit_style)
+        
+        # Configurar calendário
+        try:
+            calendar = self.data_input.calendarWidget()
+            calendar.setStyleSheet("""
+                QCalendarWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QAbstractItemView:enabled {
+                    background-color: #003b57;
+                    color: white;
+                    selection-background-color: #005079;
+                    selection-color: white;
+                }
+                QCalendarWidget QToolButton {
+                    background-color: #003b57;
+                    color: white;
+                }
+                QCalendarWidget QMenu {
+                    background-color: #003b57;
+                    color: white;
+                }
+            """)
+        except:
+            pass
+            
         linha3_layout.addWidget(self.data_input)
         
         main_layout.addLayout(linha3_layout)
@@ -284,24 +318,28 @@ class FormularioPedidoVendas(QWidget):
         msg_box.setText(texto)
         msg_box.setStyleSheet("""
             QMessageBox { 
-                background-color: white;
+                background-color: #003b57;
             }
             QLabel { 
-                color: black;
-                background-color: white;
+                color: white;
+                background-color: #003b57;
             }
             QPushButton {
-                background-color: #003b57;
+                background-color: #005079;
                 color: white;
                 border: none;
                 padding: 5px 15px;
-                border-radius: 2px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
             }
         """)
         msg_box.exec_()
 
 
-# Agora definimos a classe principal que estava no arquivo original
+# Classe principal de Pedido de Vendas
 class PedidoVendasWindow(QWidget):
     def __init__(self, janela_parent=None):
         super().__init__()
@@ -376,7 +414,7 @@ class PedidoVendasWindow(QWidget):
             }
         """
         
-        # Estilo para DateEdit
+        # Estilo para DateEdit com ícone de calendário
         dateedit_style = """
             QDateEdit {
                 background-color: #fffff0;
@@ -392,6 +430,11 @@ class PedidoVendasWindow(QWidget):
             }
             QDateEdit::drop-down {
                 border: none;
+            }
+            QDateEdit::down-arrow {
+                width: 16px;
+                height: 16px;
+                image: url(ico-img/calendar-outline.svg);
             }
         """
         
@@ -432,30 +475,64 @@ class PedidoVendasWindow(QWidget):
         self.data_entrada.setCalendarPopup(True)
         self.data_entrada.setDate(QDate.currentDate())
         self.data_entrada.setStyleSheet(dateedit_style)
+        
+        # Configurar calendário para data de entrada
+        try:
+            calendar = self.data_entrada.calendarWidget()
+            calendar.setStyleSheet("""
+                QCalendarWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QAbstractItemView:enabled {
+                    background-color: #003b57;
+                    color: white;
+                    selection-background-color: #005079;
+                    selection-color: white;
+                }
+                QCalendarWidget QToolButton {
+                    background-color: #003b57;
+                    color: white;
+                }
+                QCalendarWidget QMenu {
+                    background-color: #003b57;
+                    color: white;
+                }
+            """)
+        except:
+            pass
+            
         filtro_layout2.addWidget(self.data_entrada)
         
         main_layout.addLayout(filtro_layout2)
         
         # Terceira linha de filtros
         filtro_layout3 = QHBoxLayout()
-        filtro_layout3.setSpacing(10)
-        
-        # Espaço para manter alinhamento
-        spacer2 = QWidget()
-        filtro_layout3.addWidget(spacer2)
-        
+        # Zera margens internas (esquerda, topo, direita, base)
+        filtro_layout3.setContentsMargins(0, 0, 0, 0)
+        # Espaçamento mínimo entre widgets
+        filtro_layout3.setSpacing(5)
+
         # Campo Data de Saída
         data_saida_label = QLabel("Data de Saída")
         data_saida_label.setStyleSheet("color: white; font-size: 16px;")
         filtro_layout3.addWidget(data_saida_label)
-        
+
         self.data_saida = QDateEdit()
         self.data_saida.setCalendarPopup(True)
         self.data_saida.setDate(QDate.currentDate())
         self.data_saida.setStyleSheet(dateedit_style)
+        self.data_saida.setFixedWidth(120)  # ou ajuste pro tamanho que quiser
         filtro_layout3.addWidget(self.data_saida)
-        
+
+        # Depois do date edit, stretch para empurrar tudo à esquerda
+        filtro_layout3.addStretch()
+
         main_layout.addLayout(filtro_layout3)
+
+
         
         # Botões de ação
         acoes_layout = QHBoxLayout()
@@ -630,9 +707,40 @@ class PedidoVendasWindow(QWidget):
             return
         
         row = selected_rows[0].row()
-        self.tabela.removeRow(row)
         
-        self.mostrar_mensagem("Sucesso", "Pedido excluído com sucesso!")
+        # Criar uma caixa de diálogo de confirmação com estilo personalizado
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmar Exclusão")
+        msg_box.setText(f"Deseja realmente excluir o pedido {self.tabela.item(row, 0).text()}?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #003b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #003b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        
+        resposta = msg_box.exec_()
+        
+        if resposta == QMessageBox.Yes:
+            self.tabela.removeRow(row)
+            self.mostrar_mensagem("Sucesso", "Pedido excluído com sucesso!")
     
     def cadastrar(self):
         """Abre a tela de cadastro de pedido"""
@@ -668,6 +776,8 @@ class PedidoVendasWindow(QWidget):
         msg_box = QMessageBox()
         if "Atenção" in titulo:
             msg_box.setIcon(QMessageBox.Warning)
+        elif "Erro" in titulo:
+            msg_box.setIcon(QMessageBox.Critical)
         else:
             msg_box.setIcon(QMessageBox.Information)
         
@@ -675,18 +785,22 @@ class PedidoVendasWindow(QWidget):
         msg_box.setText(texto)
         msg_box.setStyleSheet("""
             QMessageBox { 
-                background-color: white;
+                background-color: #003b57;
             }
             QLabel { 
-                color: black;
-                background-color: white;
+                color: white;
+                background-color: #003b57;
             }
             QPushButton {
-                background-color: #003b57;
+                background-color: #005079;
                 color: white;
                 border: none;
-                padding: 5px 15px;
-                border-radius: 2px;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
             }
         """)
         msg_box.exec_()

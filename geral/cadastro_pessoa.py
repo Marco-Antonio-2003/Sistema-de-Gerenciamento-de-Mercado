@@ -1,3 +1,4 @@
+#cadastro_pessoa.py
 import sys
 import os
 import importlib.util
@@ -7,7 +8,16 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMessageBox, QStyle, QComboBox)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
-from geral.formulario_pessoa import FormularioPessoa
+try:
+    # Importação relativa (mesmo pacote)
+    from .formulario_pessoa import FormularioPessoa
+except (ImportError, ModuleNotFoundError):
+    try:
+        # Importação do pacote geral
+        from geral.formulario_pessoa import FormularioPessoa
+    except (ImportError, ModuleNotFoundError):
+        # Importação direta (mesmo diretório)
+        from formulario_pessoa import FormularioPessoa
 
 
 class CadastroPessoa(QWidget):
@@ -81,12 +91,30 @@ class CadastroPessoa(QWidget):
         self.tipo_label.setFont(QFont("Arial", 12))
         self.tipo_label.setStyleSheet("color: white;")
         self.tipo_combo = QComboBox()
+        # Atualizar o estilo do ComboBox Tipo de Pessoa
+        # Substitua o estilo do ComboBox existente por este:
+
         self.tipo_combo.setStyleSheet("""
             QComboBox {
-                background-color: #fffff0; 
-                padding: 8px; 
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 8px;
                 font-size: 12px;
                 min-height: 35px;
+            }
+            QComboBox::drop-down {
+                border: 0px;
+            }
+            QComboBox::down-arrow {
+                image: url(down_arrow.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                border: 1px solid #cccccc;
+                selection-background-color: #1a5f96;
+                selection-color: white;
             }
         """)
         self.tipo_combo.addItems(["Jurídica", "Física"])
@@ -269,6 +297,42 @@ class CadastroPessoa(QWidget):
                 texto_formatado = f"{texto_limpo[:3]}.{texto_limpo[3:6]}.{texto_limpo[6:]}"
             else:
                 texto_formatado = f"{texto_limpo[:3]}.{texto_limpo[3:6]}.{texto_limpo[6:9]}-{texto_limpo[9:]}"
+            
+            # Verifica se o texto realmente mudou para evitar loops
+            if texto_formatado != texto:
+                # Bloqueia sinais para evitar recursão
+                self.documento_input.blockSignals(True)
+                self.documento_input.setText(texto_formatado)
+                
+                # Posicionamento direto do cursor para CPF baseado no número de dígitos
+                if len(texto_limpo) == 0:
+                    nova_pos = 0
+                elif len(texto_limpo) == 1:
+                    nova_pos = 1
+                elif len(texto_limpo) == 2:
+                    nova_pos = 2
+                elif len(texto_limpo) == 3:
+                    nova_pos = 3
+                elif len(texto_limpo) == 4:
+                    nova_pos = 5  # Após o primeiro ponto: "123.4"
+                elif len(texto_limpo) == 5:
+                    nova_pos = 6
+                elif len(texto_limpo) == 6:
+                    nova_pos = 7
+                elif len(texto_limpo) == 7:
+                    nova_pos = 9  # Após o segundo ponto: "123.456.7"
+                elif len(texto_limpo) == 8:
+                    nova_pos = 10
+                elif len(texto_limpo) == 9:
+                    nova_pos = 11
+                elif len(texto_limpo) == 10:
+                    nova_pos = 13  # Após o hífen: "123.456.789-0"
+                else:  # len(texto_limpo) == 11
+                    nova_pos = 14
+                
+                # Define a nova posição do cursor
+                self.documento_input.setCursorPosition(nova_pos)
+                self.documento_input.blockSignals(False)
         else:
             # Limitar a 14 dígitos para CNPJ
             if len(texto_limpo) > 14:
@@ -285,18 +349,48 @@ class CadastroPessoa(QWidget):
                 texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:]}"
             else:
                 texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:12]}-{texto_limpo[12:]}"
-        
-        # Atualizar o texto sem disparar o evento novamente
-        if texto_formatado != texto:
-            cursor_pos = self.documento_input.cursorPosition()
-            self.documento_input.blockSignals(True)
-            self.documento_input.setText(texto_formatado)
-            # Ajustar a posição do cursor
-            if cursor_pos < len(texto_formatado):
-                self.documento_input.setCursorPosition(cursor_pos)
-            else:
-                self.documento_input.setCursorPosition(len(texto_formatado))
-            self.documento_input.blockSignals(False)
+            
+            # Verifica se o texto realmente mudou para evitar loops
+            if texto_formatado != texto:
+                # Bloqueia sinais para evitar recursão
+                self.documento_input.blockSignals(True)
+                self.documento_input.setText(texto_formatado)
+                
+                # Posicionamento direto do cursor para CNPJ baseado no número de dígitos
+                if len(texto_limpo) == 0:
+                    nova_pos = 0
+                elif len(texto_limpo) == 1:
+                    nova_pos = 1
+                elif len(texto_limpo) == 2:
+                    nova_pos = 2
+                elif len(texto_limpo) == 3:
+                    nova_pos = 4  # Após o primeiro ponto: "12.3"
+                elif len(texto_limpo) == 4:
+                    nova_pos = 5
+                elif len(texto_limpo) == 5:
+                    nova_pos = 6
+                elif len(texto_limpo) == 6:
+                    nova_pos = 8  # Após o segundo ponto: "12.345.6"
+                elif len(texto_limpo) == 7:
+                    nova_pos = 9
+                elif len(texto_limpo) == 8:
+                    nova_pos = 10
+                elif len(texto_limpo) == 9:
+                    nova_pos = 12  # Após a barra: "12.345.678/9"
+                elif len(texto_limpo) == 10:
+                    nova_pos = 13
+                elif len(texto_limpo) == 11:
+                    nova_pos = 14
+                elif len(texto_limpo) == 12:
+                    nova_pos = 15
+                elif len(texto_limpo) == 13:
+                    nova_pos = 17  # Após o hífen: "12.345.678/9012-3"
+                else:  # len(texto_limpo) == 14
+                    nova_pos = 18
+                
+                # Define a nova posição do cursor
+                self.documento_input.setCursorPosition(nova_pos)
+                self.documento_input.blockSignals(False)
     
     def validar_documento(self):
         """Valida o CNPJ ou CPF informado"""
@@ -361,13 +455,37 @@ class CadastroPessoa(QWidget):
         self.tipo_combo.setCurrentIndex(index)
     
     def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
-        """Exibe uma mensagem para o usuário"""
+        """Exibe uma mensagem para o usuário com estilo personalizado"""
         msg_box = QMessageBox()
         msg_box.setIcon(tipo)
         msg_box.setWindowTitle(titulo)
         msg_box.setText(mensagem)
         msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        
+        # Aplicar estilo personalizado para texto branco e botões personalizados
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        
+        return msg_box.exec_()
     
     def load_formulario_pessoa(self):
         """Carrega dinamicamente o módulo FormularioPessoa"""
@@ -887,37 +1005,61 @@ class FormularioPessoa(QWidget):
     def salvar_pessoa(self):
         """Salva os dados da pessoa na tabela da tela de cadastro"""
         nome = self.nome_input.text()
+        documento = self.documento_input.text() if hasattr(self, 'documento_input') else ""
+        tipo_pessoa = self.tipo_combo.currentText()
+        codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
         # Validação básica para o nome
         if not nome:
-            QMessageBox.warning(self, "Campos obrigatórios", "Por favor, informe pelo menos o nome da pessoa.")
+            self.mostrar_mensagem("Campos obrigatórios", "Por favor, informe pelo menos o nome da pessoa.", QMessageBox.Warning)
             return
-            
-        # Gerar código
-        ultimo_codigo = 0
-        if self.cadastro_tela.table.rowCount() > 0:
+        
+        # Verificar acesso à tabela
+        if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
+            self.mostrar_mensagem("Erro", "Não foi possível acessar a tabela de pessoas.", QMessageBox.Critical)
+            return
+        
+        # Verificar se é uma atualização ou novo cadastro
+        if self.btn_incluir.text() == "Atualizar" and codigo:
+            # Modo de atualização - procurar o item na tabela pelo código
+            encontrado = False
             for row in range(self.cadastro_tela.table.rowCount()):
-                codigo = int(self.cadastro_tela.table.item(row, 0).text())
-                if codigo > ultimo_codigo:
-                    ultimo_codigo = codigo
+                if self.cadastro_tela.table.item(row, 0).text() == codigo:
+                    # Atualizar os dados na tabela
+                    self.cadastro_tela.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.cadastro_tela.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
+                    
+                    # Mensagem de sucesso
+                    self.mostrar_mensagem("Sucesso", f"Pessoa atualizada com sucesso!\nNome: {nome}\nTipo: {tipo_pessoa}")
+                    
+                    encontrado = True
+                    break
+            
+            if not encontrado:
+                self.mostrar_mensagem("Erro", "Pessoa não encontrada para atualização.", QMessageBox.Warning)
+                return
+        else:
+            # Gerar código para nova pessoa
+            ultimo_codigo = 0
+            if self.cadastro_tela.table.rowCount() > 0:
+                for row in range(self.cadastro_tela.table.rowCount()):
+                    codigo = int(self.cadastro_tela.table.item(row, 0).text())
+                    if codigo > ultimo_codigo:
+                        ultimo_codigo = codigo
+            
+            novo_codigo = ultimo_codigo + 1
+            
+            # Adicionar à tabela
+            row_position = self.cadastro_tela.table.rowCount()
+            self.cadastro_tela.table.insertRow(row_position)
+            self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
+            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
+            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
+            
+            # Mensagem de sucesso
+            self.mostrar_mensagem("Sucesso", f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
         
-        novo_codigo = ultimo_codigo + 1
-        
-        # Obter tipo de pessoa
-        tipo_pessoa = self.tipo_combo.currentText()
-        
-        # Adicionar à tabela
-        row_position = self.cadastro_tela.table.rowCount()
-        self.cadastro_tela.table.insertRow(row_position)
-        self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-        self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
-        self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
-        
-        # Mensagem de sucesso
-        QMessageBox.information(self, "Sucesso", 
-                              f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
-        
-        # Fechar a janela
+        # Fechar a janela em ambos os casos
         if self.janela_parent:
             self.janela_parent.close()
 ''')
@@ -949,7 +1091,7 @@ class FormularioPessoa(QWidget):
         self.form_window.show()
     
     def alterar_pessoa(self):
-        """Altera os dados da pessoa"""
+        """Abre o formulário para alterar os dados da pessoa selecionada"""
         codigo = self.codigo_input.text()
         nome = self.nome_input.text()
         tipo = self.tipo_combo.currentText()
@@ -957,36 +1099,70 @@ class FormularioPessoa(QWidget):
         cidade = self.cidade_input.text()
         
         if not codigo or not nome:
-            self.mostrar_mensagem("Campos obrigatórios", 
-                                 "Por favor, selecione uma pessoa e preencha todos os campos",
-                                 QMessageBox.Warning)
-            return
-            
-        # Validar documento
-        if documento and not self.validar_documento():
+            self.mostrar_mensagem("Seleção necessária", 
+                                "Por favor, selecione uma pessoa para alterar",
+                                QMessageBox.Warning)
             return
         
-        # Busca a linha pelo código
-        encontrado = False
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                self.table.setItem(row, 1, QTableWidgetItem(nome))
-                self.table.setItem(row, 2, QTableWidgetItem(tipo))
-                
-                # Limpa os campos
-                self.codigo_input.clear()
-                self.nome_input.clear()
-                self.documento_input.clear()
-                self.cidade_input.clear()
-                
-                self.mostrar_mensagem("Sucesso", f"Pessoa código {codigo} alterada com sucesso!")
-                encontrado = True
-                break
+        # Carregar a classe FormularioPessoa
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, apenas ativá-la em vez de criar uma nova
+            self.form_window.setWindowState(self.form_window.windowState() & ~Qt.WindowMinimized)
+            self.form_window.activateWindow()
+            self.form_window.raise_()
+            return
         
-        if not encontrado:
-            self.mostrar_mensagem("Não encontrado", 
-                                 f"Pessoa com código {codigo} não encontrada", 
-                                 QMessageBox.Warning)
+        # Criar uma nova janela para o formulário
+        self.form_window = QMainWindow()
+        self.form_window.setWindowTitle("Alterar Cadastro de Pessoa")
+        self.form_window.setGeometry(100, 100, 800, 600)
+        self.form_window.setStyleSheet("""
+            background-color: #043b57;
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QMessageBox QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        
+        # Criar e definir o widget do formulário
+        form_widget = FormularioPessoa(self, self.form_window)
+        self.form_window.setCentralWidget(form_widget)
+        
+        # Preencher os campos com os dados da pessoa selecionada
+        form_widget.codigo_input.setText(codigo)
+        form_widget.nome_input.setText(nome)
+        
+        # Configurar o combo de tipo de pessoa
+        index = 0 if tipo == "Jurídica" else 1
+        form_widget.tipo_combo.setCurrentIndex(index)
+        
+        # Preencher outros campos se disponíveis
+        if documento:
+            form_widget.documento_input.setText(documento)
+        if cidade:
+            form_widget.cidade_input.setText(cidade)
+        
+        # Alterando o título do botão para "Atualizar" em vez de "Incluir"
+        form_widget.btn_incluir.setText("Atualizar")
+        
+        # Mostrar a janela
+        self.form_window.show()
     
     def excluir_pessoa(self):
         """Exclui uma pessoa"""

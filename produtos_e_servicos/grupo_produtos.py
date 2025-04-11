@@ -120,20 +120,54 @@ class GrupoProdutos(QWidget):
         
         main_layout.addLayout(fields_layout)
         
-        # Layout para botões e grupo de produtos
-        actions_layout = QHBoxLayout()
+        # Campo Grupo de Produtos (dropdown)
+        grupo_layout = QVBoxLayout()
+        grupo_label = QLabel("Grupo de Produtos:")
+        grupo_label.setStyleSheet("color: white; font-size: 14px;")
+        grupo_layout.addWidget(grupo_label)
         
-        # Layout para botões de ação
-        buttons_layout = QVBoxLayout()
+        self.grupo_combo = QComboBox()
+        self.grupo_combo.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 10px;
+                font-size: 14px;
+                border-radius: 4px;
+                color: black;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: black;
+                selection-background-color: #043b57;
+                selection-color: white;
+            }
+            QComboBox:hover {
+                border: 1px solid #0078d7;
+            }
+            QComboBox::item:hover {
+                background-color: #043b57;
+                color: white;
+            }
+        """)
+        # Adicionar itens ao ComboBox
+        self.grupo_combo.addItem("Selecione um grupo")
+        self.grupo_combo.addItem("Grupo 1")
+        self.grupo_combo.addItem("Grupo 2")
+        self.grupo_combo.addItem("Grupo 3")
+        grupo_layout.addWidget(self.grupo_combo)
         
-        # Botão Alterar
-        btn_alterar = QPushButton("Alterar")
-        # Adicionar ícone para o botão Alterar usando ícones do sistema
-        try:
-            btn_alterar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        except:
-            pass
-        btn_alterar.setStyleSheet("""
+        main_layout.addLayout(grupo_layout)
+        
+        # Layout para botões de ação (horizontal e abaixo do combo)
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(20)
+        
+        # Estilo comum para os botões
+        btn_style = """
             QPushButton {
                 background-color: #fffff0;
                 color: black;
@@ -146,7 +180,16 @@ class GrupoProdutos(QWidget):
             QPushButton:hover {
                 background-color: #e6e6d9;
             }
-        """)
+        """
+        
+        # Botão Alterar
+        btn_alterar = QPushButton("Alterar")
+        # Adicionar ícone para o botão Alterar usando ícones do sistema
+        try:
+            btn_alterar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        except:
+            pass
+        btn_alterar.setStyleSheet(btn_style)
         btn_alterar.clicked.connect(self.alterar)
         buttons_layout.addWidget(btn_alterar)
         
@@ -157,20 +200,7 @@ class GrupoProdutos(QWidget):
             btn_excluir.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
         except:
             pass
-        btn_excluir.setStyleSheet("""
-            QPushButton {
-                background-color: #fffff0;
-                color: black;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                text-align: left;
-            }
-            QPushButton:hover {
-                background-color: #e6e6d9;
-            }
-        """)
+        btn_excluir.setStyleSheet(btn_style)
         btn_excluir.clicked.connect(self.excluir)
         buttons_layout.addWidget(btn_excluir)
         
@@ -181,55 +211,14 @@ class GrupoProdutos(QWidget):
             btn_cadastrar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogNewFolder))
         except:
             pass
-        btn_cadastrar.setStyleSheet("""
-            QPushButton {
-                background-color: #fffff0;
-                color: black;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                text-align: left;
-            }
-            QPushButton:hover {
-                background-color: #e6e6d9;
-            }
-        """)
+        btn_cadastrar.setStyleSheet(btn_style)
         btn_cadastrar.clicked.connect(self.cadastrar)
         buttons_layout.addWidget(btn_cadastrar)
         
-        actions_layout.addLayout(buttons_layout)
+        # Adicionar espaço para empurrar os botões para a esquerda
+        buttons_layout.addStretch(1)
         
-        # Campo Grupo de Produtos (dropdown)
-        grupo_layout = QVBoxLayout()
-        grupo_label = QLabel("Grupo de Produtos:")
-        grupo_label.setStyleSheet("color: white; font-size: 14px;")
-        grupo_layout.addWidget(grupo_label)
-        
-        self.grupo_combo = QComboBox()
-        self.grupo_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-        """)
-        # Adicionar itens ao ComboBox
-        self.grupo_combo.addItem("Selecione um grupo")
-        self.grupo_combo.addItem("Grupo 1")
-        self.grupo_combo.addItem("Grupo 2")
-        self.grupo_combo.addItem("Grupo 3")
-        grupo_layout.addWidget(self.grupo_combo)
-        
-        actions_layout.addLayout(grupo_layout, 1)  # 1 para expandir
-        
-        main_layout.addLayout(actions_layout)
+        main_layout.addLayout(buttons_layout)
         
         # Tabela de Produtos
         self.tabela = QTableWidget()
@@ -307,34 +296,74 @@ class GrupoProdutos(QWidget):
         print("Voltando para a tela anterior")
     
     def alterar(self):
-        """Altera os dados de um produto"""
-        selected_rows = self.tabela.selectionModel().selectedRows()
-        if not selected_rows:
-            self.mostrar_mensagem("Atenção", "Selecione um produto para alterar!")
-            return
-        
-        row = selected_rows[0].row()
+        """Abre o formulário para alterar os dados do grupo selecionado"""
+        # Verificar se um grupo foi selecionado
         codigo = self.codigo_input.text()
-        nome = self.nome_input.text()
-        grupo = self.grupo_combo.currentText()
         
-        if not codigo or not nome or grupo == "Selecione um grupo":
-            self.mostrar_mensagem("Atenção", "Preencha todos os campos!")
+        if not codigo:
+            self.mostrar_mensagem("Seleção necessária", 
+                                 "Por favor, selecione um grupo para alterar", 
+                                 QMessageBox.Warning)
             return
         
-        # Atualizar na tabela e na lista de dados
-        self.tabela.setItem(row, 0, QTableWidgetItem(codigo))
-        self.tabela.setItem(row, 1, QTableWidgetItem(nome))
-        self.tabela.setItem(row, 2, QTableWidgetItem(grupo))
+        # Buscar os dados completos do grupo selecionado
+        dados_grupo = None
         
-        # Atualizar na lista de dados
-        old_codigo = self.grupos_data[row]["codigo"]
-        for i, item in enumerate(self.grupos_data):
-            if item["codigo"] == old_codigo:
-                self.grupos_data[i] = {"codigo": codigo, "nome": nome, "grupo": grupo}
+        for grupo in self.grupos_data:
+            if grupo["codigo"] == codigo:
+                dados_grupo = grupo
                 break
         
-        self.mostrar_mensagem("Sucesso", "Produto alterado com sucesso!")
+        if not dados_grupo:
+            self.mostrar_mensagem("Erro", 
+                                "Não foi possível encontrar os dados do grupo selecionado", 
+                                QMessageBox.Critical)
+            return
+        
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, fechá-la para abrir uma nova com os dados atualizados
+            self.form_window.close()
+        
+        # Carregar dinamicamente a classe FormularioGrupo
+        FormularioGrupo = self.load_formulario_grupo()
+        if not FormularioGrupo:
+            return
+            
+        # Criar uma nova janela para o formulário
+        self.form_window = QMainWindow()
+        self.form_window.setWindowTitle("Alterar Grupo de Produtos")
+        self.form_window.setGeometry(150, 150, 800, 600)
+        self.form_window.setStyleSheet("background-color: #043b57;")
+        
+        # Criar o widget do formulário e passá-lo como widget central
+        formulario = FormularioGrupo(self)
+        
+        # Preencher os campos com os dados do grupo
+        if hasattr(formulario, 'codigo_input'):
+            formulario.codigo_input.setText(dados_grupo["codigo"])
+            # Desabilitar edição do código para evitar problemas de identificação
+            formulario.codigo_input.setReadOnly(True)
+        
+        if hasattr(formulario, 'nome_input'):
+            formulario.nome_input.setText(dados_grupo["nome"])
+        
+        # Configurar grupo se houver
+        if hasattr(formulario, 'grupo_combo'):
+            index = formulario.grupo_combo.findText(dados_grupo["grupo"])
+            if index >= 0:
+                formulario.grupo_combo.setCurrentIndex(index)
+        
+        # Se o botão existe, alterar texto para "Salvar Alterações"
+        if hasattr(formulario, 'btn_salvar'):
+            formulario.btn_salvar.setText("Salvar Alterações")
+            # Armazenar o código original para facilitar a atualização
+            formulario.codigo_original = dados_grupo["codigo"]
+        
+        self.form_window.setCentralWidget(formulario)
+        
+        # Exibir a janela
+        self.form_window.show()
     
     def excluir(self):
         """Exclui um produto"""
@@ -343,19 +372,44 @@ class GrupoProdutos(QWidget):
             self.mostrar_mensagem("Atenção", "Selecione um produto para excluir!")
             return
         
-        # Confirmar exclusão
-        confirmacao = QMessageBox.question(
-            self, 
-            "Confirmar exclusão", 
-            "Deseja realmente excluir este item?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-        
-        if confirmacao == QMessageBox.No:
-            return
-        
         row = selected_rows[0].row()
         codigo = self.tabela.item(row, 0).text()
+        nome = self.tabela.item(row, 1).text()
+        
+        # Criar uma mensagem de confirmação personalizada com estilo
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmar exclusão")
+        msg_box.setText(f"Deseja realmente excluir o grupo '{nome}'?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+        
+        # Aplicar estilo personalizado
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #043b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        
+        resposta = msg_box.exec_()
+        
+        if resposta == QMessageBox.No:
+            return
         
         # Remover da lista de dados
         for i, item in enumerate(self.grupos_data):
@@ -371,7 +425,7 @@ class GrupoProdutos(QWidget):
         self.nome_input.clear()
         self.grupo_combo.setCurrentIndex(0)
         
-        self.mostrar_mensagem("Sucesso", "Produto excluído com sucesso!")
+        self.mostrar_mensagem("Sucesso", "Grupo excluído com sucesso!")
     
     def load_formulario_grupo(self):
         """
@@ -432,6 +486,7 @@ class FormularioGrupo(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
+        self.codigo_original = None  # Para armazenar o código original em caso de alteração
         self.initUI()
         
     def initUI(self):
@@ -469,6 +524,34 @@ class FormularioGrupo(QWidget):
             }
         """
         
+        combo_style = """
+            QComboBox {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 10px;
+                font-size: 14px;
+                border-radius: 4px;
+                color: black;
+                min-height: 30px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: black;
+                selection-background-color: #043b57;
+                selection-color: white;
+            }
+            QComboBox:hover {
+                border: 1px solid #0078d7;
+            }
+            QComboBox::item:hover {
+                background-color: #043b57;
+                color: white;
+            }
+        """
+        
         # Campo Código
         self.codigo_label = QLabel("Código:")
         self.codigo_label.setStyleSheet(label_style)
@@ -487,7 +570,7 @@ class FormularioGrupo(QWidget):
         self.grupo_label = QLabel("Grupo:")
         self.grupo_label.setStyleSheet(label_style)
         self.grupo_combo = QComboBox()
-        self.grupo_combo.setStyleSheet(input_style)
+        self.grupo_combo.setStyleSheet(combo_style)
         self.grupo_combo.addItem("Selecione um grupo")
         self.grupo_combo.addItem("Grupo 1")
         self.grupo_combo.addItem("Grupo 2")
@@ -553,34 +636,89 @@ class FormularioGrupo(QWidget):
         grupo = self.grupo_combo.currentText()
         
         if not codigo or not nome or grupo == "Selecione um grupo":
-            QMessageBox.warning(self, "Campos obrigatórios", "Todos os campos são obrigatórios.")
+            self.mostrar_mensagem("Campos obrigatórios", "Todos os campos são obrigatórios.")
             return
         
-        # Verificar se o código já existe
-        for produto in self.parent.grupos_data:
-            if produto["codigo"] == codigo:
-                QMessageBox.warning(self, "Código duplicado", "Já existe um grupo com este código.")
-                return
+        # Verificar se é uma alteração
+        if self.codigo_original is not None and self.btn_salvar.text() == "Salvar Alterações":
+            # Modo de alteração
+            for i, item in enumerate(self.parent.grupos_data):
+                if item["codigo"] == self.codigo_original:
+                    # Atualizar dados do grupo
+                    self.parent.grupos_data[i]["codigo"] = codigo
+                    self.parent.grupos_data[i]["nome"] = nome
+                    self.parent.grupos_data[i]["grupo"] = grupo
+                    
+                    # Atualizar a tabela
+                    self.parent.carregar_dados()
+                    
+                    # Mostrar mensagem de sucesso
+                    self.mostrar_mensagem("Sucesso", "Grupo de produtos alterado com sucesso!")
+                    
+                    # Fechar o formulário
+                    self.voltar()
+                    return
+                    
+            # Se chegou aqui, o grupo não foi encontrado
+            self.mostrar_mensagem("Erro", "Grupo não encontrado para alteração.")
+            return
+        else:
+            # Modo de inclusão - verificar se o código já existe
+            for produto in self.parent.grupos_data:
+                if produto["codigo"] == codigo:
+                    self.mostrar_mensagem("Código duplicado", "Já existe um grupo com este código.")
+                    return
+            
+            # Adicionar novo grupo à lista
+            novo_grupo = {
+                "codigo": codigo,
+                "nome": nome,
+                "grupo": grupo
+            }
+            
+            # Adicionar à lista de dados
+            self.parent.grupos_data.append(novo_grupo)
+            
+            # Atualizar a tabela
+            self.parent.carregar_dados()
+            
+            # Mostrar mensagem de sucesso
+            self.mostrar_mensagem("Sucesso", "Grupo de produtos cadastrado com sucesso!")
+            
+            # Fechar o formulário
+            self.voltar()
+    
+    def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
+        """Exibe uma caixa de mensagem"""
+        msg_box = QMessageBox()
+        if "Campos" in titulo or "Código" in titulo or "Erro" in titulo:
+            msg_box.setIcon(QMessageBox.Warning)
+        else:
+            msg_box.setIcon(tipo)
         
-        # Adicionar novo grupo à lista
-        novo_grupo = {
-            "codigo": codigo,
-            "nome": nome,
-            "grupo": grupo
-        }
-        
-        # Adicionar à lista de dados
-        self.parent.grupos_data.append(novo_grupo)
-        
-        # Atualizar a tabela
-        self.parent.carregar_dados()
-        
-        # Mostrar mensagem de sucesso
-        QMessageBox.information(self, "Sucesso", "Grupo de produtos cadastrado com sucesso!")
-        
-        # Fechar o formulário
-        if self.parent and hasattr(self.parent, 'form_window'):
-            self.parent.form_window.close()
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(texto)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #043b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        msg_box.exec_()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -625,7 +763,7 @@ if __name__ == "__main__":
             self.mostrar_mensagem("Erro", f"Ocorreu um erro ao abrir o formulário: {str(e)}")
     
     def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
-        """Exibe uma caixa de mensagem"""
+        """Exibe uma caixa de mensagem personalizada"""
         msg_box = QMessageBox()
         msg_box.setIcon(tipo)
         
@@ -633,18 +771,22 @@ if __name__ == "__main__":
         msg_box.setText(texto)
         msg_box.setStyleSheet("""
             QMessageBox { 
-                background-color: white;
+                background-color: #043b57;
             }
             QLabel { 
-                color: black;
-                background-color: white;
+                color: white;
+                background-color: #043b57;
             }
             QPushButton {
-                background-color: #043b57;
+                background-color: #005079;
                 color: white;
                 border: none;
-                padding: 5px 15px;
-                border-radius: 2px;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
             }
         """)
         msg_box.exec_()

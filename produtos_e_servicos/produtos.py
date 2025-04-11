@@ -1,3 +1,4 @@
+#produtos.py
 import sys
 import os
 import importlib.util
@@ -406,47 +407,140 @@ class Produtos(QWidget):
         # Alternativamente, você pode implementar a lógica para voltar para outra tela
         print("Voltando para a tela anterior")
     
+    # Ajustes no método de alterar e QMessageBox
+
     def alterar(self):
-        """Altera os dados de um produto"""
+        """Abre o formulário para alterar os dados do produto selecionado"""
+        # Verificar se um produto foi selecionado
         codigo = self.codigo_input.text()
-        nome = self.nome_input.text()
-        codigo_barras = self.barras_input.text()
-        marca = self.marca_input.text()
-        grupo = self.grupo_combo.currentText()
         
-        if not codigo or not nome:
-            self.mostrar_mensagem("Atenção", "Preencha pelo menos o código e o nome!")
+        if not codigo:
+            self.mostrar_mensagem("Seleção necessária", 
+                                "Por favor, selecione um produto para alterar", 
+                                QMessageBox.Warning)
             return
-            
-        if grupo == "Selecione um grupo":
-            grupo = ""  # Não enviar grupo se não foi selecionado
         
-        # Encontrar o produto a ser alterado
-        produto_encontrado = False
-        for i, produto in enumerate(self.produtos_data):
+        # Buscar os dados completos do produto selecionado
+        dados_produto = None
+        
+        for produto in self.produtos_data:
             if produto["codigo"] == codigo:
-                # Atualizar os dados do produto
-                self.produtos_data[i]["nome"] = nome
-                self.produtos_data[i]["codigo_barras"] = codigo_barras
-                self.produtos_data[i]["marca"] = marca
-                self.produtos_data[i]["grupo"] = grupo if grupo != "" else None
-                
-                produto_encontrado = True
+                dados_produto = produto
                 break
         
-        if produto_encontrado:
-            # Recarregar a tabela
-            self.carregar_produtos()
-            self.mostrar_mensagem("Sucesso", "Produto alterado com sucesso!")
+        if not dados_produto:
+            self.mostrar_mensagem("Erro", 
+                                "Não foi possível encontrar os dados do produto selecionado", 
+                                QMessageBox.Critical)
+            return
+        
+        # Verificar se já existe uma janela de formulário aberta
+        if hasattr(self, 'form_window') and self.form_window.isVisible():
+            # Se existir, fechá-la para abrir uma nova com os dados atualizados
+            self.form_window.close()
+        
+        # Carregar dinamicamente a classe FormularioProdutos
+        FormularioProdutos = self.load_formulario_produtos()
+        if not FormularioProdutos:
+            return
             
-            # Limpar campos
-            self.codigo_input.clear()
-            self.nome_input.clear()
-            self.barras_input.clear()
-            self.marca_input.clear()
-            self.grupo_combo.setCurrentIndex(0)
-        else:
-            self.mostrar_mensagem("Erro", "Produto não encontrado!")
+        # Criar uma nova janela para o formulário
+        self.form_window = QMainWindow()
+        self.form_window.setWindowTitle("Alterar Produto")
+        self.form_window.setGeometry(150, 150, 800, 600)
+        self.form_window.setStyleSheet("background-color: #043b57;")
+        
+        # Criar o widget do formulário com os dados do produto e passá-lo como widget central
+        formulario = FormularioProdutos(self)
+        
+        # Preencher os campos com os dados do produto
+        if hasattr(formulario, 'codigo_input'):
+            formulario.codigo_input.setText(str(dados_produto["codigo"]))
+            formulario.codigo_input.setReadOnly(True)  # Código não deve ser alterado
+        
+        if hasattr(formulario, 'nome_input'):
+            formulario.nome_input.setText(dados_produto["nome"])
+        
+        if hasattr(formulario, 'barras_input') and "codigo_barras" in dados_produto:
+            formulario.barras_input.setText(str(dados_produto["codigo_barras"]))
+        
+        # Configurar grupo se houver
+        if hasattr(formulario, 'grupo_combo') and "grupo" in dados_produto and dados_produto["grupo"]:
+            index = formulario.grupo_combo.findText(dados_produto["grupo"])
+            if index >= 0:
+                formulario.grupo_combo.setCurrentIndex(index)
+        
+        # Configurar marca se houver
+        if "marca" in dados_produto and dados_produto["marca"]:
+            if hasattr(formulario, 'marca_combo'):
+                index = formulario.marca_combo.findText(dados_produto["marca"])
+                if index >= 0:
+                    formulario.marca_combo.setCurrentIndex(index)
+            elif hasattr(formulario, 'marca_input'):
+                formulario.marca_input.setText(dados_produto["marca"])
+        
+        # Configurar preços se houver
+        if hasattr(formulario, 'preco_venda_input') and "preco_venda" in dados_produto:
+            if isinstance(dados_produto["preco_venda"], float):
+                formulario.preco_venda_input.setText(str(dados_produto["preco_venda"]).replace('.', ','))
+            else:
+                formulario.preco_venda_input.setText(str(dados_produto["preco_venda"]))
+        
+        if hasattr(formulario, 'preco_compra_input') and "preco_custo" in dados_produto:
+            if isinstance(dados_produto["preco_custo"], float):
+                formulario.preco_compra_input.setText(str(dados_produto["preco_custo"]).replace('.', ','))
+            else:
+                formulario.preco_compra_input.setText(str(dados_produto["preco_custo"]))
+        
+        # Configurar unidade se houver
+        if hasattr(formulario, 'unidade_combo') and "unidade" in dados_produto and dados_produto["unidade"]:
+            index = formulario.unidade_combo.findText(dados_produto["unidade"])
+            if index >= 0:
+                formulario.unidade_combo.setCurrentIndex(index)
+        
+        # Se o botão existe, alterar texto para "Salvar Alterações"
+        if hasattr(formulario, 'btn_incluir'):
+            formulario.btn_incluir.setText("Atualizar")
+            
+        # Passar o produto original para o formulário, se ele tiver um atributo para isso
+        if hasattr(formulario, 'set_produto_original'):
+            formulario.set_produto_original(dados_produto)
+        elif hasattr(formulario, 'produto_original'):
+            formulario.produto_original = dados_produto
+        
+        self.form_window.setCentralWidget(formulario)
+        
+        # Exibir a janela
+        self.form_window.show()
+
+    def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
+        """Exibe uma caixa de mensagem personalizada"""
+        msg_box = QMessageBox()
+        msg_box.setIcon(tipo)
+        
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(texto)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #043b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        msg_box.exec_()
     
     def excluir(self):
         """Exclui um produto"""
@@ -454,20 +548,45 @@ class Produtos(QWidget):
         if not selected_rows:
             self.mostrar_mensagem("Atenção", "Selecione um produto para excluir!")
             return
-            
+                
         row = selected_rows[0].row()
         codigo = self.tabela.item(row, 0).text()
         nome = self.tabela.item(row, 1).text()
         
-        # Confirmar exclusão
-        confirmacao = QMessageBox.question(
-            self, 
-            "Confirmar exclusão", 
-            f"Deseja realmente excluir o produto '{nome}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
+        # Criar uma mensagem de confirmação personalizada com estilo
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmar exclusão")
+        msg_box.setText(f"Deseja realmente excluir o produto '{nome}'?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
         
-        if confirmacao == QMessageBox.No:
+        # Aplicar estilo personalizado
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #043b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        
+        # Obter resposta
+        resposta = msg_box.exec_()
+        
+        if resposta == QMessageBox.No:
             return
         
         # Encontrar e remover o produto
