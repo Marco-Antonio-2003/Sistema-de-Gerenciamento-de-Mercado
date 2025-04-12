@@ -25,27 +25,27 @@ class RelatorioFiscalWindow(QWidget):
         # Cabeçalho com título
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #004465;
-                color: white;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #00354f;
-            }
-            QPushButton:pressed {
-                background-color: #0078d7;
-            }
-        """)
-        self.btn_voltar.setMinimumWidth(70)
-        self.btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(self.btn_voltar)
+        # # Botão Voltar
+        # self.btn_voltar = QPushButton("Voltar")
+        # self.btn_voltar.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #004465;
+        #         color: white;
+        #         padding: 6px 12px;
+        #         border: none;
+        #         border-radius: 4px;
+        #         font-size: 12px;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #00354f;
+        #     }
+        #     QPushButton:pressed {
+        #         background-color: #0078d7;
+        #     }
+        # """)
+        # self.btn_voltar.setMinimumWidth(70)
+        # self.btn_voltar.clicked.connect(self.voltar)
+        # header_layout.addWidget(self.btn_voltar)
         
         # Título
         title_label = QLabel("Relatório Fiscal")

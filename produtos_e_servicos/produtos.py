@@ -35,38 +35,15 @@ class Produtos(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título e botão voltar
+        # Layout para o título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-        
-        # Título
+        # Título centralizado
         titulo = QLabel("Produtos")
         titulo.setFont(QFont("Arial", 20, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)  # 1 para expandir
-        
-        # Espaço para alinhar com o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(titulo)
         
         main_layout.addLayout(header_layout)
         
@@ -183,7 +160,6 @@ class Produtos(QWidget):
         linha2_layout.addLayout(grupo_layout)
         
         main_layout.addLayout(linha2_layout)
-        
         # Terceira linha de campos
         linha3_layout = QHBoxLayout()
         linha3_layout.setSpacing(20)
@@ -399,16 +375,9 @@ class Produtos(QWidget):
                 self.marca_input.setText("")
                 self.grupo_combo.setCurrentIndex(0)
     
-    def voltar(self):
-        """Ação do botão voltar"""
-        # Fechar a janela atual se estiver em uma janela separada
-        if hasattr(self, 'parent_window') and self.parent_window:
-            self.parent_window.close()
-        # Alternativamente, você pode implementar a lógica para voltar para outra tela
-        print("Voltando para a tela anterior")
-    
-    # Ajustes no método de alterar e QMessageBox
-
+    # O método voltar foi removido
+        
+    # O restante do código continua igual
     def alterar(self):
         """Abre o formulário para alterar os dados do produto selecionado"""
         # Verificar se um produto foi selecionado
@@ -512,7 +481,6 @@ class Produtos(QWidget):
         
         # Exibir a janela
         self.form_window.show()
-
     def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
         """Exibe uma caixa de mensagem personalizada"""
         msg_box = QMessageBox()
@@ -798,17 +766,13 @@ class FormularioProdutos(QWidget):
             }
         """
         
-        # Botão Voltar
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet(btn_style)
-        self.btn_voltar.clicked.connect(self.voltar)
+        # Removido botão Voltar
         
         # Botão Salvar
         self.btn_salvar = QPushButton("Salvar")
         self.btn_salvar.setStyleSheet(btn_style)
         self.btn_salvar.clicked.connect(self.salvar)
         
-        botoes_layout.addWidget(self.btn_voltar)
         botoes_layout.addWidget(self.btn_salvar)
         
         botoes_container = QHBoxLayout()
@@ -821,10 +785,7 @@ class FormularioProdutos(QWidget):
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
         
-    def voltar(self):
-        """Fecha a janela e volta para a tela anterior"""
-        if self.parent and hasattr(self.parent, 'form_window'):
-            self.parent.form_window.close()
+    # Removido método voltar
     
     def salvar(self):
         """Salva os dados do produto"""

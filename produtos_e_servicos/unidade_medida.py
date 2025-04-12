@@ -88,42 +88,20 @@ class UnidadeMedida(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
 
-        # Cabeçalho
+        # Cabeçalho - apenas com o título no centro
         header_layout = QHBoxLayout()
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079; color: white; border: none;
-                padding: 10px 20px; font-size: 14px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #003d5c; }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-
+        
+        # Ajuste do espaçamento para centralizar o título
+        header_layout.addStretch(1)
+        
         titulo = QLabel("Unidade de Medida")
         titulo.setFont(QFont("Arial", 20, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)
-
-        # # btn_cadastrar = QPushButton("Cadastrar")
-        # # carregar ícone se existir
-        # try:
-        #     icon_path = os.path.join(os.path.dirname(__file__), "ico-img", "add.png")
-        #     if os.path.exists(icon_path):
-        #         btn_cadastrar.setIcon(QIcon(icon_path))
-        # except Exception:
-        #     pass
-        # btn_cadastrar.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #005079; color: white; border: none;
-        #         padding: 10px 20px; font-size: 14px; border-radius: 4px;
-        #     }
-        #     QPushButton:hover { background-color: #003d5c; }
-        # """)
-        # btn_cadastrar.clicked.connect(self.cadastrar)
-        # header_layout.addWidget(btn_cadastrar)
+        header_layout.addWidget(titulo, 2)  # Peso maior para o título
+        
+        # Espaçamento igual no lado direito
+        header_layout.addStretch(1)
 
         main_layout.addLayout(header_layout)
 
@@ -465,6 +443,7 @@ if __name__ == "__main__":
         self.form_window.setCentralWidget(formulario_widget)
         self.form_window.show()
 
+    # Método voltar mantido, mas não usado na interface
     def voltar(self):
         if self.parent_window:
             self.parent_window.close()

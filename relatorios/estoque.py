@@ -45,23 +45,23 @@ class EstoqueWindow(QWidget):
         # Layout para o título e botão voltar
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
+        # # Botão Voltar
+        # btn_voltar = QPushButton("Voltar")
+        # btn_voltar.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #005079;
+        #         color: white;
+        #         border: none;
+        #         padding: 10px 20px;
+        #         font-size: 14px;
+        #         border-radius: 4px;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #003d5c;
+        #     }
+        # """)
+        # btn_voltar.clicked.connect(self.voltar)
+        # header_layout.addWidget(btn_voltar)
         
         # Título
         titulo = QLabel("Estoque")
@@ -72,7 +72,7 @@ class EstoqueWindow(QWidget):
         
         # Espaço para alinhar com o botão voltar
         spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
+        # spacer.setFixedWidth(btn_voltar.sizeHint().width())
         header_layout.addWidget(spacer)
         
         main_layout.addLayout(header_layout)

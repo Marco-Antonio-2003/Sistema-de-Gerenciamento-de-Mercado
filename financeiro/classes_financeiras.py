@@ -18,42 +18,15 @@ class ClassesFinanceirasWindow(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # Cabeçalho com título
+        # Cabeçalho com título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #004465;
-                color: white;
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #00354f;
-            }
-            QPushButton:pressed {
-                background-color: #0078d7;
-            }
-        """)
-        self.btn_voltar.setMinimumWidth(70)
-        self.btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(self.btn_voltar)
-        
-        # Título
+        # Título centralizado
         title_label = QLabel("Classe Financeira")
         title_label.setFont(QFont("Arial", 18, QFont.Bold))
-        title_label.setStyleSheet("color: white; margin-left: 20px;")
+        title_label.setStyleSheet("color: white;")
         title_label.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(title_label, 1)  # 1 = stretch factor
-        
-        # Adicionar espaço à direita para balancear o botão voltar
-        spacer = QWidget()
-        spacer.setMinimumWidth(70)
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(title_label)
         
         main_layout.addLayout(header_layout)
         
@@ -282,10 +255,8 @@ class ClassesFinanceirasWindow(QWidget):
         # Preencher os campos de filtro com os dados da linha selecionada
         self.codigo_input.setText(codigo)
         self.descricao_input.setText(descricao)
-        
-    def voltar(self):
-        """Fecha a tela atual quando o botão voltar for clicado"""
-        self.window().close()
+    
+    # Método voltar foi removido
     
     def cadastrar_classe(self):
         """Abre o formulário para cadastrar nova classe financeira"""
@@ -548,44 +519,12 @@ class FormularioClasseFinanceira(QDialog):
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(10)
         
-        # Cabeçalho com botão voltar e título
-        header_layout = QHBoxLayout()
-        
-        # Botão Voltar com texto
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #004465;
-                color: white;
-                padding: 5px 10px;
-                border: none;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #00354f;
-            }
-            QPushButton:pressed {
-                background-color: #0078d7;
-            }
-        """)
-        self.btn_voltar.setFixedWidth(60)
-        self.btn_voltar.clicked.connect(self.reject)
-        header_layout.addWidget(self.btn_voltar)
-        
-        # Título
+        # Título centralizado (sem botão voltar)
         title_label = QLabel("Cadastro de Classe Financeira")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_label.setStyleSheet("color: white;")
         title_label.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(title_label, 1)  # 1 = stretch factor
-        
-        # Adicionar espaço à direita para balancear o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(60)
-        header_layout.addWidget(spacer)
-        
-        main_layout.addLayout(header_layout)
+        main_layout.addWidget(title_label)
         
         # Estilo para inputs
         input_style = """
@@ -775,7 +714,7 @@ if __name__ == "__main__":
     window.setGeometry(100, 100, 700, 400)
     window.setStyleSheet("QMainWindow { background-color: #003353; }")
     
-    classe_financeira = ClasseFinanceira()
+    classe_financeira = ClassesFinanceirasWindow()
     window.setCentralWidget(classe_financeira)
     
     window.show()

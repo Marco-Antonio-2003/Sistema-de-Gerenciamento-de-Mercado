@@ -45,42 +45,15 @@ class ContaCorrenteWindow(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # Cabeçalho com título
+        # Cabeçalho com título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #004465;
-                color: white;
-                padding: 8px 15px;
-                border: none;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #00354f;
-            }
-            QPushButton:pressed {
-                background-color: #0078d7;
-            }
-        """)
-        self.btn_voltar.setMinimumWidth(90)
-        self.btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(self.btn_voltar)
-        
-        # Título
+        # Título centralizado
         title_label = QLabel("Contas Correntes")
         title_label.setFont(QFont("Arial", 22, QFont.Bold))
-        title_label.setStyleSheet("color: white; margin-left: 20px;")
+        title_label.setStyleSheet("color: white;")
         title_label.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(title_label, 1)  # 1 = stretch factor
-        
-        # Adicionar espaço à direita para balancear o botão voltar
-        spacer = QWidget()
-        spacer.setMinimumWidth(90)
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(title_label)
         
         main_layout.addLayout(header_layout)
         
@@ -356,10 +329,8 @@ class ContaCorrenteWindow(QWidget):
         # Preencher os campos de filtro com os dados da linha selecionada
         self.codigo_input.setText(conta)
         self.descricao_input.setText(descricao)
-        
-    def voltar(self):
-        """Fecha a tela atual quando o botão voltar for clicado"""
-        self.window().close()
+    
+    # Método voltar foi removido
     
     def filtrar(self):
         """Filtra os dados da tabela com base nos critérios de filtro"""
@@ -477,25 +448,6 @@ class ContaCorrenteWindow(QWidget):
             ok_button = msg_box.button(QMessageBox.Ok)
             if ok_button:
                 ok_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 80px;
-                        min-height: 25px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
-            
-            msg_box.exec_()
-            ok_button.setStyleSheet("""
                     QPushButton {
                         color: white;
                         background-color: #004465;
@@ -854,6 +806,6 @@ if __name__ == "__main__":
     
     contas_correntes = ContaCorrenteWindow()
     window.setCentralWidget(contas_correntes)
-    
     window.show()
     sys.exit(app.exec_())
+    

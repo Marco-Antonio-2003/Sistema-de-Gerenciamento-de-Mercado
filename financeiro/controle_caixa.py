@@ -143,27 +143,27 @@ class ControleCaixaWindow(QWidget):
         # Cabeçalho com botão voltar e título
         header_layout = QHBoxLayout()
         
-        # Botão Voltar com texto
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #004465;
-                color: white;
-                padding: 8px 15px;
-                border: none;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #00354f;
-            }
-            QPushButton:pressed {
-                background-color: #0078d7;
-            }
-        """)
-        self.btn_voltar.setMinimumWidth(90)
-        self.btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(self.btn_voltar)
+        # # Botão Voltar com texto
+        # self.btn_voltar = QPushButton("Voltar")
+        # self.btn_voltar.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #004465;
+        #         color: white;
+        #         padding: 8px 15px;
+        #         border: none;
+        #         border-radius: 5px;
+        #         font-size: 14px;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #00354f;
+        #     }
+        #     QPushButton:pressed {
+        #         background-color: #0078d7;
+        #     }
+        # """)
+        # self.btn_voltar.setMinimumWidth(90)
+        # self.btn_voltar.clicked.connect(self.voltar)
+        # header_layout.addWidget(self.btn_voltar)
         
         # Título
         title_label = QLabel("Controle de Caixa")

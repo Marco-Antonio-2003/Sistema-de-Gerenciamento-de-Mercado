@@ -81,38 +81,15 @@ class FornecedoresWindow(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título e botão voltar
+        # Layout para o título centralizado
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-        
-        # Título
+        # Título centralizado
         titulo = QLabel("Fornecedores")
         titulo.setFont(QFont("Arial", 20, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)  # 1 para expandir
-        
-        # Espaço para alinhar com o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(titulo)
         
         main_layout.addLayout(header_layout)
         
@@ -402,13 +379,7 @@ class FornecedoresWindow(QWidget):
         if index >= 0:
             self.tipo_combo.setCurrentIndex(index)
     
-    def voltar(self):
-        """Ação do botão voltar"""
-        # Fechar a janela atual se estiver em uma janela separada
-        if hasattr(self, 'parent_window') and self.parent_window:
-            self.parent_window.close()
-        # Alternativamente, você pode implementar a lógica para voltar para outra tela
-        print("Voltando para a tela anterior")
+    # Método voltar foi removido
     
     def alterar(self):
         """Abre o formulário para alteração de fornecedor selecionado"""

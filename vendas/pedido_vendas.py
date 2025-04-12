@@ -38,38 +38,15 @@ class FormularioPedidoVendas(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título e botão voltar
+        # Layout para o título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-        
-        # Título
+        # Título centralizado
         titulo = QLabel("Cadastro de Pedido de vendas")
         titulo.setFont(QFont("Arial", 24, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)  # 1 para expandir
-        
-        # Espaço para alinhar com o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(titulo)
         
         main_layout.addLayout(header_layout)
         
@@ -259,24 +236,7 @@ class FormularioPedidoVendas(QWidget):
         # Mudando o texto do botão para indicar alteração
         self.btn_incluir.setText("Alterar")
     
-    def voltar(self):
-        """Ação do botão voltar"""
-        # Se a janela foi criada a partir de outra janela (tem um parent)
-        if self.janela_parent:
-            # Verifica se o parent é um QMainWindow
-            if isinstance(self.janela_parent, QMainWindow):
-                self.janela_parent.close()
-            # Se o parent for um widget dentro de uma aplicação
-            else:
-                # Verifica se há uma janela principal ativa
-                main_window = QApplication.activeWindow()
-                if main_window:
-                    main_window.close()
-                    
-        # Se estiver sendo executado como aplicação principal (sem parent)
-        else:
-            # Encerra a aplicação
-            QApplication.instance().quit()
+    # Método voltar foi removido
     
     def incluir(self):
         """Inclui ou altera um pedido"""
@@ -363,38 +323,15 @@ class PedidoVendasWindow(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título e botão voltar
+        # Layout para o título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-        
-        # Título
+        # Título centralizado
         titulo = QLabel("Pedido de vendas")
         titulo.setFont(QFont("Arial", 24, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)  # 1 para expandir
-        
-        # Espaço para alinhar com o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(titulo)
         
         main_layout.addLayout(header_layout)
         
@@ -666,24 +603,7 @@ class PedidoVendasWindow(QWidget):
             row = selected_rows[0].row()
             # Aqui você poderia preencher campos se necessário
     
-    def voltar(self):
-        """Ação do botão voltar"""
-        # Se a janela foi criada a partir de outra janela (tem um parent)
-        if self.janela_parent:
-            # Verifica se o parent é um QMainWindow
-            if isinstance(self.janela_parent, QMainWindow):
-                self.janela_parent.close()
-            # Se o parent for um widget dentro de uma aplicação
-            else:
-                # Verifica se há uma janela principal ativa
-                main_window = QApplication.activeWindow()
-                if main_window:
-                    main_window.close()
-                    
-        # Se estiver sendo executado como aplicação principal (sem parent)
-        else:
-            # Encerra a aplicação
-            QApplication.instance().quit()
+    # Método voltar foi removido
     
     def alterar(self):
         """Altera os dados de um pedido"""

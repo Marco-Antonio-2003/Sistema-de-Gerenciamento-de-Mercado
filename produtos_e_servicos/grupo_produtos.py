@@ -39,38 +39,15 @@ class GrupoProdutos(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título e botão voltar
+        # Layout para o título centralizado (sem botão voltar)
         header_layout = QHBoxLayout()
         
-        # Botão Voltar
-        btn_voltar = QPushButton("Voltar")
-        btn_voltar.setStyleSheet("""
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        btn_voltar.clicked.connect(self.voltar)
-        header_layout.addWidget(btn_voltar)
-        
-        # Título
+        # Título centralizado
         titulo = QLabel("Grupo de Produtos")
         titulo.setFont(QFont("Arial", 20, QFont.Bold))
         titulo.setStyleSheet("color: white;")
         titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo, 1)  # 1 para expandir
-        
-        # Espaço para alinhar com o botão voltar
-        spacer = QWidget()
-        spacer.setFixedWidth(btn_voltar.sizeHint().width())
-        header_layout.addWidget(spacer)
+        header_layout.addWidget(titulo)
         
         main_layout.addLayout(header_layout)
         
@@ -119,7 +96,6 @@ class GrupoProdutos(QWidget):
         fields_layout.addLayout(nome_layout, 1)  # 1 para expandir
         
         main_layout.addLayout(fields_layout)
-        
         # Campo Grupo de Produtos (dropdown)
         grupo_layout = QVBoxLayout()
         grupo_label = QLabel("Grupo de Produtos:")
@@ -219,7 +195,6 @@ class GrupoProdutos(QWidget):
         buttons_layout.addStretch(1)
         
         main_layout.addLayout(buttons_layout)
-        
         # Tabela de Produtos
         self.tabela = QTableWidget()
         self.tabela.setStyleSheet("""
@@ -286,14 +261,7 @@ class GrupoProdutos(QWidget):
             if index >= 0:
                 self.grupo_combo.setCurrentIndex(index)
     
-    def voltar(self):
-        """Ação do botão voltar"""
-        # Fechar a janela atual se estiver em uma janela separada
-        if hasattr(self, 'parent_window') and self.parent_window:
-            self.parent_window.close()
-        # Alternativamente, você pode implementar a lógica para voltar para outra tela
-        # Como por exemplo, mudar o widget central de um QMainWindow
-        print("Voltando para a tela anterior")
+    # Método voltar foi removido
     
     def alterar(self):
         """Abre o formulário para alterar os dados do grupo selecionado"""
@@ -335,7 +303,6 @@ class GrupoProdutos(QWidget):
         self.form_window.setWindowTitle("Alterar Grupo de Produtos")
         self.form_window.setGeometry(150, 150, 800, 600)
         self.form_window.setStyleSheet("background-color: #043b57;")
-        
         # Criar o widget do formulário e passá-lo como widget central
         formulario = FormularioGrupo(self)
         
@@ -600,17 +567,11 @@ class FormularioGrupo(QWidget):
             }
         """
         
-        # Botão Voltar
-        self.btn_voltar = QPushButton("Voltar")
-        self.btn_voltar.setStyleSheet(btn_style)
-        self.btn_voltar.clicked.connect(self.voltar)
-        
-        # Botão Salvar
+        # Botão Salvar (único botão após remoção do botão Voltar)
         self.btn_salvar = QPushButton("Salvar")
         self.btn_salvar.setStyleSheet(btn_style)
         self.btn_salvar.clicked.connect(self.salvar)
         
-        botoes_layout.addWidget(self.btn_voltar)
         botoes_layout.addWidget(self.btn_salvar)
         
         botoes_container = QHBoxLayout()
@@ -622,11 +583,6 @@ class FormularioGrupo(QWidget):
         
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
-        
-    def voltar(self):
-        """Fecha a janela e volta para a tela anterior"""
-        if self.parent and hasattr(self.parent, 'form_window'):
-            self.parent.form_window.close()
     
     def salvar(self):
         """Salva os dados do grupo de produtos"""
@@ -656,7 +612,8 @@ class FormularioGrupo(QWidget):
                     self.mostrar_mensagem("Sucesso", "Grupo de produtos alterado com sucesso!")
                     
                     # Fechar o formulário
-                    self.voltar()
+                    if self.parent and hasattr(self.parent, 'form_window'):
+                        self.parent.form_window.close()
                     return
                     
             # Se chegou aqui, o grupo não foi encontrado
@@ -686,7 +643,8 @@ class FormularioGrupo(QWidget):
             self.mostrar_mensagem("Sucesso", "Grupo de produtos cadastrado com sucesso!")
             
             # Fechar o formulário
-            self.voltar()
+            if self.parent and hasattr(self.parent, 'form_window'):
+                self.parent.form_window.close()
     
     def mostrar_mensagem(self, titulo, texto, tipo=QMessageBox.Information):
         """Exibe uma caixa de mensagem"""
@@ -727,7 +685,8 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
 ''')
         except Exception as e:
-            print(f"Erro ao criar arquivo formulario_grupo.py: {str(e)}")
+            print(f"Erro ao criar arquivo: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Não foi possível criar o arquivo: {str(e)}", QMessageBox.Critical)
     
     def cadastrar(self):
         """Abre a tela de cadastro de grupo de produtos"""
