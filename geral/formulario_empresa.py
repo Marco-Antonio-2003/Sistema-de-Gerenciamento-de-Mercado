@@ -12,12 +12,15 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QFormLayout, QComboBox, QMessageBox, QTableWidgetItem)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
+from base.banco import criar_empresa, atualizar_empresa, buscar_empresa_por_id, buscar_empresa_por_documento
 
 class FormularioEmpresa(QWidget):
     def __init__(self, cadastro_tela=None, janela_parent=None):
         super().__init__()
         self.cadastro_tela = cadastro_tela  # Referência para a tela de cadastro
         self.janela_parent = janela_parent  # Referência para a janela que contém este widget
+        self.modo_edicao = False  # Flag para indicar se estamos editando ou criando
+        self.id_empresa = None    # ID da empresa em edição (se for o caso)
         self.initUI()
         
     def initUI(self):
@@ -604,67 +607,67 @@ class FormularioEmpresa(QWidget):
                 self.documento_input.blockSignals(False)
                 
         else:
-            # Limitar a 14 dígitos para CNPJ
-            if len(texto_limpo) > 14:
-                texto_limpo = texto_limpo[:14]
-            
-            # Formatar CNPJ: 00.000.000/0001-00
-            if len(texto_limpo) <= 2:
-                texto_formatado = texto_limpo
-            elif len(texto_limpo) <= 5:
-                texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:]}"
-            elif len(texto_limpo) <= 8:
-                texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:]}"
-            elif len(texto_limpo) <= 12:
-                texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:]}"
-            else:
-                texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:12]}-{texto_limpo[12:]}"
-            
-            # Verifica se o texto realmente mudou para evitar loops
-            if texto_formatado != texto:
-                # Bloqueia sinais para evitar recursão
-                self.documento_input.blockSignals(True)
-                self.documento_input.setText(texto_formatado)
+                # Limitar a 14 dígitos para CNPJ
+                if len(texto_limpo) > 14:
+                    texto_limpo = texto_limpo[:14]
                 
-                # Posicionamento direto do cursor para CNPJ baseado no número de dígitos
-                if len(texto_limpo) == 0:
-                    nova_pos = 0
-                elif len(texto_limpo) == 1:
-                    nova_pos = 1
-                elif len(texto_limpo) == 2:
-                    nova_pos = 2
-                elif len(texto_limpo) == 3:
-                    nova_pos = 4  # Após o primeiro ponto: "12.3"
-                elif len(texto_limpo) == 4:
-                    nova_pos = 5
-                elif len(texto_limpo) == 5:
-                    nova_pos = 6
-                elif len(texto_limpo) == 6:
-                    nova_pos = 8  # Após o segundo ponto: "12.345.6"
-                elif len(texto_limpo) == 7:
-                    nova_pos = 9
-                elif len(texto_limpo) == 8:
-                    nova_pos = 10
-                elif len(texto_limpo) == 9:
-                    nova_pos = 12  # Após a barra: "12.345.678/9"
-                elif len(texto_limpo) == 10:
-                    nova_pos = 13
-                elif len(texto_limpo) == 11:
-                    nova_pos = 14
-                elif len(texto_limpo) == 12:
-                    nova_pos = 15
-                elif len(texto_limpo) == 13:
-                    nova_pos = 17  # Após o hífen: "12.345.678/9012-3"
-                else:  # len(texto_limpo) == 14
-                    nova_pos = 18
+                # Formatar CNPJ: 00.000.000/0001-00
+                if len(texto_limpo) <= 2:
+                    texto_formatado = texto_limpo
+                elif len(texto_limpo) <= 5:
+                    texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:]}"
+                elif len(texto_limpo) <= 8:
+                    texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:]}"
+                elif len(texto_limpo) <= 12:
+                    texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:]}"
+                else:
+                    texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:12]}-{texto_limpo[12:]}"
                 
-                # Define a nova posição do cursor
-                self.documento_input.setCursorPosition(nova_pos)
-                self.documento_input.blockSignals(False)
-                
-                # Se o CNPJ estiver completo (14 dígitos), consultar automaticamente
-                if len(texto_limpo) == 14 and REQUESTS_AVAILABLE:
-                    self.consultar_documento()
+                # Verifica se o texto realmente mudou para evitar loops
+                if texto_formatado != texto:
+                    # Bloqueia sinais para evitar recursão
+                    self.documento_input.blockSignals(True)
+                    self.documento_input.setText(texto_formatado)
+                    
+                    # Posicionamento direto do cursor para CNPJ baseado no número de dígitos
+                    if len(texto_limpo) == 0:
+                        nova_pos = 0
+                    elif len(texto_limpo) == 1:
+                        nova_pos = 1
+                    elif len(texto_limpo) == 2:
+                        nova_pos = 2
+                    elif len(texto_limpo) == 3:
+                        nova_pos = 4  # Após o primeiro ponto: "12.3"
+                    elif len(texto_limpo) == 4:
+                        nova_pos = 5
+                    elif len(texto_limpo) == 5:
+                        nova_pos = 6
+                    elif len(texto_limpo) == 6:
+                        nova_pos = 8  # Após o segundo ponto: "12.345.6"
+                    elif len(texto_limpo) == 7:
+                        nova_pos = 9
+                    elif len(texto_limpo) == 8:
+                        nova_pos = 10
+                    elif len(texto_limpo) == 9:
+                        nova_pos = 12  # Após a barra: "12.345.678/9"
+                    elif len(texto_limpo) == 10:
+                        nova_pos = 13
+                    elif len(texto_limpo) == 11:
+                        nova_pos = 14
+                    elif len(texto_limpo) == 12:
+                        nova_pos = 15
+                    elif len(texto_limpo) == 13:
+                        nova_pos = 17  # Após o hífen: "12.345.678/9012-3"
+                    else:  # len(texto_limpo) == 14
+                        nova_pos = 18
+                    
+                    # Define a nova posição do cursor
+                    self.documento_input.setCursorPosition(nova_pos)
+                    self.documento_input.blockSignals(False)
+                    
+                    # Se o CNPJ estiver completo (14 dígitos), consultar automaticamente
+                    if len(texto_limpo) == 14 and REQUESTS_AVAILABLE:
+                        self.consultar_documento()
     
     def formatar_cep(self, texto):
         """Formata o CEP durante a digitação e busca endereço quando completo"""
@@ -784,6 +787,14 @@ class FormularioEmpresa(QWidget):
                 return
             
             try:
+                # Verificar se já existe uma empresa com este CNPJ no banco
+                empresa_existente = buscar_empresa_por_documento(doc_limpo)
+                if empresa_existente and (not self.modo_edicao or empresa_existente[0] != self.id_empresa):
+                    self.mostrar_mensagem("CNPJ duplicado", 
+                                      "Já existe uma empresa cadastrada com este CNPJ.",
+                                      QMessageBox.Warning)
+                    return
+                
                 # Fazer a requisição à API BrasilAPI
                 url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
                 response = requests.get(url)
@@ -878,7 +889,7 @@ class FormularioEmpresa(QWidget):
             return True
     
     def salvar_empresa(self):
-        """Salva os dados da empresa na tabela da tela de cadastro"""
+        """Salva os dados da empresa no banco de dados"""
         nome_pessoa = self.nome_pessoa_input.text()
         nome_empresa = self.nome_empresa_input.text()
         telefone = self.telefone_input.text()
@@ -886,93 +897,101 @@ class FormularioEmpresa(QWidget):
         regime = self.regime_combo.currentText()
         codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
+        # Remover formatação do telefone e documento
+        telefone_limpo = ''.join(filter(str.isdigit, telefone))
+        documento_limpo = ''.join(filter(str.isdigit, documento))
+        
+        # Obter campos de endereço
+        cep = ''.join(filter(str.isdigit, self.cep_input.text()))
+        rua = self.rua_input.text()
+        numero = self.numero_input.text()
+        bairro = self.bairro_input.text()
+        cidade = self.cidade_input.text()
+        estado = self.estado_input.text().upper()
+        
+        # Tipo de documento (CNPJ ou CPF)
+        tipo_documento = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
+        
         # Validação básica
         if not nome_empresa:
             self.mostrar_mensagem("Campos obrigatórios", "Por favor, informe o nome da empresa.", QMessageBox.Warning)
             return
             
         if not documento:
-            tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-            self.mostrar_mensagem("Campos obrigatórios", f"Por favor, informe o {tipo_doc}.", QMessageBox.Warning)
+            self.mostrar_mensagem("Campos obrigatórios", f"Por favor, informe o {tipo_documento}.", QMessageBox.Warning)
             return
         
         # Validar documento
         if not self.validar_documento():
             return
         
-        # Verificar acesso à tabela
-        if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
-            self.mostrar_mensagem("Erro", "Não foi possível acessar a tabela de empresas.", QMessageBox.Critical)
+        # Verificar acesso à tela de cadastro
+        if not self.cadastro_tela:
+            self.mostrar_mensagem("Erro", "Não foi possível acessar a tela de cadastro de empresas.", QMessageBox.Critical)
             return
         
-        # Verificar se é um cadastro novo ou uma atualização
-        if self.btn_incluir.text() == "Atualizar" and codigo:
-            # Modo de atualização - procurar o item na tabela pelo código
-            encontrado = False
-            for row in range(self.cadastro_tela.table.rowCount()):
-                if self.cadastro_tela.table.item(row, 0).text() == codigo:
-                    # Se o documento (CNPJ/CPF) foi alterado, verificar se não existe duplicado
-                    doc_atual = self.cadastro_tela.table.item(row, 2).text()
-                    if doc_atual != documento:
-                        # Verificar se o novo documento já existe em outro registro
-                        for check_row in range(self.cadastro_tela.table.rowCount()):
-                            if check_row != row and self.cadastro_tela.table.item(check_row, 2).text() == documento:
-                                tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-                                self.mostrar_mensagem(f"{tipo_doc} duplicado", 
-                                                 f"Já existe outra empresa cadastrada com este {tipo_doc}.", 
-                                                 QMessageBox.Warning)
-                                return
-                    
-                    # Atualizar os dados na tabela
-                    self.cadastro_tela.table.setItem(row, 1, QTableWidgetItem(nome_empresa))
-                    self.cadastro_tela.table.setItem(row, 2, QTableWidgetItem(documento))
-                    
-                    # Mensagem de sucesso
-                    tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-                    self.mostrar_mensagem("Sucesso", 
-                                      f"Empresa atualizada com sucesso!\nNome: {nome_empresa}\n{tipo_doc}: {documento}")
-                    
-                    encontrado = True
-                    break
-            
-            if not encontrado:
-                self.mostrar_mensagem("Erro", "Empresa não encontrada para atualização.", QMessageBox.Warning)
-                return
-        else:
-            # Modo de inclusão - verificar documento duplicado
-            for row in range(self.cadastro_tela.table.rowCount()):
-                if self.cadastro_tela.table.item(row, 2).text() == documento:
-                    tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-                    self.mostrar_mensagem(f"{tipo_doc} duplicado", 
-                                       f"Já existe uma empresa cadastrada com este {tipo_doc}.", 
-                                       QMessageBox.Warning)
+        try:
+            # Verificar se é um cadastro novo ou uma atualização
+            if codigo:  # Modo de atualização
+                # Atualizar a empresa no banco de dados
+                id_empresa = int(codigo)
+                
+                # Atualizar a empresa no banco
+                atualizar_empresa(
+                    id_empresa,
+                    nome_empresa,
+                    nome_pessoa,
+                    documento_limpo,
+                    tipo_documento,
+                    regime,
+                    telefone_limpo,
+                    cep,
+                    rua,
+                    numero,
+                    bairro,
+                    cidade,
+                    estado
+                )
+                
+                # Mensagem de sucesso
+                self.mostrar_mensagem("Sucesso", f"Empresa '{nome_empresa}' atualizada com sucesso!")
+            else:  # Modo de inclusão
+                # Verificar se o documento já existe no banco
+                empresa_existente = buscar_empresa_por_documento(documento_limpo)
+                if empresa_existente:
+                    self.mostrar_mensagem(f"{tipo_documento} duplicado", 
+                                      f"Já existe uma empresa cadastrada com este {tipo_documento}.", 
+                                      QMessageBox.Warning)
                     return
+                
+                # Criar a empresa no banco de dados
+                criar_empresa(
+                    nome_empresa,
+                    nome_pessoa,
+                    documento_limpo,
+                    tipo_documento,
+                    regime,
+                    telefone_limpo,
+                    cep,
+                    rua,
+                    numero,
+                    bairro,
+                    cidade,
+                    estado
+                )
+                
+                # Mensagem de sucesso
+                self.mostrar_mensagem("Sucesso", f"Empresa '{nome_empresa}' cadastrada com sucesso!")
             
-            # Gerar código
-            ultimo_codigo = 0
-            if self.cadastro_tela.table.rowCount() > 0:
-                for row in range(self.cadastro_tela.table.rowCount()):
-                    row_codigo = int(self.cadastro_tela.table.item(row, 0).text())
-                    if row_codigo > ultimo_codigo:
-                        ultimo_codigo = row_codigo
+            # Recarregar a tabela de empresas na tela de cadastro
+            self.cadastro_tela.carregar_empresas()
             
-            novo_codigo = ultimo_codigo + 1
-            
-            # Adicionar à tabela
-            row_position = self.cadastro_tela.table.rowCount()
-            self.cadastro_tela.table.insertRow(row_position)
-            self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome_empresa))
-            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(documento))
-            
-            # Mensagem de sucesso
-            tipo_doc = "CPF" if self.documento_label.text() == "CPF:" else "CNPJ"
-            self.mostrar_mensagem("Sucesso", 
-                              f"Empresa cadastrada com sucesso!\nNome: {nome_empresa}\n{tipo_doc}: {documento}")
-        
-        # Fechar a janela em ambos os casos
-        if self.janela_parent:
-            self.janela_parent.close()
+            # Fechar a janela
+            if self.janela_parent:
+                self.janela_parent.close()
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao salvar empresa: {str(e)}", QMessageBox.Critical)
 
 
 # Para testar a tela individualmente

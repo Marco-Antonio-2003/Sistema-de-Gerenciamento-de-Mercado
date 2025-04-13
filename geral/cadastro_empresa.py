@@ -8,11 +8,25 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMessageBox, QStyle)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
+from base.banco import listar_empresas, excluir_empresa, verificar_tabela_empresas, buscar_empresa_por_id
 
 class CadastroEmpresa(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Inicializar banco de dados
+        self.inicializar_bd()
         self.initUI()
+        
+    def inicializar_bd(self):
+        """Inicializa a tabela de empresas no banco de dados"""
+        try:
+            verificar_tabela_empresas()
+        except Exception as e:
+            self.mostrar_mensagem(
+                "Erro", 
+                f"Erro ao inicializar tabela de empresas: {e}", 
+                QMessageBox.Critical
+            )
         
     def initUI(self):
         # Layout principal
@@ -66,6 +80,7 @@ class CadastroEmpresa(QWidget):
         self.codigo_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
         self.codigo_input.setMinimumHeight(35)
         self.codigo_input.setMaximumWidth(150)
+        self.codigo_input.setReadOnly(True)  # Código é gerado pelo banco
         codigo_form.addRow(self.codigo_label, self.codigo_input)
         
         codigo_botoes_layout.addLayout(codigo_form)
@@ -181,26 +196,39 @@ class CadastroEmpresa(QWidget):
         
         main_layout.addWidget(self.table)
         
-        # Carregar dados de teste (remover ou modificar quando conectar ao banco de dados)
-        self.carregar_dados_teste()
+        # Carregar dados do banco de dados
+        self.carregar_empresas()
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
         
-    def carregar_dados_teste(self):
-        # Dados de exemplo para demonstração
-        dados = [
-            (1, "Empresa A", "12.345.678/0001-90"),
-            (2, "Empresa B", "98.765.432/0001-10"),
-            (3, "Empresa C", "45.678.901/0001-23")
-        ]
-        
-        self.table.setRowCount(len(dados))
-        
-        for row, (codigo, nome, cnpj) in enumerate(dados):
-            self.table.setItem(row, 0, QTableWidgetItem(str(codigo)))
-            self.table.setItem(row, 1, QTableWidgetItem(nome))
-            self.table.setItem(row, 2, QTableWidgetItem(cnpj))
+    def carregar_empresas(self):
+        """Carrega as empresas do banco de dados na tabela"""
+        try:
+            empresas = listar_empresas()
+            
+            # Limpar tabela atual
+            self.table.setRowCount(0)
+            
+            # Adicionar empresas na tabela
+            if empresas:
+                self.table.setRowCount(len(empresas))
+                
+                for row, (id_empresa, nome, documento) in enumerate(empresas):
+                    # Formatar CNPJ/CPF para exibição
+                    if documento and len(documento) == 14:  # CNPJ
+                        documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+                    elif documento and len(documento) == 11:  # CPF
+                        documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+                    else:
+                        documento_formatado = documento
+                    
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_empresa)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(documento_formatado))
+                    
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao carregar empresas: {e}", QMessageBox.Critical)
     
     def selecionar_empresa(self, item):
         row = item.row()
@@ -221,6 +249,22 @@ class CadastroEmpresa(QWidget):
         msg_box.setWindowTitle(titulo)
         msg_box.setText(mensagem)
         msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: white;
+            }
+            QLabel { 
+                color: black;
+                background-color: white;
+            }
+            QPushButton {
+                background-color: #003b57;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                border-radius: 2px;
+            }
+        """)
         msg_box.exec_()
         
     def validar_cnpj(self, cnpj):
@@ -244,7 +288,7 @@ class CadastroEmpresa(QWidget):
             # Tente primeiro com importação direta (para ambiente de desenvolvimento)
             try:
                 # Importação direta usando o módulo
-                from geral.formulario_empresa import FormularioEmpresa
+                from geral.formulario_empresa import FormularioEmpresa  # Alterado aqui
                 print("Importação direta de FormularioEmpresa bem-sucedida")
                 return FormularioEmpresa
             except ImportError as e:
@@ -254,8 +298,15 @@ class CadastroEmpresa(QWidget):
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 module_path = os.path.join(script_dir, "formulario_empresa.py")
                 
-                # Se o arquivo não existir, vamos criar um básico
+                # Se o arquivo não existir na pasta atual, tente na pasta geral
                 if not os.path.exists(module_path):
+                    module_path = os.path.join(os.path.dirname(script_dir), "geral", "formulario_empresa.py")
+                    
+                # Se ainda não existir, crie um básico
+                if not os.path.exists(module_path):
+                    # Crie a pasta geral se não existir
+                    os.makedirs(os.path.join(os.path.dirname(script_dir), "geral"), exist_ok=True)
+                    module_path = os.path.join(os.path.dirname(script_dir), "geral", "formulario_empresa.py")
                     self.criar_formulario_empresa_padrao(module_path)
                 
                 # Carregar o módulo dinamicamente
@@ -287,6 +338,7 @@ class CadastroEmpresa(QWidget):
                                          QLineEdit, QPushButton, QMessageBox)
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
+from data.banco import criar_empresa, atualizar_empresa, buscar_empresa_por_id
 
 class FormularioEmpresa(QWidget):
     def __init__(self, parent_window, form_window=None):
@@ -322,6 +374,15 @@ class FormularioEmpresa(QWidget):
                 min-height: 35px;
             }
         """
+        
+        # Campo Código (apenas para edição)
+        self.codigo_label = QLabel("Código:")
+        self.codigo_label.setFont(QFont("Arial", 12))
+        self.codigo_label.setStyleSheet("color: white;")
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet(lineedit_style)
+        self.codigo_input.setReadOnly(True)
+        form_layout.addRow(self.codigo_label, self.codigo_input)
         
         # Campo Nome
         self.nome_label = QLabel("Nome:")
@@ -366,46 +427,66 @@ class FormularioEmpresa(QWidget):
     def salvar_empresa(self):
         nome = self.nome_input.text()
         cnpj = self.cnpj_input.text()
+        codigo = self.codigo_input.text()
         
         # Validação básica
         if not nome or not cnpj:
             QMessageBox.warning(self, "Campos obrigatórios", "Por favor, preencha todos os campos.")
             return
         
-        # Obter o próximo código disponível (exemplo simplificado)
-        ultimo_codigo = 0
-        for row in range(self.parent_window.table.rowCount()):
-            codigo = int(self.parent_window.table.item(row, 0).text())
-            if codigo > ultimo_codigo:
-                ultimo_codigo = codigo
-        
-        novo_codigo = ultimo_codigo + 1
-        
-        # Adicionar à tabela
-        row = self.parent_window.table.rowCount()
-        self.parent_window.table.insertRow(row)
-        self.parent_window.table.setItem(row, 0, QTableWidgetItem(str(novo_codigo)))
-        self.parent_window.table.setItem(row, 1, QTableWidgetItem(nome))
-        self.parent_window.table.setItem(row, 2, QTableWidgetItem(cnpj))
-        
-        # Mostrar mensagem de sucesso
-        QMessageBox.information(self, "Sucesso", "Empresa cadastrada com sucesso!")
-        
-        # Limpar campos
-        self.nome_input.clear()
-        self.cnpj_input.clear()
-        
-        # Fechar o formulário, se necessário
-        if self.form_window:
-            self.form_window.close()
+        try:
+            # Verificar se é uma edição ou um novo cadastro
+            if codigo:  # Edição
+                # Atualizar empresa no banco de dados
+                atualizar_empresa(
+                    int(codigo),
+                    nome,
+                    "",  # nome_pessoa
+                    cnpj,
+                    "CNPJ",  # tipo_documento
+                    "Simples Nacional",  # regime
+                    "",  # telefone
+                    "",  # cep
+                    "",  # rua
+                    "",  # numero
+                    "",  # bairro
+                    "",  # cidade
+                    ""   # estado
+                )
+                QMessageBox.information(self, "Sucesso", "Empresa atualizada com sucesso!")
+            else:  # Novo cadastro
+                # Criar empresa no banco de dados
+                novo_id = criar_empresa(
+                    nome,
+                    "",  # nome_pessoa
+                    cnpj,
+                    "CNPJ",  # tipo_documento
+                    "Simples Nacional",  # regime
+                    "",  # telefone
+                    "",  # cep
+                    "",  # rua
+                    "",  # numero
+                    "",  # bairro
+                    "",  # cidade
+                    ""   # estado
+                )
+                QMessageBox.information(self, "Sucesso", "Empresa cadastrada com sucesso!")
+                
+            # Recarregar a lista de empresas na tela principal
+            self.parent_window.carregar_empresas()
+            
+            # Fechar o formulário
+            if self.form_window:
+                self.form_window.close()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao salvar empresa: {str(e)}")
 ''')
             print(f"Arquivo formulario_empresa.py criado em {filepath}")
             
         except Exception as e:
             print(f"Erro ao criar arquivo formulario_empresa.py: {str(e)}")
-            
-    # Substitua o método cadastrar_empresa no arquivo cadastro_empresa.py
-
+    
     def cadastrar_empresa(self):
         """Abre o formulário para cadastro de empresa"""
         # Carregar dinamicamente a classe FormularioEmpresa
@@ -432,17 +513,22 @@ class FormularioEmpresa(QWidget):
         form_widget = FormularioEmpresa(self, self.form_window)
         self.form_window.setCentralWidget(form_widget)
         
+        # Limpar os campos para um novo cadastro
+        if hasattr(form_widget, 'codigo_input'):
+            form_widget.codigo_input.clear()
+        if hasattr(form_widget, 'nome_empresa_input'):
+            form_widget.nome_empresa_input.clear()
+        if hasattr(form_widget, 'documento_input'):
+            form_widget.documento_input.clear()
+        
         # Mostrar a janela
         self.form_window.show()
     
-    # Função alterar_empresa modificada no arquivo cadastro_empresa.py
     def alterar_empresa(self):
         """Abre o formulário para alterar os dados da empresa selecionada"""
         codigo = self.codigo_input.text()
-        nome = self.nome_input.text()
-        cnpj = self.cnpj_input.text()
         
-        if not codigo or not nome or not cnpj:
+        if not codigo:
             self.mostrar_mensagem(
                 "Seleção necessária", 
                 "Por favor, selecione uma empresa para alterar",
@@ -463,38 +549,108 @@ class FormularioEmpresa(QWidget):
             self.form_window.raise_()
             return
         
-        # Criar uma nova janela para o formulário
-        self.form_window = QMainWindow()
-        self.form_window.setWindowTitle("Alterar Cadastro de Empresa")
-        self.form_window.setGeometry(100, 100, 800, 600)
-        self.form_window.setStyleSheet("background-color: #043b57;")
-        
-        # Criar e definir o widget do formulário
-        form_widget = FormularioEmpresa(self, self.form_window)
-        self.form_window.setCentralWidget(form_widget)
-        
-        # Preencher os campos com os dados da empresa selecionada
-        form_widget.codigo_input.setText(codigo)
-        form_widget.documento_input.setText(cnpj)
-        form_widget.nome_empresa_input.setText(nome)
-        
-        # Encontrar os dados adicionais na tabela se necessário
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                # Aqui você poderia obter mais dados da tabela se necessário
-                break
-        
-        # Alterando o título do botão para "Atualizar" em vez de "Incluir"
-        form_widget.btn_incluir.setText("Atualizar")
-        
-        # Mostrar a janela
-        self.form_window.show()
+        # Buscar dados completos da empresa
+        try:
+            empresa = buscar_empresa_por_id(int(codigo))
+            if not empresa:
+                self.mostrar_mensagem("Erro", f"Empresa com código {codigo} não encontrada", QMessageBox.Warning)
+                return
+                
+            # Criar uma nova janela para o formulário
+            self.form_window = QMainWindow()
+            self.form_window.setWindowTitle("Alterar Cadastro de Empresa")
+            self.form_window.setGeometry(100, 100, 800, 600)
+            self.form_window.setStyleSheet("background-color: #043b57;")
+            
+            # Criar e definir o widget do formulário
+            form_widget = FormularioEmpresa(self, self.form_window)
+            self.form_window.setCentralWidget(form_widget)
+            
+            # Preencher os campos com os dados da empresa - COM VERIFICAÇÃO DE ATRIBUTOS
+            # Código
+            if hasattr(form_widget, 'codigo_input'):
+                form_widget.codigo_input.setText(str(empresa[0]))  # ID
+            
+            # Nome da empresa - tenta diferentes variações do nome do campo
+            if hasattr(form_widget, 'nome_input'):
+                form_widget.nome_input.setText(empresa[1])  # NOME_EMPRESA
+            elif hasattr(form_widget, 'nome_empresa_input'):
+                form_widget.nome_empresa_input.setText(empresa[1])
+                
+            # Nome da pessoa
+            if hasattr(form_widget, 'nome_pessoa_input') and len(empresa) > 2:
+                form_widget.nome_pessoa_input.setText(empresa[2])  # NOME_PESSOA
+                
+            # Documento (CNPJ/CPF)
+            documento = empresa[3] if len(empresa) > 3 else ""  # DOCUMENTO
+            
+            # Formatar CNPJ/CPF para exibição
+            if documento and len(documento) == 14:  # CNPJ
+                documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+            elif documento and len(documento) == 11:  # CPF
+                documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+            else:
+                documento_formatado = documento
+            
+            # Tenta diferentes variações do nome do campo
+            if hasattr(form_widget, 'cnpj_input'):
+                form_widget.cnpj_input.setText(documento_formatado)
+            elif hasattr(form_widget, 'documento_input'):
+                form_widget.documento_input.setText(documento_formatado)
+                
+            # Tipo de documento
+            if hasattr(form_widget, 'tipo_documento') and len(empresa) > 4:
+                tipo_doc = empresa[4]
+                # Se tiver um QComboBox para selecionar o tipo
+                if hasattr(form_widget.tipo_documento, 'setCurrentText'):
+                    form_widget.tipo_documento.setCurrentText(tipo_doc)
+                    
+            # Preencher campos adicionais se existirem
+            if len(empresa) > 5 and hasattr(form_widget, 'regime_combo'):
+                form_widget.regime_combo.setCurrentText(empresa[5] or "Simples Nacional")
+                
+            if len(empresa) > 6 and hasattr(form_widget, 'telefone_input'):
+                form_widget.telefone_input.setText(empresa[6] or "")
+                
+            if len(empresa) > 7 and hasattr(form_widget, 'cep_input'):
+                cep = empresa[7] or ""
+                if cep and len(cep) == 8:
+                    cep = f"{cep[:5]}-{cep[5:]}"
+                form_widget.cep_input.setText(cep)
+                
+            if len(empresa) > 8 and hasattr(form_widget, 'rua_input'):
+                form_widget.rua_input.setText(empresa[8] or "")
+                
+            if len(empresa) > 9 and hasattr(form_widget, 'numero_input'):
+                form_widget.numero_input.setText(empresa[9] or "")
+                
+            if len(empresa) > 10 and hasattr(form_widget, 'bairro_input'):
+                form_widget.bairro_input.setText(empresa[10] or "")
+                
+            if len(empresa) > 11 and hasattr(form_widget, 'cidade_input'):
+                form_widget.cidade_input.setText(empresa[11] or "")
+                
+            if len(empresa) > 12 and hasattr(form_widget, 'estado_input'):
+                form_widget.estado_input.setText(empresa[12] or "")
+            
+            # Mostrar a janela
+            self.form_window.show()
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao buscar dados da empresa: {e}", QMessageBox.Critical)
+            import traceback
+            traceback.print_exc()  # Imprime o stack trace completo para depuração
     
     def excluir_empresa(self):
+        """Exclui a empresa selecionada do banco de dados"""
         codigo = self.codigo_input.text()
         
         if not codigo:
-            self.mostrar_mensagem("Seleção necessária", "Por favor, selecione uma empresa para excluir", QMessageBox.Warning)
+            self.mostrar_mensagem(
+                "Seleção necessária", 
+                "Por favor, selecione uma empresa para excluir", 
+                QMessageBox.Warning
+            )
             return
             
         # Confirmar exclusão
@@ -503,29 +659,46 @@ class FormularioEmpresa(QWidget):
         msg_box.setWindowTitle("Confirmar exclusão")
         msg_box.setText(f"Deseja realmente excluir a empresa de código {codigo}?")
         msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: white;
+            }
+            QLabel { 
+                color: black;
+                background-color: white;
+            }
+            QPushButton {
+                background-color: #003b57;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                border-radius: 2px;
+            }
+        """)
         resposta = msg_box.exec_()
         
         if resposta == QMessageBox.No:
             return
         
-        # Busca a linha pelo código
-        encontrado = False
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                nome = self.table.item(row, 1).text()
-                self.table.removeRow(row)
-                
-                # Limpa os campos
-                self.codigo_input.clear()
-                self.nome_input.clear()
-                self.cnpj_input.clear()
-                
-                self.mostrar_mensagem("Sucesso", f"Empresa {nome} (código: {codigo}) excluída com sucesso!")
-                encontrado = True
-                break
-        
-        if not encontrado:
-            self.mostrar_mensagem("Não encontrado", f"Empresa com código {codigo} não encontrada", QMessageBox.Warning)
+        # Excluir a empresa do banco de dados
+        try:
+            nome = self.nome_input.text()
+            
+            # Excluir empresa
+            excluir_empresa(int(codigo))
+            
+            # Limpar os campos
+            self.codigo_input.clear()
+            self.nome_input.clear()
+            self.cnpj_input.clear()
+            
+            # Recarregar a lista de empresas
+            self.carregar_empresas()
+            
+            self.mostrar_mensagem("Sucesso", f"Empresa {nome} (código: {codigo}) excluída com sucesso!")
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao excluir empresa: {e}", QMessageBox.Critical)
 
 
 # Se este arquivo for executado como script principal

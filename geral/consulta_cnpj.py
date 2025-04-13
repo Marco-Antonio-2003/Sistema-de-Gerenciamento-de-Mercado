@@ -247,7 +247,7 @@ class ConsultaCNPJForm(QWidget):
         main_layout.addLayout(duas_colunas_layout)
         
         # Botão "Incluir" com tamanho reduzido
-        self.btn_incluir = QPushButton("Incluir")
+        self.btn_incluir = QPushButton("Incluir como um novo Cliente")
         self.btn_incluir.setStyleSheet("""
             QPushButton {
                 background-color: #01fd9a;
@@ -278,18 +278,18 @@ class ConsultaCNPJForm(QWidget):
         
         self.btn_group = QButtonGroup()
         
-        self.radio_cliente = QRadioButton("Incluir como Cliente")
-        self.radio_cliente.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
-        self.radio_fornecedor = QRadioButton("Como Fornecedor")
-        self.radio_fornecedor.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
+        # self.radio_cliente = QRadioButton("Incluir como Cliente")
+        # self.radio_cliente.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
+        # self.radio_fornecedor = QRadioButton("Como Fornecedor")
+        # self.radio_fornecedor.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
         
-        self.btn_group.addButton(self.radio_cliente)
-        self.btn_group.addButton(self.radio_fornecedor)
+        # self.btn_group.addButton(self.radio_cliente)
+        # self.btn_group.addButton(self.radio_fornecedor)
         
-        radio_layout.addWidget(self.radio_cliente)
-        radio_layout.addWidget(self.radio_fornecedor)
+        # radio_layout.addWidget(self.radio_cliente)
+        # radio_layout.addWidget(self.radio_fornecedor)
         
-        main_layout.addLayout(radio_layout)
+        # main_layout.addLayout(radio_layout)
         
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
@@ -486,16 +486,115 @@ class ConsultaCNPJForm(QWidget):
     
     def incluir_registro(self):
         """
-        Método para incluir os dados consultados no banco de dados.
-        Atualmente, apenas exibe uma mensagem de sucesso.
+        Inclui os dados consultados do CNPJ como uma nova pessoa no banco de dados
         """
-        # Aqui você pode adicionar a lógica para inserir os dados no banco de dados.
-        # Exemplo: if self.radio_cliente.isChecked(): inserir_cliente() else: inserir_fornecedor()
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Inclusão")
-        msg.setText("Registro incluído com sucesso!")
-        msg.setStyleSheet("background-color: white;")
-        msg.exec_()
+        # Verificar se os dados foram consultados
+        if not self.nome_input.text():
+            QMessageBox.warning(self, "Dados incompletos", 
+                            "Por favor, consulte um CNPJ antes de incluir os dados.")
+            return
+        
+        try:
+            # Importando a função criar_pessoa do banco
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from base.banco import criar_pessoa
+            
+            # Obter os dados dos campos
+            nome = self.nome_input.text()
+            
+            # Determinar o tipo de pessoa (sempre será Jurídica para CNPJ)
+            tipo_pessoa = "Jurídica"
+            
+            # Obter o CNPJ formatado
+            documento = self.cnpj_input.text()
+            
+            # Obter telefone
+            telefone = self.telefone_input.text()
+            
+            # Obter dados de endereço - verificando campos vazios e adicionando informações
+            cep = self.cep_input.text() or ""
+            
+            # Para rua, podemos buscar alguma informação relevante ou deixar em branco
+            # Temos que ter cuidado para não confundir o usuário misturando os campos
+            complemento = self.complemento_input.text() or ""
+            numero = self.numero_input.text() or ""
+            
+            # Tentamos formar um endereço completo baseado no que temos disponível
+            rua = ""
+            # Verificamos se existe alguma informação de número ou complemento
+            if complemento or numero:
+                if complemento and numero:
+                    rua = f"{complemento}, {numero}"
+                elif complemento:
+                    rua = complemento
+                else:
+                    rua = f"Número: {numero}"
+            
+            bairro = self.bairro_input.text() or ""
+            cidade = self.cidade_input.text() or ""
+            estado = self.uf_input.text() or ""
+            
+            # Data cadastro (atual)
+            from datetime import datetime
+            data_cadastro = datetime.now().strftime("%d/%m/%Y")
+            
+            # Criar observação com informações adicionais do CNPJ
+            observacao = f"CNPJ consultado automaticamente. "
+            
+            # Adicionar informações relevantes à observação
+            info_add = []
+            if self.situacao_input.text():
+                info_add.append(f"Situação: {self.situacao_input.text()}")
+            if self.fantasia_input.text():
+                info_add.append(f"Nome Fantasia: {self.fantasia_input.text()}")
+            if self.email_input.text():
+                info_add.append(f"Email: {self.email_input.text()}")
+            if self.cnae_input.text():
+                info_add.append(f"CNAE: {self.cnae_input.text()}")
+            if self.inscricao_estadual_input.text():
+                info_add.append(f"Inscrição Estadual: {self.inscricao_estadual_input.text()}")
+            if self.abertura_input.text():
+                info_add.append(f"Data de Abertura: {self.abertura_input.text()}")
+            
+            observacao += ". ".join(info_add)
+            
+            # Inserir a pessoa no banco de dados
+            novo_id = criar_pessoa(
+                nome, 
+                tipo_pessoa, 
+                documento, 
+                telefone, 
+                data_cadastro,
+                cep, 
+                rua, 
+                bairro, 
+                cidade, 
+                estado, 
+                observacao
+            )
+            
+            # Exibir mensagem de sucesso
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Inclusão")
+            msg.setText(f"Empresa cadastrada com sucesso como uma nova pessoa!\n\nCódigo: {novo_id}\nNome: {nome}")
+            msg.setStyleSheet("background-color: white;")
+            msg.exec_()
+            
+            # Notificar tela de cadastro para atualizar a lista (se existir)
+            if self.cadastro_tela and hasattr(self.cadastro_tela, 'carregar_pessoas'):
+                self.cadastro_tela.carregar_pessoas()
+            
+            # Fechar a janela após inclusão bem-sucedida
+            if self.janela_parent:
+                self.janela_parent.close()
+                
+        except Exception as e:
+            # Exibir mensagem de erro
+            QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao incluir os dados: {str(e)}")
+            import traceback
+            traceback.print_exc()  # Imprime o stack trace completo para depuração
 
 
 class ConsultaCNPJWindow(QMainWindow):

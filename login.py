@@ -1,4 +1,3 @@
-#login.py
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -7,6 +6,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSettings
 from principal import MainWindow
+# Alterar a importação para usar o novo módulo
+from base.banco import validar_login, criar_usuario_padrao, verificar_tabela_usuarios
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -23,8 +24,19 @@ class LoginWindow(QMainWindow):
         # Configurar a interface
         self.initUI()
         
-        # Carregar o usuário salvo, se existir
-        self.carregar_usuario_salvo()
+        # Inicializar banco de dados
+        self.inicializar_bd()
+        
+        # Carregar o usuário e empresa salvos, se existirem
+        self.carregar_dados_salvos()
+    
+    def inicializar_bd(self):
+        """Inicializa o banco de dados e cria as tabelas necessárias"""
+        try:
+            verificar_tabela_usuarios()
+            criar_usuario_padrao()
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao inicializar banco de dados: {e}")
     
     def center_on_screen(self):
         """Centraliza a janela na tela"""
@@ -153,57 +165,68 @@ class LoginWindow(QMainWindow):
         """Avança para o campo de empresa quando Enter é pressionado no campo de senha"""
         self.empresa_input.setFocus()
     
-    def carregar_usuario_salvo(self):
-        """Carrega o usuário salvo anteriormente, se existir"""
+    def carregar_dados_salvos(self):
+        """Carrega o usuário e empresa salvos anteriormente, se existirem"""
         usuario_salvo = self.settings.value("ultimo_usuario", "")
+        empresa_salva = self.settings.value("ultima_empresa", "")
+        
         if usuario_salvo:
             self.usuario_input.setText(usuario_salvo)
-            self.senha_input.setFocus()  # Coloca o foco no campo de senha
+            
+        if empresa_salva:
+            self.empresa_input.setText(empresa_salva)
+        
+        # Se tiver usuário salvo, põe o foco na senha
+        if usuario_salvo:
+            self.senha_input.setFocus()
+        else:
+            self.usuario_input.setFocus()
     
-    def salvar_usuario(self, usuario):
-        """Salva o usuário para uso futuro"""
+    def salvar_dados(self, usuario, empresa):
+        """Salva o usuário e empresa para uso futuro"""
         self.settings.setValue("ultimo_usuario", usuario)
+        self.settings.setValue("ultima_empresa", empresa)
         self.settings.sync()  # Garante que as configurações sejam salvas imediatamente
     
     def login(self):
-        """Processa o login quando o botão é clicado ou Enter é pressionado"""
-        usuario = self.usuario_input.text()
-        senha = self.senha_input.text()
-        empresa = self.empresa_input.text()
+        usuario = self.usuario_input.text().strip()
+        senha   = self.senha_input.text().strip()
+        empresa = self.empresa_input.text().strip()
         
-        # Validação dos campos
+        # validações de campo…
         if not usuario:
-            self.mostrar_mensagem("Atenção", "Por favor, informe o usuário!")
+            self.mostrar_mensagem("Atenção", "Informe o usuário!")
             self.usuario_input.setFocus()
             return
-        
         if not senha:
-            self.mostrar_mensagem("Atenção", "Por favor, informe a senha!")
+            self.mostrar_mensagem("Atenção", "Informe a senha!")
             self.senha_input.setFocus()
             return
-        
         if not empresa:
-            self.mostrar_mensagem("Atenção", "Por favor, informe a empresa!")
+            self.mostrar_mensagem("Atenção", "Informe a empresa!")
             self.empresa_input.setFocus()
             return
         
-        # Salvar o usuário para próximos logins
-        self.salvar_usuario(usuario)
+        # salva usuário e empresa para próxima vez
+        self.salvar_dados(usuario, empresa)
         
-        # Aqui você pode adicionar a lógica de validação de login real
-        # Por enquanto, apenas vamos simular um login bem-sucedido
-        
-        # Para fins de teste, vamos considerar qualquer login válido
-        self.mostrar_mensagem("Sucesso", "Login realizado com sucesso!")
-        
-        # Abrir a tela principal
+        # *** valida no banco Firebird ***
         try:
-            self.main_window = MainWindow(usuario=usuario, empresa=empresa)
-            self.main_window.show()
-            self.close()
+            ok = validar_login(usuario, senha, empresa)
         except Exception as e:
-            self.mostrar_mensagem("Erro", f"Erro ao abrir o sistema: {str(e)}")
-            print(f"Erro ao abrir a tela principal: {str(e)}")
+            self.mostrar_mensagem("Erro", f"Falha ao acessar o banco: {e}")
+            return
+        
+        if not ok:
+            self.mostrar_mensagem("Erro", "Usuário ou senha inválidos!")
+            return
+        
+        # sucesso!
+        self.mostrar_mensagem("Sucesso", "Login realizado com sucesso!")
+        self.main_window = MainWindow(usuario=usuario, empresa=empresa)
+        self.main_window.show()
+        self.close()
+
     
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""

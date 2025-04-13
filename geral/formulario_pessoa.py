@@ -780,19 +780,88 @@ class FormularioPessoa(QWidget):
                 return False
             
             return True
+    def preencher_formulario_do_banco(self, id_pessoa):
+        """Preenche o formulário com dados da pessoa do banco de dados"""
+        try:
+            from base.banco import buscar_pessoa_por_id
+            
+            # Buscar dados da pessoa
+            pessoa = buscar_pessoa_por_id(id_pessoa)
+            if not pessoa:
+                self.mostrar_mensagem("Erro", f"Pessoa com ID {id_pessoa} não encontrada", QMessageBox.Warning)
+                return False
+            
+            # ID, NOME, TIPO_PESSOA, DOCUMENTO, TELEFONE, DATA_CADASTRO, CEP, RUA, BAIRRO, CIDADE, ESTADO, OBSERVACAO
+            self.codigo_input.setText(str(pessoa[0]))
+            self.nome_input.setText(pessoa[1])
+            
+            # Configurar o tipo de pessoa
+            index = 0 if pessoa[2] == "Jurídica" else 1
+            self.tipo_combo.setCurrentIndex(index)
+            
+            # Formatar CNPJ/CPF para exibição
+            documento = pessoa[3]
+            if documento and len(documento) == 14:  # CNPJ
+                documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+            elif documento and len(documento) == 11:  # CPF
+                documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+            else:
+                documento_formatado = documento
+                
+            self.documento_input.setText(documento_formatado)
+            
+            # Preencher telefone
+            telefone = pessoa[4] or ""
+            if telefone and len(telefone) > 10:  # Formatar telefone
+                self.telefone_input.setText(f"({telefone[:2]}) {telefone[2:7]}-{telefone[7:]}")
+            elif telefone and len(telefone) > 2:
+                self.telefone_input.setText(f"({telefone[:2]}) {telefone[2:]}")
+            else:
+                self.telefone_input.setText(telefone)
+            
+            # Preencher data de cadastro
+            if pessoa[5]:  # DATA_CADASTRO
+                try:
+                    from PyQt5.QtCore import QDate
+                    data = QDate.fromString(pessoa[5].strftime("%d/%m/%Y"), "dd/MM/yyyy")
+                    self.data_input.setDate(data)
+                except Exception as e:
+                    print(f"Erro ao converter data: {e}")
+                    self.data_input.setDate(QDate.currentDate())
+            
+            # Preencher CEP
+            cep = pessoa[6] or ""
+            if cep and len(cep) >= 8:
+                self.cep_input.setText(f"{cep[:5]}-{cep[5:]}")
+            else:
+                self.cep_input.setText(cep)
+            
+            # Preencher outros campos de endereço
+            self.rua_input.setText(pessoa[7] or "")  # RUA
+            self.bairro_input.setText(pessoa[8] or "")  # BAIRRO
+            self.cidade_input.setText(pessoa[9] or "")  # CIDADE
+            self.estado_input.setText(pessoa[10] or "")  # ESTADO
+            
+            # Alterar texto do botão para Atualizar
+            self.btn_incluir.setText("Atualizar")
+            
+            return True
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao carregar dados da pessoa: {e}", QMessageBox.Critical)
+            return False
     
     def salvar_pessoa(self):
-        """Salva os dados da pessoa na tabela da tela de cadastro"""
+        """Salva os dados da pessoa no banco de dados"""
         nome = self.nome_input.text()
         tipo_pessoa = self.tipo_combo.currentText()
         documento = self.documento_input.text()
         telefone = self.telefone_input.text()
         data_cadastro = self.data_input.date().toString("dd/MM/yyyy")
+        cep = self.cep_input.text()
         rua = self.rua_input.text()
         bairro = self.bairro_input.text()
-        cep = self.cep_input.text()
         cidade = self.cidade_input.text()
-        estado = self.estado_input.text()
+        estado = self.estado_input.text().upper()
         codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
         # Validação básica
@@ -809,61 +878,63 @@ class FormularioPessoa(QWidget):
         if not self.validar_documento():
             return
         
-        # Verificar acesso à tabela
-        if not self.cadastro_tela or not hasattr(self.cadastro_tela, 'table'):
-            self.mostrar_mensagem("Erro", "Não foi possível acessar a tabela de pessoas.", QMessageBox.Critical)
-            return
-        
-        # Verificar se é uma atualização ou novo cadastro
-        if self.btn_incluir.text() == "Atualizar" and codigo:
-            # Modo de atualização - procurar o item na tabela pelo código
-            encontrado = False
-            for row in range(self.cadastro_tela.table.rowCount()):
-                if self.cadastro_tela.table.item(row, 0).text() == codigo:
-                    # Atualizar os dados na tabela
-                    self.cadastro_tela.table.setItem(row, 1, QTableWidgetItem(nome))
-                    self.cadastro_tela.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
-                    
-                    # Mensagem de sucesso
-                    self.mostrar_mensagem("Sucesso", f"Pessoa atualizada com sucesso!\nNome: {nome}\nTipo: {tipo_pessoa}")
-                    
-                    encontrado = True
-                    break
+        try:
+            # Importar funções do banco de dados
+            from base.banco import criar_pessoa, atualizar_pessoa, buscar_pessoa_por_id
             
-            if not encontrado:
-                self.mostrar_mensagem("Erro", "Pessoa não encontrada para atualização.", QMessageBox.Warning)
-                return
-        else:
-            # Novo cadastro - verificar documento duplicado
-            for row in range(self.cadastro_tela.table.rowCount()):
-                # Aqui não verificamos o documento na tabela, pois precisamos de uma coluna específica
-                # A verificação pode ser implementada se a coluna de documento for adicionada à tabela
-                pass
+            # Verificar se é uma atualização ou novo cadastro
+            if self.btn_incluir.text() == "Atualizar" and codigo:
+                # Verificar se a pessoa existe
+                pessoa = buscar_pessoa_por_id(int(codigo))
+                if not pessoa:
+                    self.mostrar_mensagem("Erro", f"Pessoa com código {codigo} não encontrada", QMessageBox.Warning)
+                    return
+                    
+                # Atualizar no banco de dados
+                atualizar_pessoa(
+                    int(codigo),
+                    nome,
+                    tipo_pessoa,
+                    documento,
+                    telefone,
+                    data_cadastro,
+                    cep,
+                    rua,
+                    bairro,
+                    cidade,
+                    estado
+                )
                 
-            # Gerar código para nova pessoa
-            ultimo_codigo = 0
-            if self.cadastro_tela.table.rowCount() > 0:
-                for row in range(self.cadastro_tela.table.rowCount()):
-                    codigo_atual = int(self.cadastro_tela.table.item(row, 0).text())
-                    if codigo_atual > ultimo_codigo:
-                        ultimo_codigo = codigo_atual
+                self.mostrar_mensagem("Sucesso", f"Pessoa atualizada com sucesso!\nNome: {nome}")
+            else:
+                # Criar nova pessoa no banco de dados
+                novo_id = criar_pessoa(
+                    nome,
+                    tipo_pessoa,
+                    documento,
+                    telefone,
+                    data_cadastro,
+                    cep,
+                    rua,
+                    bairro,
+                    cidade,
+                    estado
+                )
+                
+                self.mostrar_mensagem("Sucesso", f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_id}")
             
-            novo_codigo = ultimo_codigo + 1
+            # Atualizar a tabela na tela principal
+            if self.cadastro_tela:
+                self.cadastro_tela.carregar_pessoas()
             
-            # Adicionar à tabela
-            row_position = self.cadastro_tela.table.rowCount()
-            self.cadastro_tela.table.insertRow(row_position)
-            self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(str(novo_codigo)))
-            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
-            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_pessoa))
-            
-            # Mensagem de sucesso
-            self.mostrar_mensagem("Sucesso", f"Pessoa cadastrada com sucesso!\nNome: {nome}\nCódigo: {novo_codigo}")
+            # Fechar a janela
+            if self.janela_parent:
+                self.janela_parent.close()
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao salvar pessoa: {str(e)}", QMessageBox.Critical)
+
         
-        # Fechar a janela em ambos os casos
-        if self.janela_parent:
-            self.janela_parent.close()
-    
     def abrir_calendario(self):
         """Abre o calendário quando o botão ou o campo de data é clicado"""
         # Criar um calendário personalizado para garantir fundo branco

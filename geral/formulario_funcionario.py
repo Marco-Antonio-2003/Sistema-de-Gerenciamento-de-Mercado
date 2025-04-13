@@ -2,6 +2,9 @@
 import sys
 import os
 # Importação condicional do requests
+# Adicionar o diretório raiz ao caminho de busca
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 try:
     import requests
     REQUESTS_AVAILABLE = True
@@ -743,95 +746,222 @@ class FormularioFuncionario(QWidget):
             
         return True
     
+    # Método para salvar o funcionário no banco de dados
     def salvar_funcionario(self):
-        """Salva os dados do funcionário na tabela da tela de cadastro"""
+        """Salva os dados do funcionário no banco de dados"""
+        # Obter dados do formulário
         nome = self.nome_input.text()
-        tipo_pessoa = self.tipo_combo.currentText()
-        cpf = self.cpf_input.text()
-        telefone = self.telefone_input.text()
-        data_cadastro = self.data_input.date().toString("dd/MM/yyyy")
-        sexo = self.sexo_combo.currentText()
         tipo_vendedor = self.tipo_vendedor_combo.currentText()
+        telefone = self.telefone_input.text()
+        tipo_pessoa = self.tipo_combo.currentText()
+        data_cadastro = self.data_input.date().toString("dd/MM/yyyy")
+        cpf_cnpj = self.cpf_input.text()
+        sexo = self.sexo_combo.currentText()
+        cep = self.cep_input.text()
         rua = self.rua_input.text()
         bairro = self.bairro_input.text()
-        cep = self.cep_input.text()
         cidade = self.cidade_input.text()
+        estado = "" if not hasattr(self, 'estado_input') else self.estado_input.text()
+        codigo = self.codigo_input.text()  # Obtém o código se estiver preenchido
         
         # Validação básica
         if not nome:
             self.mostrar_mensagem("Campos obrigatórios", 
-                               "Por favor, informe o nome do funcionário.", 
-                               QMessageBox.Warning)
+                            "Por favor, informe o nome do funcionário.", 
+                            QMessageBox.Warning)
             self.nome_input.setFocus()
             return
             
-        if not cpf:
+        if not cpf_cnpj:
+            documento_tipo = "CPF" if self.cpf_label.text() == "CPF:" else "CNPJ"
             self.mostrar_mensagem("Campos obrigatórios", 
-                               "Por favor, informe o CPF/CNPJ.", 
-                               QMessageBox.Warning)
+                            f"Por favor, informe o {documento_tipo}.", 
+                            QMessageBox.Warning)
             self.cpf_input.setFocus()
             return
         
         # Validar CPF/CNPJ
-        if self.cpf_label.text() == "CPF:" and not self.validar_cpf(cpf):
+        if self.cpf_label.text() == "CPF:" and not self.validar_cpf(cpf_cnpj):
             self.cpf_input.setFocus()
             return
         
-        # Código para salvar na tabela principal
-        if self.cadastro_tela and hasattr(self.cadastro_tela, 'table'):
-            # Se é uma edição, localiza o item na tabela
-            modo_edicao = False
-            row_position = -1
+        try:
+            # Importar funções do banco
+            from base.banco import criar_funcionario, atualizar_funcionario, buscar_funcionario_por_id
             
-            if self.dados_funcionario and 'codigo' in self.dados_funcionario:
-                codigo = self.dados_funcionario['codigo']
-                for row in range(self.cadastro_tela.table.rowCount()):
-                    if self.cadastro_tela.table.item(row, 0).text() == codigo:
-                        row_position = row
-                        modo_edicao = True
-                        break
-            
-            # Se não for edição, adicionar nova linha
-            if not modo_edicao:
-                # Gerar código
-                novo_codigo = 1
-                if self.cadastro_tela.table.rowCount() > 0:
-                    ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
-                    novo_codigo = ultimo_codigo + 1
+            # Verificar se é uma atualização ou novo cadastro
+            if self.btn_incluir.text() == "Atualizar" and codigo:
+                # Verificar se o funcionário existe
+                funcionario = buscar_funcionario_por_id(int(codigo))
+                if not funcionario:
+                    self.mostrar_mensagem("Erro", 
+                                    f"Funcionário com código {codigo} não encontrado", 
+                                    QMessageBox.Warning)
+                    return
+                    
+                # Atualizar no banco de dados
+                atualizar_funcionario(
+                    int(codigo),
+                    nome,
+                    tipo_vendedor,
+                    telefone,
+                    tipo_pessoa,
+                    data_cadastro,
+                    cpf_cnpj,
+                    sexo,
+                    cep,
+                    rua,
+                    bairro,
+                    cidade,
+                    estado
+                )
                 
-                codigo = str(novo_codigo)
-                row_position = self.cadastro_tela.table.rowCount()
-                self.cadastro_tela.table.insertRow(row_position)
-                self.cadastro_tela.table.setItem(row_position, 0, QTableWidgetItem(codigo))
+                self.mostrar_mensagem("Sucesso", 
+                                f"Funcionário atualizado com sucesso!\nNome: {nome}")
+                                
+                # Atualizar a tabela principal
+                if self.cadastro_tela:
+                    self.cadastro_tela.carregar_funcionarios()
+                    
+                # Fechar a janela
+                if self.janela_parent:
+                    self.janela_parent.close()
             else:
-                codigo = self.dados_funcionario['codigo']
+                # Criar novo funcionário no banco de dados
+                novo_id = criar_funcionario(
+                    nome,
+                    tipo_vendedor,
+                    telefone,
+                    tipo_pessoa,
+                    data_cadastro,
+                    cpf_cnpj,
+                    sexo,
+                    cep,
+                    rua,
+                    bairro,
+                    cidade,
+                    estado
+                )
+                
+                self.mostrar_mensagem("Sucesso", 
+                                f"Funcionário cadastrado com sucesso!\nNome: {nome}\nCódigo: {novo_id}")
+                
+                # Atualizar a tabela principal
+                if self.cadastro_tela:
+                    self.cadastro_tela.carregar_funcionarios()
+                    
+                # Fechar a janela
+                if self.janela_parent:
+                    self.janela_parent.close()
+        
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao salvar funcionário: {str(e)}", QMessageBox.Critical)
+
+    def preencher_formulario_do_banco(self, id_funcionario):
+        """Preenche o formulário com dados do funcionário do banco de dados"""
+        try:
+            from base.banco import buscar_funcionario_por_id
             
-            # Atualizar ou adicionar dados à tabela
-            self.cadastro_tela.table.setItem(row_position, 1, QTableWidgetItem(nome))
-            self.cadastro_tela.table.setItem(row_position, 2, QTableWidgetItem(tipo_vendedor))
+            # Buscar dados do funcionário
+            funcionario = buscar_funcionario_por_id(id_funcionario)
+            if not funcionario:
+                self.mostrar_mensagem("Erro", f"Funcionário com ID {id_funcionario} não encontrado", QMessageBox.Warning)
+                return False
             
-            # Adicionar telefone se a coluna existir
-            if self.cadastro_tela.table.columnCount() > 3:
-                self.cadastro_tela.table.setItem(row_position, 3, QTableWidgetItem(telefone))
+            # Preencher os campos do formulário
+            # ID, NOME, TIPO_VENDEDOR, TELEFONE, TIPO_PESSOA, DATA_CADASTRO, CPF_CNPJ, SEXO, CEP, RUA, BAIRRO, CIDADE, ESTADO, OBSERVACAO
+            self.codigo_input.setText(str(funcionario[0]))  # ID
+            self.nome_input.setText(funcionario[1])         # NOME
             
-            # Mensagem de sucesso
-            acao = "atualizado" if modo_edicao else "cadastrado"
+            # Configurar o tipo de vendedor
+            tipo_vendedor = funcionario[2]  # TIPO_VENDEDOR
+            index = 0  # Padrão: Interno
+            if tipo_vendedor == "Externo":
+                index = 1
+            elif tipo_vendedor == "Representante":
+                index = 2
+            self.tipo_vendedor_combo.setCurrentIndex(index)
             
-            self.mostrar_mensagem("Sucesso", 
-                               f"Funcionário {acao} com sucesso!\nNome: {nome}\nCódigo: {codigo}")
+            # Preencher telefone
+            telefone = funcionario[3] or ""        # TELEFONE
+            if telefone and len(telefone) > 10:    # Formatar telefone
+                self.telefone_input.setText(f"({telefone[:2]}) {telefone[2:7]}-{telefone[7:]}")
+            elif telefone and len(telefone) > 2:
+                self.telefone_input.setText(f"({telefone[:2]}) {telefone[2:]}")
+            else:
+                self.telefone_input.setText(telefone)
             
-            # Fechar a janela
-            if self.janela_parent:
-                self.janela_parent.close()
-        else:
-            # Caso não tenha referência à tabela principal
-            self.mostrar_mensagem("Teste", 
-                               "Funcionário seria cadastrado com os seguintes dados:\n" +
-                               f"Nome: {nome}\n" +
-                               f"Telefone: {telefone}\n" +
-                               f"Tipo de pessoa: {tipo_pessoa}\n" +
-                               f"Tipo de vendedor: {tipo_vendedor}\n" +
-                               f"Data de cadastro: {data_cadastro}")
+            # Configurar o tipo de pessoa
+            if funcionario[4]:                     # TIPO_PESSOA
+                tipo_pessoa = funcionario[4]
+                index = 0 if tipo_pessoa == "Jurídica" else 1
+                self.tipo_combo.setCurrentIndex(index)
+            
+            # Preencher data de cadastro
+            if funcionario[5]:                     # DATA_CADASTRO
+                try:
+                    from PyQt5.QtCore import QDate
+                    data = QDate.fromString(funcionario[5].strftime("%d/%m/%Y"), "dd/MM/yyyy")
+                    self.data_input.setDate(data)
+                except Exception as e:
+                    print(f"Erro ao converter data: {e}")
+                    self.data_input.setDate(QDate.currentDate())
+            
+            # Formatar CPF/CNPJ
+            cpf_cnpj = funcionario[6]              # CPF_CNPJ
+            if cpf_cnpj:
+                if len(cpf_cnpj) <= 11:            # CPF
+                    # Configurar o tipo de pessoa para Física
+                    self.tipo_combo.setCurrentIndex(1)  # Índice 1: Física
+                    # Formatar CPF
+                    if len(cpf_cnpj) == 11:
+                        cpf_formatado = f"{cpf_cnpj[:3]}.{cpf_cnpj[3:6]}.{cpf_cnpj[6:9]}-{cpf_cnpj[9:]}"
+                        self.cpf_input.setText(cpf_formatado)
+                    else:
+                        self.cpf_input.setText(cpf_cnpj)
+                else:                             # CNPJ
+                    # Configurar o tipo de pessoa para Jurídica
+                    self.tipo_combo.setCurrentIndex(0)  # Índice 0: Jurídica
+                    # Formatar CNPJ
+                    if len(cpf_cnpj) == 14:
+                        cnpj_formatado = f"{cpf_cnpj[:2]}.{cpf_cnpj[2:5]}.{cpf_cnpj[5:8]}/{cpf_cnpj[8:12]}-{cpf_cnpj[12:]}"
+                        self.cpf_input.setText(cnpj_formatado)
+                    else:
+                        self.cpf_input.setText(cpf_cnpj)
+            
+            # Preencher sexo
+            if funcionario[7]:                    # SEXO
+                sexo = funcionario[7]
+                index = 0  # Padrão: Masculino
+                if sexo == "Feminino":
+                    index = 1
+                elif sexo == "Outro":
+                    index = 2
+                self.sexo_combo.setCurrentIndex(index)
+            
+            # Preencher CEP
+            cep = funcionario[8] or ""            # CEP
+            if cep and len(cep) >= 8:
+                self.cep_input.setText(f"{cep[:5]}-{cep[5:]}")
+            else:
+                self.cep_input.setText(cep)
+            
+            # Preencher campos de endereço
+            self.rua_input.setText(funcionario[9] or "")     # RUA
+            self.bairro_input.setText(funcionario[10] or "") # BAIRRO
+            self.cidade_input.setText(funcionario[11] or "") # CIDADE
+
+            # Verificar se o campo estado_input existe antes de tentar acessá-lo
+            if hasattr(self, 'estado_input'):
+                self.estado_input.setText(funcionario[12] or "") # ESTADO
+            
+            # Alterar texto do botão para Atualizar
+            self.btn_incluir.setText("Atualizar")
+            
+            return True
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao carregar dados do funcionário: {e}", QMessageBox.Critical)
+            return False
 
 
 # Para testar a tela individualmente

@@ -1,5 +1,7 @@
 import sys
 import os
+# Adicionar o diretório raiz ao caminho de busca
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, 
@@ -11,7 +13,21 @@ from PyQt5.QtCore import Qt
 class CadastroFuncionario(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Inicializar banco de dados
+        self.inicializar_bd()
         self.initUI()
+
+    def inicializar_bd(self):
+        """Inicializa a tabela de funcionários no banco de dados"""
+        try:
+            from base.banco import verificar_tabela_funcionarios
+            verificar_tabela_funcionarios()
+        except Exception as e:
+            self.mostrar_mensagem(
+                "Erro", 
+                f"Erro ao inicializar tabela de funcionários: {e}", 
+                QMessageBox.Critical
+            )
         
     def initUI(self):
         # Layout principal
@@ -238,7 +254,7 @@ class CadastroFuncionario(QWidget):
         main_layout.addWidget(self.table)
         
         # Carregar dados de teste
-        self.carregar_dados_teste()
+        self.carregar_funcionarios()
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
@@ -271,21 +287,72 @@ class CadastroFuncionario(QWidget):
             self.telefone_input.setCursorPosition(len(texto_formatado))
             self.telefone_input.blockSignals(False)
     
-    def carregar_dados_teste(self):
-        """Carrega alguns dados de teste na tabela"""
-        dados_teste = [
-            ("1", "João Silva", "Interno", "(11) 98765-4321"),
-            ("2", "Maria Oliveira", "Externo", "(21) 99876-5432"),
-            ("3", "Carlos Souza", "Representante", "(31) 97654-3210")
-        ]
+    def excluir_funcionario(self):
+        """Exclui um funcionário do banco de dados"""
+        codigo = self.codigo_input.text()
         
-        self.table.setRowCount(len(dados_teste))
+        if not codigo:
+            self.mostrar_mensagem("Seleção necessária", 
+                                "Por favor, selecione um funcionário para excluir", 
+                                QMessageBox.Warning)
+            return
+            
+        # Confirmar exclusão
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirmar exclusão")
+        msg_box.setText(f"Deseja realmente excluir o funcionário de código {codigo}?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        resposta = msg_box.exec_()
         
-        for row, (codigo, nome, tipo, telefone) in enumerate(dados_teste):
-            self.table.setItem(row, 0, QTableWidgetItem(codigo))
-            self.table.setItem(row, 1, QTableWidgetItem(nome))
-            self.table.setItem(row, 2, QTableWidgetItem(tipo))
-            self.table.setItem(row, 3, QTableWidgetItem(telefone))
+        if resposta == QMessageBox.No:
+            return
+        
+        try:
+            from base.banco import excluir_funcionario
+            
+            # Excluir o funcionário do banco
+            excluir_funcionario(int(codigo))
+            
+            # Limpar os campos
+            self.codigo_input.clear()
+            self.nome_input.clear()
+            self.telefone_input.clear()
+            self.cidade_input.clear()
+            
+            # Recarregar a tabela
+            self.carregar_funcionarios()
+            
+            self.mostrar_mensagem("Sucesso", f"Funcionário com código {codigo} excluído com sucesso!")
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao excluir funcionário: {e}", QMessageBox.Critical)
+
+    def carregar_funcionarios(self):
+        """Carrega os funcionários do banco de dados na tabela"""
+        try:
+            from base.banco import listar_funcionarios
+            funcionarios = listar_funcionarios()
+            
+            # Limpar tabela atual
+            self.table.setRowCount(0)
+            
+            # Adicionar funcionários na tabela
+            if funcionarios:
+                self.table.setRowCount(len(funcionarios))
+                
+                for row, (id_funcionario, nome, tipo_vendedor, telefone) in enumerate(funcionarios):
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_funcionario)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(tipo_vendedor))
+                    
+                    # Adicionar telefone se disponível
+                    if telefone:
+                        self.table.setItem(row, 3, QTableWidgetItem(telefone))
+                    else:
+                        self.table.setItem(row, 3, QTableWidgetItem(""))
+                    
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao carregar funcionários: {e}", QMessageBox.Critical)
     
     def selecionar_funcionario(self, item):
         """Carrega os dados do funcionário selecionado nos campos do formulário"""
@@ -1134,66 +1201,57 @@ class FormularioFuncionario(QWidget):
     
     def alterar_funcionario(self):
         """Abre o formulário para alterar os dados do funcionário selecionado"""
-        # Verificar se um funcionário foi selecionado
         codigo = self.codigo_input.text()
         
         if not codigo:
             self.mostrar_mensagem("Seleção necessária", 
-                                 "Por favor, selecione um funcionário para alterar", 
-                                 QMessageBox.Warning)
-            return
-        
-        # Buscar os dados completos do funcionário selecionado
-        dados_funcionario = None
-        
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                dados_funcionario = {
-                    'codigo': codigo,
-                    'nome': self.table.item(row, 1).text(),
-                    'tipo_vendedor': self.table.item(row, 2).text()
-                }
-                
-                # Adicionar telefone se disponível
-                if self.table.columnCount() > 3 and self.table.item(row, 3) is not None:
-                    dados_funcionario['telefone'] = self.table.item(row, 3).text()
-                
-                # Adicionar cidade se estiver preenchida
-                if self.cidade_input.text():
-                    dados_funcionario['cidade'] = self.cidade_input.text()
-                
-                break
-        
-        if not dados_funcionario:
-            self.mostrar_mensagem("Erro", 
-                                "Não foi possível encontrar os dados do funcionário selecionado", 
-                                QMessageBox.Critical)
+                                "Por favor, selecione um funcionário para alterar",
+                                QMessageBox.Warning)
             return
         
         # Verificar se já existe uma janela de formulário aberta
         if hasattr(self, 'janela_formulario') and self.janela_formulario.isVisible():
-            # Se existir, fechá-la para abrir uma nova com os dados atualizados
-            self.janela_formulario.close()
-        
-        # Carregar dinamicamente a classe FormularioFuncionario
-        FormularioFuncionario = self.load_formulario_funcionario()
-        if not FormularioFuncionario:
+            # Se existir, apenas ativá-la em vez de criar uma nova
+            self.janela_formulario.setWindowState(self.janela_formulario.windowState() & ~Qt.WindowMinimized)
+            self.janela_formulario.activateWindow()
+            self.janela_formulario.raise_()
             return
+        
+        # Buscar dados do funcionário no banco de dados
+        try:
+            from base.banco import buscar_funcionario_por_id
             
-        # Criar uma nova janela para o formulário
-        self.janela_formulario = QMainWindow()
-        self.janela_formulario.setWindowTitle("Alterar Cadastro de Funcionário")
-        self.janela_formulario.setGeometry(150, 150, 800, 600)
-        self.janela_formulario.setStyleSheet("background-color: #043b57;")
-        
-        # Criar o widget do formulário com os dados do funcionário e passá-lo como widget central
-        formulario = FormularioFuncionario(cadastro_tela=self, 
-                                          janela_parent=self.janela_formulario,
-                                          dados_funcionario=dados_funcionario)
-        self.janela_formulario.setCentralWidget(formulario)
-        
-        # Exibir a janela
-        self.janela_formulario.show()
+            # Buscar dados completos do funcionário
+            funcionario = buscar_funcionario_por_id(int(codigo))
+            if not funcionario:
+                self.mostrar_mensagem("Erro", f"Funcionário com código {codigo} não encontrado", QMessageBox.Warning)
+                return
+                
+            # Carregar FormularioFuncionario
+            FormularioFuncionario = self.load_formulario_funcionario()
+            if FormularioFuncionario is None:
+                return
+            
+            # Criar uma nova janela para o formulário
+            self.janela_formulario = QMainWindow()
+            self.janela_formulario.setWindowTitle("Alterar Cadastro de Funcionário")
+            self.janela_formulario.setGeometry(150, 150, 800, 600)
+            self.janela_formulario.setStyleSheet("background-color: #043b57;")
+            
+            # Criar o widget do formulário
+            formulario = FormularioFuncionario(cadastro_tela=self, janela_parent=self.janela_formulario)
+            self.janela_formulario.setCentralWidget(formulario)
+            
+            # Preencher o formulário com os dados do funcionário
+            formulario.preencher_formulario_do_banco(int(codigo))
+            
+            # Mostrar a janela
+            self.janela_formulario.show()
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao buscar dados do funcionário: {e}", QMessageBox.Critical)
+            import traceback
+            traceback.print_exc()  # Imprime o stack trace completo para depuração
     
     def excluir_funcionario(self):
         """Exclui um funcionário"""

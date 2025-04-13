@@ -19,12 +19,35 @@ except (ImportError, ModuleNotFoundError):
         # Importação direta (mesmo diretório)
         from formulario_pessoa import FormularioPessoa
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class CadastroPessoa(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Inicializar banco de dados
+        self.inicializar_bd()
         self.initUI()
-        
+
+    def inicializar_bd(self):
+        """Inicializa a tabela de pessoas no banco de dados"""
+        try:
+            # Tente importação absoluta
+            from base.banco import verificar_tabela_pessoas
+            verificar_tabela_pessoas()
+        except ImportError:
+            try:
+                # Tente importação relativa
+                import sys, os
+                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from base.banco import verificar_tabela_pessoas
+                verificar_tabela_pessoas()
+            except Exception as e:
+                self.mostrar_mensagem(
+                    "Erro", 
+                    f"Erro ao inicializar tabela de pessoas: {e}", 
+                    QMessageBox.Critical
+                )
+
     def initUI(self):
         # Layout principal
         main_layout = QVBoxLayout(self)
@@ -254,7 +277,7 @@ class CadastroPessoa(QWidget):
         main_layout.addWidget(self.table)
         
         # Carregar dados de teste
-        self.carregar_dados_teste()
+        self.carregar_pessoas()
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
@@ -424,20 +447,27 @@ class CadastroPessoa(QWidget):
             
             return True
     
-    def carregar_dados_teste(self):
-        # Dados de exemplo para demonstração
-        dados = [
-            (1, "João Silva", "Física"),
-            (2, "Maria Comercial Ltda.", "Jurídica"),
-            (3, "Carlos Pereira", "Física")
-        ]
-        
-        self.table.setRowCount(len(dados))
-        
-        for row, (codigo, nome, tipo) in enumerate(dados):
-            self.table.setItem(row, 0, QTableWidgetItem(str(codigo)))
-            self.table.setItem(row, 1, QTableWidgetItem(nome))
-            self.table.setItem(row, 2, QTableWidgetItem(tipo))
+    def carregar_pessoas(self):
+        """Carrega as pessoas do banco de dados na tabela"""
+        try:
+            from base.banco import listar_pessoas
+            pessoas = listar_pessoas()
+            
+            # Limpar tabela atual
+            self.table.setRowCount(0)
+            
+            # Adicionar pessoas na tabela
+            if pessoas:
+                self.table.setRowCount(len(pessoas))
+                
+                for row, (id_pessoa, nome, tipo_pessoa) in enumerate(pessoas):
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_pessoa)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
+                    
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao carregar pessoas: {e}", QMessageBox.Critical)
+
     
     def selecionar_pessoa(self, item):
         row = item.row()
@@ -1090,21 +1120,18 @@ class FormularioPessoa(QWidget):
         # Mostrar a janela
         self.form_window.show()
     
+    # Substituir o método alterar_pessoa em cadastro_pessoa.py
+
     def alterar_pessoa(self):
         """Abre o formulário para alterar os dados da pessoa selecionada"""
         codigo = self.codigo_input.text()
-        nome = self.nome_input.text()
-        tipo = self.tipo_combo.currentText()
-        documento = self.documento_input.text()
-        cidade = self.cidade_input.text()
         
-        if not codigo or not nome:
+        if not codigo:
             self.mostrar_mensagem("Seleção necessária", 
                                 "Por favor, selecione uma pessoa para alterar",
                                 QMessageBox.Warning)
             return
         
-        # Carregar a classe FormularioPessoa
         # Verificar se já existe uma janela de formulário aberta
         if hasattr(self, 'form_window') and self.form_window.isVisible():
             # Se existir, apenas ativá-la em vez de criar uma nova
@@ -1113,65 +1140,71 @@ class FormularioPessoa(QWidget):
             self.form_window.raise_()
             return
         
-        # Criar uma nova janela para o formulário
-        self.form_window = QMainWindow()
-        self.form_window.setWindowTitle("Alterar Cadastro de Pessoa")
-        self.form_window.setGeometry(100, 100, 800, 600)
-        self.form_window.setStyleSheet("""
-            background-color: #043b57;
-            QMessageBox {
+        # Buscar dados da pessoa no banco de dados
+        try:
+            from base.banco import buscar_pessoa_por_id
+            
+            # Buscar dados completos da pessoa
+            pessoa = buscar_pessoa_por_id(int(codigo))
+            if not pessoa:
+                self.mostrar_mensagem("Erro", f"Pessoa com código {codigo} não encontrada", QMessageBox.Warning)
+                return
+                
+            # Carregar FormularioPessoa
+            FormularioPessoa = self.load_formulario_pessoa()
+            if FormularioPessoa is None:
+                return
+            
+            # Criar uma nova janela para o formulário
+            self.form_window = QMainWindow()
+            self.form_window.setWindowTitle("Alterar Cadastro de Pessoa")
+            self.form_window.setGeometry(100, 100, 800, 600)
+            self.form_window.setStyleSheet("""
                 background-color: #043b57;
-            }
-            QMessageBox QLabel {
-                color: white;
-                font-size: 14px;
-            }
-            QMessageBox QPushButton {
-                background-color: #fffff0;
-                color: black;
-                border: 1px solid #cccccc;
-                min-width: 80px;
-                min-height: 25px;
-                padding: 3px;
-                font-size: 13px;
-            }
-            QMessageBox QPushButton:hover {
-                background-color: #e6e6e6;
-            }
-        """)
-        
-        # Criar e definir o widget do formulário
-        form_widget = FormularioPessoa(self, self.form_window)
-        self.form_window.setCentralWidget(form_widget)
-        
-        # Preencher os campos com os dados da pessoa selecionada
-        form_widget.codigo_input.setText(codigo)
-        form_widget.nome_input.setText(nome)
-        
-        # Configurar o combo de tipo de pessoa
-        index = 0 if tipo == "Jurídica" else 1
-        form_widget.tipo_combo.setCurrentIndex(index)
-        
-        # Preencher outros campos se disponíveis
-        if documento:
-            form_widget.documento_input.setText(documento)
-        if cidade:
-            form_widget.cidade_input.setText(cidade)
-        
-        # Alterando o título do botão para "Atualizar" em vez de "Incluir"
-        form_widget.btn_incluir.setText("Atualizar")
-        
-        # Mostrar a janela
-        self.form_window.show()
+                QMessageBox {
+                    background-color: #043b57;
+                }
+                QMessageBox QLabel {
+                    color: white;
+                    font-size: 14px;
+                }
+                QMessageBox QPushButton {
+                    background-color: #fffff0;
+                    color: black;
+                    border: 1px solid #cccccc;
+                    min-width: 80px;
+                    min-height: 25px;
+                    padding: 3px;
+                    font-size: 13px;
+                }
+                QMessageBox QPushButton:hover {
+                    background-color: #e6e6e6;
+                }
+            """)
+            
+            # Criar e definir o widget do formulário
+            form_widget = FormularioPessoa(self, self.form_window)
+            self.form_window.setCentralWidget(form_widget)
+            
+            # Preencher o formulário com os dados da pessoa
+            form_widget.preencher_formulario_do_banco(int(codigo))
+            
+            # Mostrar a janela
+            self.form_window.show()
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao buscar dados da pessoa: {e}", QMessageBox.Critical)
+            import traceback
+            traceback.print_exc()  # Imprime o stack trace completo para depuração
     
     def excluir_pessoa(self):
-        """Exclui uma pessoa"""
+        """Exclui uma pessoa do banco de dados"""
         codigo = self.codigo_input.text()
         
         if not codigo:
             self.mostrar_mensagem("Seleção necessária", 
-                                 "Por favor, selecione uma pessoa para excluir", 
-                                 QMessageBox.Warning)
+                                "Por favor, selecione uma pessoa para excluir", 
+                                QMessageBox.Warning)
             return
             
         # Confirmar exclusão
@@ -1185,27 +1218,24 @@ class FormularioPessoa(QWidget):
         if resposta == QMessageBox.No:
             return
         
-        # Busca a linha pelo código
-        encontrado = False
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                nome = self.table.item(row, 1).text()
-                self.table.removeRow(row)
-                
-                # Limpa os campos
-                self.codigo_input.clear()
-                self.nome_input.clear()
-                self.documento_input.clear()
-                self.cidade_input.clear()
-                
-                self.mostrar_mensagem("Sucesso", f"Pessoa {nome} (código: {codigo}) excluída com sucesso!")
-                encontrado = True
-                break
-        
-        if not encontrado:
-            self.mostrar_mensagem("Não encontrado", 
-                                 f"Pessoa com código {codigo} não encontrada", 
-                                 QMessageBox.Warning)
+        try:
+            from base.banco import excluir_pessoa
+            
+            # Excluir a pessoa do banco
+            excluir_pessoa(int(codigo))
+            
+            # Limpar os campos
+            self.codigo_input.clear()
+            self.nome_input.clear()
+            self.documento_input.clear()
+            self.cidade_input.clear()
+            
+            # Recarregar a tabela
+            self.carregar_pessoas()
+            
+            self.mostrar_mensagem("Sucesso", f"Pessoa com código {codigo} excluída com sucesso!")
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Falha ao excluir pessoa: {e}", QMessageBox.Critical)
 
 
 # Classe para executar o módulo como script principal
