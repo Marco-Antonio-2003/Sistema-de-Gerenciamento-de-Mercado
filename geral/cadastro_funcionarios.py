@@ -6,9 +6,67 @@ import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QComboBox, QMessageBox,
-                             QFrame, QFormLayout, QStyle)
+                             QFrame, QFormLayout, QStyle, QGridLayout)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
+
+# Classe para os ComboBox editáveis
+class ComboBoxEditavel(QComboBox):
+    def __init__(self, parent=None):
+        super(ComboBoxEditavel, self).__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.completer().setCaseSensitivity(Qt.CaseInsensitive)
+        
+        # Definir como vazio ao inicializar
+        self.clearEditText()  # Limpa o texto no editor
+        
+        # Estilo do ComboBox com seta para baixo
+        self.setStyleSheet("""
+            QComboBox {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            QComboBox:focus {
+                border: 1px solid #0078d7;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #cccccc;
+                border-left-style: solid;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow {
+                width: 14px;
+                height: 14px;
+                image: url(ico-img/down-arrow.png);
+            }
+            QComboBox QAbstractItemView {
+                background-color: #fffff0;
+                selection-background-color: #0078d7;
+                selection-color: white;
+                border: 1px solid #cccccc;
+            }
+        """)
+        
+    def showPopup(self):
+        """Sobrescreve o método de mostrar popup para garantir que o texto atual não seja selecionado"""
+        super().showPopup()
+        
+    def addItems(self, items):
+        """Sobrescreve o método addItems para não selecionar o primeiro item"""
+        super().addItems(items)
+        self.setCurrentIndex(-1)  # Definir índice como -1 (nenhum selecionado)
+        self.clearEditText()  # Limpar o texto do editor
 
 class CadastroFuncionario(QWidget):
     def __init__(self, parent=None):
@@ -41,115 +99,175 @@ class CadastroFuncionario(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
         
-        # Formulário
-        form_layout = QFormLayout()
-        form_layout.setLabelAlignment(Qt.AlignRight)
-        form_layout.setVerticalSpacing(15)
-        form_layout.setHorizontalSpacing(20)
+        # Área de pesquisa (adicionado seguindo o modelo de pessoas)
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #043b57;")
+        search_layout = QVBoxLayout(search_frame)
         
-        # Campo Nome
-        self.nome_label = QLabel("Nome:")
-        self.nome_label.setFont(QFont("Arial", 12))
-        self.nome_label.setStyleSheet("color: white;")
-        self.nome_input = QLineEdit()
-        self.nome_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.nome_input.setMinimumHeight(35)
-        form_layout.addRow(self.nome_label, self.nome_input)
+        # Estilos
+        label_style = "color: white; font-size: 14px;"
         
-        # Campo Telefone
-        self.telefone_label = QLabel("Telefone:")
-        self.telefone_label.setFont(QFont("Arial", 12))
-        self.telefone_label.setStyleSheet("color: white;")
-        self.telefone_input = QLineEdit()
-        self.telefone_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.telefone_input.setMinimumHeight(35)
-        self.telefone_input.setPlaceholderText("(00) 00000-0000")
-        self.telefone_input.textChanged.connect(self.formatar_telefone)
-        form_layout.addRow(self.telefone_label, self.telefone_input)
+        # Grid de pesquisa
+        search_grid = QGridLayout()
+        search_grid.setColumnStretch(1, 1)  # Coluna do campo de texto se expande
+        search_grid.setColumnStretch(3, 1)  # Coluna do campo de texto se expande
         
-        # Layout para Código e Tipo de Vendedor (lado a lado)
-        codigo_tipo_layout = QHBoxLayout()
+        # Campo de pesquisa por código
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_search = ComboBoxEditavel()
+        self.codigo_search.setPlaceholderText("Digite o código")
+        search_grid.addWidget(codigo_label, 0, 0)
+        search_grid.addWidget(self.codigo_search, 0, 1)
         
-        # Campo Código
-        codigo_form = QFormLayout()
-        codigo_form.setLabelAlignment(Qt.AlignRight)
-        codigo_form.setVerticalSpacing(15)
-        codigo_form.setHorizontalSpacing(20)
+        # Campo de pesquisa por nome
+        nome_label = QLabel("Nome:")
+        nome_label.setStyleSheet(label_style)
+        self.nome_search = ComboBoxEditavel()
+        self.nome_search.setPlaceholderText("Digite o nome do funcionário")
+        search_grid.addWidget(nome_label, 0, 2)
+        search_grid.addWidget(self.nome_search, 0, 3)
         
-        self.codigo_label = QLabel("Código:")
-        self.codigo_label.setFont(QFont("Arial", 12))
-        self.codigo_label.setStyleSheet("color: white;")
-        self.codigo_input = QLineEdit()
-        self.codigo_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.codigo_input.setMinimumHeight(35)
-        self.codigo_input.setMaximumWidth(150)
-        codigo_form.addRow(self.codigo_label, self.codigo_input)
+        # Campo de pesquisa por telefone
+        telefone_label = QLabel("Telefone:")
+        telefone_label.setStyleSheet(label_style)
+        self.telefone_search = ComboBoxEditavel()
+        self.telefone_search.setPlaceholderText("Digite o telefone")
+        search_grid.addWidget(telefone_label, 1, 0)
+        search_grid.addWidget(self.telefone_search, 1, 1)
         
-        # Tipo de Vendedor
-        tipo_form = QFormLayout()
-        tipo_form.setLabelAlignment(Qt.AlignRight)
-        tipo_form.setVerticalSpacing(15)
-        tipo_form.setHorizontalSpacing(20)
-        
-        self.tipo_label = QLabel("Tipo de Vendedor:")
-        self.tipo_label.setFont(QFont("Arial", 12))
-        self.tipo_label.setStyleSheet("color: white;")
-        self.tipo_combo = QComboBox()
-        self.tipo_combo.setStyleSheet("""
+        # Campo de pesquisa por tipo de vendedor
+        tipo_label = QLabel("Tipo de Vendedor:")
+        tipo_label.setStyleSheet(label_style)
+        self.tipo_search = QComboBox()
+        self.tipo_search.setStyleSheet("""
             QComboBox {
-                background-color: #ffffff; 
-                padding: 8px; 
-                font-size: 12px;
-                min-height: 35px;
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 5px;
+                font-size: 14px;
+                border-radius: 4px;
+                color: black;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QComboBox::drop-down { 
+                border: none; 
+            }
+            QComboBox:hover { 
+                border: 1px solid #0078d7; 
             }
             QComboBox QAbstractItemView {
                 background-color: white;
-                selection-background-color: #043b57;
+                color: black;
+                selection-background-color: #0078d7;
                 selection-color: white;
-            }
-            QComboBox::drop-down {
-                border: 0px;
-            }
-            QComboBox::down-arrow {
-                image: url(down_arrow.png);
-                width: 12px;
-                height: 12px;
+                border: 1px solid #cccccc;
             }
         """)
-        self.tipo_combo.addItems(["Interno", "Externo", "Representante"])
-        tipo_form.addRow(self.tipo_label, self.tipo_combo)
+        self.tipo_search.addItems(["Todos", "Interno", "Externo", "Representante"])
+        search_grid.addWidget(tipo_label, 1, 2)
+        search_grid.addWidget(self.tipo_search, 1, 3)
         
-        codigo_tipo_layout.addLayout(codigo_form)
-        codigo_tipo_layout.addStretch()
-        codigo_tipo_layout.addLayout(tipo_form)
+        # Botões de pesquisa
+        search_btn_layout = QHBoxLayout()
         
-        # Campo Cidade
-        cidade_form = QHBoxLayout()
-        cidade_form.setSpacing(10)
+        # Botão Pesquisar
+        self.btn_pesquisar = QPushButton("Pesquisar")
+        self.btn_pesquisar.setStyleSheet("""
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        try:
+            self.btn_pesquisar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogContentsView))
+        except:
+            pass
+        self.btn_pesquisar.clicked.connect(self.pesquisar)
+        search_btn_layout.addWidget(self.btn_pesquisar)
         
-        self.cidade_label = QLabel("Cidade:")
-        self.cidade_label.setFont(QFont("Arial", 12))
-        self.cidade_label.setStyleSheet("color: white;")
-        self.cidade_input = QLineEdit()
-        self.cidade_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.cidade_input.setMinimumHeight(35)
+        # Botão Limpar Filtros
+        self.btn_limpar = QPushButton("Limpar Filtros")
+        self.btn_limpar.setStyleSheet("""
+            QPushButton {
+                background-color: #717171;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+        """)
+        try:
+            self.btn_limpar.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        except:
+            pass
+        self.btn_limpar.clicked.connect(self.limpar_filtros)
+        search_btn_layout.addWidget(self.btn_limpar)
         
-        cidade_layout = QFormLayout()
-        cidade_layout.setLabelAlignment(Qt.AlignRight)
-        cidade_layout.setVerticalSpacing(15)
-        cidade_layout.setHorizontalSpacing(20)
-        cidade_layout.addRow(self.cidade_label, self.cidade_input)
+        # Adicionar os botões à grid
+        search_grid.addLayout(search_btn_layout, 2, 3, 1, 1, Qt.AlignRight)
         
-        # Botões
+        search_layout.addLayout(search_grid)
+        main_layout.addWidget(search_frame)
+        
+        # Linha horizontal que separa a área de pesquisa da tabela
+        separator = QLabel("")
+        separator.setStyleSheet("""
+            QLabel {
+                background-color: #1e5a78;
+                min-height: 1px;
+                max-height: 1px;
+                margin-top: 3px;
+                margin-bottom: 3px;
+            }
+        """)
+        main_layout.addWidget(separator)
+        
+        # Botões de ação na parte inferior
         botoes_layout = QHBoxLayout()
         botoes_layout.setSpacing(10)
         
+        # Criar um layout para o campo de código
+        codigo_layout = QHBoxLayout()
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #fffff0;
+                padding: 8px;
+                font-size: 12px;
+                border-radius: 4px;
+                color: black;
+            }
+        """)
+        self.codigo_input.setReadOnly(True)
+        self.codigo_input.setMaximumWidth(100)
+        codigo_layout.addWidget(codigo_label)
+        codigo_layout.addWidget(self.codigo_input)
+        codigo_layout.addStretch()
+        # Botão Cadastrar
         self.btn_cadastrar = QPushButton("Cadastrar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_cadastrar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogNewFolder))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_cadastrar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -164,12 +282,12 @@ class CadastroFuncionario(QWidget):
         """)
         self.btn_cadastrar.clicked.connect(self.abrir_formulario_funcionario)
         
+        # Botão Alterar
         self.btn_alterar = QPushButton("Alterar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_alterar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_alterar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -184,12 +302,12 @@ class CadastroFuncionario(QWidget):
         """)
         self.btn_alterar.clicked.connect(self.alterar_funcionario)
         
+        # Botão Excluir
         self.btn_excluir = QPushButton("Excluir")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_excluir.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_excluir.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -204,17 +322,16 @@ class CadastroFuncionario(QWidget):
         """)
         self.btn_excluir.clicked.connect(self.excluir_funcionario)
         
-        botoes_layout.addWidget(self.btn_cadastrar)
-        botoes_layout.addWidget(self.btn_alterar)
-        botoes_layout.addWidget(self.btn_excluir)
-        botoes_layout.addStretch()
+        # Adicionar à direita
+        botoes_direita = QHBoxLayout()
+        botoes_direita.addWidget(self.btn_cadastrar)
+        botoes_direita.addWidget(self.btn_alterar)
+        botoes_direita.addWidget(self.btn_excluir)
         
-        # Adicionar os layouts ao layout principal
-        main_layout.addLayout(form_layout)
-        main_layout.addLayout(codigo_tipo_layout)
-        main_layout.addLayout(cidade_layout)
+        botoes_layout.addLayout(codigo_layout)
+        botoes_layout.addLayout(botoes_direita)
+        
         main_layout.addLayout(botoes_layout)
-        main_layout.addSpacing(20)
         
         # Tabela de funcionários
         self.table = QTableWidget()
@@ -251,10 +368,11 @@ class CadastroFuncionario(QWidget):
         
         self.table.itemClicked.connect(self.selecionar_funcionario)
         
-        main_layout.addWidget(self.table)
+        main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
-        # Carregar dados de teste
+        # Carregar dados do banco de dados
         self.carregar_funcionarios()
+        
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
@@ -287,6 +405,109 @@ class CadastroFuncionario(QWidget):
             self.telefone_input.setCursorPosition(len(texto_formatado))
             self.telefone_input.blockSignals(False)
     
+    def selecionar_funcionario(self, item):
+        """
+        Preenche apenas o campo de código quando uma linha é selecionada
+        """
+        row = item.row()
+        
+        # Obter o código da linha selecionada
+        codigo = self.table.item(row, 0).text()
+        
+        # Preencher apenas o campo de código que mantivemos
+        self.codigo_input.setText(codigo)
+        
+        # Destacar visualmente a linha selecionada na tabela
+        self.table.selectRow(row)
+    
+    # Métodos de pesquisa e limpeza de filtros (adicionados seguindo o modelo de pessoas)
+    def pesquisar(self):
+        """Pesquisa funcionários com base nos filtros selecionados"""
+        codigo = self.codigo_search.currentText().strip()
+        nome = self.nome_search.currentText().strip()
+        telefone = self.telefone_search.currentText().strip()
+        tipo = self.tipo_search.currentText()
+        
+        try:
+            # Limpar tabela para os novos resultados
+            self.table.setRowCount(0)
+            
+            # Construir consulta SQL base
+            query = """
+            SELECT ID, NOME, TIPO_VENDEDOR, TELEFONE
+            FROM FUNCIONARIOS
+            WHERE 1=1
+            """
+            
+            # Lista para armazenar os parâmetros de filtro
+            params = []
+            
+            # Adicionar condições conforme os filtros fornecidos
+            if codigo:
+                query += " AND ID = ?"
+                params.append(int(codigo))
+                
+            if nome:
+                query += " AND UPPER(NOME) LIKE UPPER(?)"
+                params.append(f"%{nome}%")  # Busca parcial, case-insensitive
+                
+            if telefone:
+                # Remover caracteres não numéricos para busca
+                telefone_limpo = ''.join(filter(str.isdigit, telefone))
+                if telefone_limpo:
+                    query += " AND TELEFONE LIKE ?"
+                    params.append(f"%{telefone_limpo}%")
+            
+            # Filtrar pelo tipo de vendedor
+            if tipo != "Todos":
+                query += " AND TIPO_VENDEDOR = ?"
+                params.append(tipo)
+            
+            # Adicionar ordenação
+            query += " ORDER BY ID"
+            
+            # Executar a consulta
+            from base.banco import execute_query
+            funcionarios = execute_query(query, tuple(params) if params else None)
+            
+            # Verificar se encontrou resultados
+            if funcionarios and len(funcionarios) > 0:
+                # Preencher a tabela com os resultados
+                self.table.setRowCount(len(funcionarios))
+                
+                for row, (id_funcionario, nome, tipo_vendedor, telefone) in enumerate(funcionarios):
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_funcionario)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(tipo_vendedor))
+                    
+                    # Adicionar telefone se disponível
+                    if telefone:
+                        self.table.setItem(row, 3, QTableWidgetItem(telefone))
+                    else:
+                        self.table.setItem(row, 3, QTableWidgetItem(""))
+            else:
+                # Mensagem quando nenhum funcionário corresponde aos filtros
+                self.mostrar_mensagem("Aviso", "Nenhum funcionário encontrado com os filtros selecionados.")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao pesquisar funcionários: {str(e)}", QMessageBox.Critical)
+
+    def limpar_filtros(self):
+        """Limpa todos os campos de pesquisa e carrega todos os funcionários novamente"""
+        self.codigo_search.setCurrentIndex(-1)
+        self.codigo_search.clearEditText()
+        
+        self.nome_search.setCurrentIndex(-1)
+        self.nome_search.clearEditText()
+        
+        self.telefone_search.setCurrentIndex(-1)
+        self.telefone_search.clearEditText()
+        
+        self.tipo_search.setCurrentIndex(0)  # "Todos"
+        
+        # Recarregar todos os funcionários
+        self.carregar_funcionarios()
+        
     def excluir_funcionario(self):
         """Exclui um funcionário do banco de dados"""
         codigo = self.codigo_input.text()
@@ -303,27 +524,58 @@ class CadastroFuncionario(QWidget):
         msg_box.setWindowTitle("Confirmar exclusão")
         msg_box.setText(f"Deseja realmente excluir o funcionário de código {codigo}?")
         msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
         resposta = msg_box.exec_()
         
         if resposta == QMessageBox.No:
             return
         
         try:
-            from base.banco import excluir_funcionario
+            # Busca a linha pelo código
+            encontrado = False
+            for row in range(self.table.rowCount()):
+                if self.table.item(row, 0).text() == codigo:
+                    nome = self.table.item(row, 1).text()
+                    self.table.removeRow(row)
+                    
+                    # Excluir do banco de dados
+                    try:
+                        from base.banco import excluir_funcionario
+                        excluir_funcionario(int(codigo))
+                    except Exception as e:
+                        print(f"Aviso: Não foi possível excluir do banco de dados: {e}")
+                    
+                    # Limpar o campo de código
+                    self.codigo_input.clear()
+                    
+                    self.mostrar_mensagem("Sucesso", f"Funcionário {nome} (código: {codigo}) excluído com sucesso!")
+                    encontrado = True
+                    break
             
-            # Excluir o funcionário do banco
-            excluir_funcionario(int(codigo))
-            
-            # Limpar os campos
-            self.codigo_input.clear()
-            self.nome_input.clear()
-            self.telefone_input.clear()
-            self.cidade_input.clear()
-            
-            # Recarregar a tabela
-            self.carregar_funcionarios()
-            
-            self.mostrar_mensagem("Sucesso", f"Funcionário com código {codigo} excluído com sucesso!")
+            if not encontrado:
+                self.mostrar_mensagem("Não encontrado", 
+                                    f"Funcionário com código {codigo} não encontrado", 
+                                    QMessageBox.Warning)
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao excluir funcionário: {e}", QMessageBox.Critical)
 
@@ -336,11 +588,17 @@ class CadastroFuncionario(QWidget):
             # Limpar tabela atual
             self.table.setRowCount(0)
             
+            # Conjuntos para armazenar valores únicos
+            codigos = set()
+            nomes = set()
+            telefones = set()
+            
             # Adicionar funcionários na tabela
             if funcionarios:
                 self.table.setRowCount(len(funcionarios))
                 
                 for row, (id_funcionario, nome, tipo_vendedor, telefone) in enumerate(funcionarios):
+                    # Adicionar à tabela
                     self.table.setItem(row, 0, QTableWidgetItem(str(id_funcionario)))
                     self.table.setItem(row, 1, QTableWidgetItem(nome))
                     self.table.setItem(row, 2, QTableWidgetItem(tipo_vendedor))
@@ -351,40 +609,57 @@ class CadastroFuncionario(QWidget):
                     else:
                         self.table.setItem(row, 3, QTableWidgetItem(""))
                     
+                    # Adicionar aos conjuntos para os ComboBoxes
+                    codigos.add(str(id_funcionario))
+                    if nome:
+                        nomes.add(nome)
+                    if telefone:
+                        telefones.add(telefone)
+                
+                # Preencher os ComboBoxes com valores únicos
+                self.codigo_search.clear()
+                self.nome_search.clear()
+                self.telefone_search.clear()
+                
+                self.codigo_search.addItems(sorted(codigos))
+                self.nome_search.addItems(sorted(nomes))
+                self.telefone_search.addItems(sorted(telefones))
+                    
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao carregar funcionários: {e}", QMessageBox.Critical)
     
-    def selecionar_funcionario(self, item):
-        """Carrega os dados do funcionário selecionado nos campos do formulário"""
-        row = item.row()
-        
-        # Preencher os campos com os dados da linha selecionada
-        codigo = self.table.item(row, 0).text()
-        nome = self.table.item(row, 1).text()
-        tipo = self.table.item(row, 2).text()
-        telefone = self.table.item(row, 3).text() if self.table.columnCount() > 3 else ""
-        
-        self.codigo_input.setText(codigo)
-        self.nome_input.setText(nome)
-        self.telefone_input.setText(telefone)
-        
-        # Ajustar o combo de tipo de vendedor
-        index = 0  # Padrão: Interno
-        if tipo == "Externo":
-            index = 1
-        elif tipo == "Representante":
-            index = 2
-            
-        self.tipo_combo.setCurrentIndex(index)
-    
     def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
-        """Exibe uma mensagem para o usuário"""
+        """Exibe uma mensagem para o usuário com estilo personalizado"""
         msg_box = QMessageBox()
         msg_box.setIcon(tipo)
         msg_box.setWindowTitle(titulo)
         msg_box.setText(mensagem)
         msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        
+        # Aplicar estilo personalizado para texto branco e botões personalizados
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #043b57;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                border: 1px solid #cccccc;
+                min-width: 80px;
+                min-height: 25px;
+                padding: 3px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+        """)
+        
+        return msg_box.exec_()
     
     def load_formulario_funcionario(self):
         """Carrega dinamicamente o módulo FormularioFuncionario"""
@@ -643,7 +918,9 @@ class FormularioFuncionario(QWidget):
         self.tipo_combo = QComboBox()
         self.tipo_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox
         self.tipo_combo.setFixedWidth(200)  # Largura fixa reduzida
-        self.tipo_combo.addItems(["Jurídica", "Física"])
+        self.tipo_combo.addItems(["Física", "Jurídica"])  # Inverter a ordem dos itens
+        self.tipo_combo.setCurrentIndex(0)  # Agora aponta para "Física"
+
         self.tipo_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
         
         tipo_layout = QFormLayout()
@@ -687,14 +964,14 @@ class FormularioFuncionario(QWidget):
         data_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         data_layout.addRow(self.data_label, self.data_input)
         
-        # Campo CPF (conforme a imagem, não mais CNPJ/CPF)
-        self.cpf_label = QLabel("CPF:")
+        # Campo CPF
+        self.cpf_label = QLabel("CPF:")  # Começa com CPF por padrão
         self.cpf_label.setStyleSheet(label_style)
         self.cpf_input = QLineEdit()
         self.cpf_input.setStyleSheet(input_style)
         self.cpf_input.setFixedWidth(250)  # Largura fixa reduzida
         self.cpf_input.textChanged.connect(self.formatar_cpf)
-        self.cpf_input.setPlaceholderText("000.000.000-00")
+        self.cpf_input.setPlaceholderText("000.000.000-00")  # Placeholder para CPF
         
         cpf_layout = QFormLayout()
         cpf_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -844,6 +1121,8 @@ class FormularioFuncionario(QWidget):
                 "O módulo 'requests' não está disponível. As funcionalidades de consulta de CEP não funcionarão.")
             # Desabilitar botões de consulta
             self.btn_buscar_cep.setEnabled(False)
+                        
+        self.atualizar_tipo_documento()
     
     def preencher_formulario(self):
         """Preenche o formulário com os dados do funcionário para edição"""
@@ -866,6 +1145,36 @@ class FormularioFuncionario(QWidget):
         
         # Cidade (se disponível)
         self.cidade_input.setText(self.dados_funcionario.get('cidade', ''))
+    
+    def preencher_formulario_do_banco(self, codigo):
+        """Preenche o formulário com dados do funcionário a partir do banco de dados"""
+        try:
+            from base.banco import buscar_funcionario_por_id
+            funcionario = buscar_funcionario_por_id(codigo)
+            
+            if funcionario:
+                id_funcionario, nome, tipo_vendedor, telefone = funcionario[0]
+                
+                # Preencher dados básicos
+                self.codigo_input.setText(str(id_funcionario))
+                self.nome_input.setText(nome)
+                self.telefone_input.setText(telefone or "")
+                
+                # Tipo de vendedor
+                index = 0  # Padrão: Interno
+                if tipo_vendedor == "Externo":
+                    index = 1
+                elif tipo_vendedor == "Representante":
+                    index = 2
+                self.tipo_vendedor_combo.setCurrentIndex(index)
+                
+                # Alterar texto do botão para "Salvar"
+                self.btn_incluir.setText("Salvar")
+            else:
+                QMessageBox.warning(self, "Aviso", f"Funcionário com código {codigo} não encontrado.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar dados do funcionário: {str(e)}")
             
     def voltar(self):
         """Volta para a tela anterior fechando esta janela"""
@@ -875,16 +1184,30 @@ class FormularioFuncionario(QWidget):
     def atualizar_tipo_documento(self):
         """Atualiza o label e placeholder do campo de documento conforme o tipo de pessoa"""
         tipo_pessoa = self.tipo_combo.currentText()
-        if tipo_pessoa == "Física":
-            self.cpf_label.setText("CPF:")
-            self.cpf_input.setPlaceholderText("000.000.000-00")
-        else:
+        print("Tipo de Pessoa selecionado:", tipo_pessoa)  # Linha de depuração
+        if tipo_pessoa == "Jurídica":
             self.cpf_label.setText("CNPJ:")
             self.cpf_input.setPlaceholderText("00.000.000/0001-00")
-            # Limpar o campo se já tiver um CPF digitado
             texto = self.cpf_input.text()
             if texto and len(''.join(filter(str.isdigit, texto))) <= 11 and len(''.join(filter(str.isdigit, texto))) > 0:
                 self.cpf_input.clear()
+        else:
+            self.cpf_label.setText("CPF:")
+            self.cpf_input.setPlaceholderText("000.000.000-00")
+                        
+    # Também modifique o método formatar_cpf() para corrigir a verificação:
+
+    def formatar_cpf(self, texto):
+        """Formata o CPF ou CNPJ durante a digitação"""
+        # Verificar o tipo de documento atual
+        tipo_documento = self.cpf_label.text()
+        if tipo_documento == "CNPJ:" or tipo_documento == "CNPJ":
+            self.formatar_cnpj_texto(texto)
+        else:
+            self.formatar_cpf_texto(texto)
+
+    # Adicione esta linha no final do método initUI(), antes do bloco de verificação do módulo requests
+    self.atualizar_tipo_documento()
     
     def formatar_telefone(self, texto):
         """Formata o telefone para (XX) XXXXX-XXXX"""
@@ -913,15 +1236,6 @@ class FormularioFuncionario(QWidget):
             # Posicionar o cursor no final
             self.telefone_input.setCursorPosition(len(texto_formatado))
             self.telefone_input.blockSignals(False)
-    
-    def formatar_cpf(self, texto):
-        """Formata o CPF durante a digitação"""
-        # Verificar o tipo de documento atual
-        tipo_documento = self.cpf_label.text()
-        if tipo_documento == "CPF:":
-            self.formatar_cpf_texto(texto)
-        else:
-            self.formatar_cnpj_texto(texto)
     
     def formatar_cpf_texto(self, texto):
         """Formata o texto como CPF: 000.000.000-00"""
@@ -1020,6 +1334,7 @@ class FormularioFuncionario(QWidget):
         # Obter o CEP removendo caracteres não numéricos
         cep = ''.join(filter(str.isdigit, self.cep_input.text()))
         
+        # Verificar se o CEP tem 8 dígitos
         # Verificar se o CEP tem 8 dígitos
         if len(cep) != 8:
             QMessageBox.warning(self, "CEP inválido", 
@@ -1120,8 +1435,8 @@ class FormularioFuncionario(QWidget):
             modo_edicao = False
             row_position = -1
             
-            if self.dados_funcionario and 'codigo' in self.dados_funcionario:
-                codigo = self.dados_funcionario['codigo']
+            if self.codigo_input.text():
+                codigo = self.codigo_input.text()
                 for row in range(self.cadastro_tela.table.rowCount()):
                     if self.cadastro_tela.table.item(row, 0).text() == codigo:
                         row_position = row
@@ -1133,7 +1448,11 @@ class FormularioFuncionario(QWidget):
                 # Gerar código
                 novo_codigo = 1
                 if self.cadastro_tela.table.rowCount() > 0:
-                    ultimo_codigo = int(self.cadastro_tela.table.item(self.cadastro_tela.table.rowCount()-1, 0).text())
+                    ultimo_codigo = 0
+                    for row in range(self.cadastro_tela.table.rowCount()):
+                        codigo_atual = int(self.cadastro_tela.table.item(row, 0).text())
+                        if codigo_atual > ultimo_codigo:
+                            ultimo_codigo = codigo_atual
                     novo_codigo = ultimo_codigo + 1
                 
                 row_position = self.cadastro_tela.table.rowCount()
@@ -1150,7 +1469,7 @@ class FormularioFuncionario(QWidget):
             
             # Mensagem de sucesso
             acao = "alterado" if modo_edicao else "cadastrado"
-            codigo_exibir = self.dados_funcionario['codigo'] if modo_edicao else str(novo_codigo)
+            codigo_exibir = self.codigo_input.text() if modo_edicao else str(novo_codigo)
             
             QMessageBox.information(self, "Sucesso", 
                                    f"Funcionário {acao} com sucesso!\nNome: {nome}\nCódigo: {codigo_exibir}")
@@ -1196,6 +1515,9 @@ class FormularioFuncionario(QWidget):
         formulario = FormularioFuncionario(cadastro_tela=self, janela_parent=self.janela_formulario)
         self.janela_formulario.setCentralWidget(formulario)
         
+        # Limpar o campo de código para garantir um novo cadastro
+        self.codigo_input.clear()
+        
         # Exibir a janela
         self.janela_formulario.show()
     
@@ -1217,16 +1539,32 @@ class FormularioFuncionario(QWidget):
             self.janela_formulario.raise_()
             return
         
-        # Buscar dados do funcionário no banco de dados
+        # Buscar dados do funcionário no banco de dados ou da tabela
         try:
-            from base.banco import buscar_funcionario_por_id
-            
-            # Buscar dados completos do funcionário
-            funcionario = buscar_funcionario_por_id(int(codigo))
-            if not funcionario:
+            # Obter dados da linha selecionada na tabela
+            row = -1
+            for i in range(self.table.rowCount()):
+                if self.table.item(i, 0).text() == codigo:
+                    row = i
+                    break
+                    
+            if row == -1:
                 self.mostrar_mensagem("Erro", f"Funcionário com código {codigo} não encontrado", QMessageBox.Warning)
                 return
                 
+            # Obter dados da linha
+            nome = self.table.item(row, 1).text()
+            tipo_vendedor = self.table.item(row, 2).text()
+            telefone = self.table.item(row, 3).text() if self.table.columnCount() > 3 else ""
+            
+            # Preparar dados para o formulário
+            dados_funcionario = {
+                'codigo': codigo,
+                'nome': nome,
+                'tipo_vendedor': tipo_vendedor,
+                'telefone': telefone
+            }
+            
             # Carregar FormularioFuncionario
             FormularioFuncionario = self.load_formulario_funcionario()
             if FormularioFuncionario is None:
@@ -1238,12 +1576,13 @@ class FormularioFuncionario(QWidget):
             self.janela_formulario.setGeometry(150, 150, 800, 600)
             self.janela_formulario.setStyleSheet("background-color: #043b57;")
             
-            # Criar o widget do formulário
-            formulario = FormularioFuncionario(cadastro_tela=self, janela_parent=self.janela_formulario)
+            # Criar o widget do formulário com os dados do funcionário
+            formulario = FormularioFuncionario(
+                cadastro_tela=self, 
+                janela_parent=self.janela_formulario,
+                dados_funcionario=dados_funcionario
+            )
             self.janela_formulario.setCentralWidget(formulario)
-            
-            # Preencher o formulário com os dados do funcionário
-            formulario.preencher_formulario_do_banco(int(codigo))
             
             # Mostrar a janela
             self.janela_formulario.show()
@@ -1252,49 +1591,6 @@ class FormularioFuncionario(QWidget):
             self.mostrar_mensagem("Erro", f"Falha ao buscar dados do funcionário: {e}", QMessageBox.Critical)
             import traceback
             traceback.print_exc()  # Imprime o stack trace completo para depuração
-    
-    def excluir_funcionario(self):
-        """Exclui um funcionário"""
-        codigo = self.codigo_input.text()
-        
-        if not codigo:
-            self.mostrar_mensagem("Seleção necessária", 
-                                 "Por favor, selecione um funcionário para excluir", 
-                                 QMessageBox.Warning)
-            return
-            
-        # Confirmar exclusão
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Question)
-        msg_box.setWindowTitle("Confirmar exclusão")
-        msg_box.setText(f"Deseja realmente excluir o funcionário de código {codigo}?")
-        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        resposta = msg_box.exec_()
-        
-        if resposta == QMessageBox.No:
-            return
-        
-        # Busca a linha pelo código
-        encontrado = False
-        for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == codigo:
-                nome = self.table.item(row, 1).text()
-                self.table.removeRow(row)
-                
-                # Limpa os campos
-                self.codigo_input.clear()
-                self.nome_input.clear()
-                self.telefone_input.clear()
-                self.cidade_input.clear()
-                
-                self.mostrar_mensagem("Sucesso", f"Funcionário {nome} (código: {codigo}) excluído com sucesso!")
-                encontrado = True
-                break
-        
-        if not encontrado:
-            self.mostrar_mensagem("Não encontrado", 
-                                 f"Funcionário com código {codigo} não encontrado", 
-                                 QMessageBox.Warning)
 
 
 # Classe para executar o módulo como script principal

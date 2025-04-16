@@ -5,10 +5,68 @@ import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
-                             QMessageBox, QStyle)
+                             QMessageBox, QStyle, QGridLayout, QComboBox)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
 from base.banco import listar_empresas, excluir_empresa, verificar_tabela_empresas, buscar_empresa_por_id
+
+# Classe para os ComboBox editáveis
+class ComboBoxEditavel(QComboBox):
+    def __init__(self, parent=None):
+        super(ComboBoxEditavel, self).__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.completer().setCaseSensitivity(Qt.CaseInsensitive)
+        
+        # Definir como vazio ao inicializar
+        self.clearEditText()  # Limpa o texto no editor
+        
+        # Estilo do ComboBox com seta para baixo
+        self.setStyleSheet("""
+            QComboBox {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            QComboBox:focus {
+                border: 1px solid #0078d7;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #cccccc;
+                border-left-style: solid;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow {
+                width: 14px;
+                height: 14px;
+                image: url(ico-img/down-arrow.png);
+            }
+            QComboBox QAbstractItemView {
+                background-color: #fffff0;
+                selection-background-color: #0078d7;
+                selection-color: white;
+                border: 1px solid #cccccc;
+            }
+        """)
+        
+    def showPopup(self):
+        """Sobrescreve o método de mostrar popup para garantir que o texto atual não seja selecionado"""
+        super().showPopup()
+        
+    def addItems(self, items):
+        """Sobrescreve o método addItems para não selecionar o primeiro item"""
+        super().addItems(items)
+        self.setCurrentIndex(-1)  # Definir índice como -1 (nenhum selecionado)
+        self.clearEditText()  # Limpar o texto do editor
 
 class CadastroEmpresa(QWidget):
     def __init__(self, parent=None):
@@ -28,6 +86,10 @@ class CadastroEmpresa(QWidget):
                 QMessageBox.Critical
             )
         
+    # Modificações para adicionar pesquisa à classe CadastroEmpresa
+
+    # Código corrigido para CadastroEmpresa - mantendo apenas os campos de pesquisa na parte superior
+
     def initUI(self):
         # Layout principal
         main_layout = QVBoxLayout(self)
@@ -40,62 +102,143 @@ class CadastroEmpresa(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
         
-        # Formulário
-        form_layout = QFormLayout()
-        form_layout.setLabelAlignment(Qt.AlignRight)
-        form_layout.setVerticalSpacing(15)
-        form_layout.setHorizontalSpacing(20)
+        # Área de pesquisa
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #043b57;")
+        search_layout = QVBoxLayout(search_frame)
         
-        # Campo Nome
-        self.nome_label = QLabel("Nome:")
-        self.nome_label.setFont(QFont("Arial", 12))
-        self.nome_label.setStyleSheet("color: white;")
-        self.nome_input = QLineEdit()
-        self.nome_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.nome_input.setMinimumHeight(35)
-        form_layout.addRow(self.nome_label, self.nome_input)
+        # Estilos
+        label_style = "color: white; font-size: 14px;"
         
-        # Campo CNPJ
-        self.cnpj_label = QLabel("CNPJ")
-        self.cnpj_label.setFont(QFont("Arial", 12))
-        self.cnpj_label.setStyleSheet("color: white;")
-        self.cnpj_input = QLineEdit()
-        self.cnpj_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.cnpj_input.setMinimumHeight(35)
-        form_layout.addRow(self.cnpj_label, self.cnpj_input)
+        # Linha de pesquisa
+        search_grid = QGridLayout()
+        search_grid.setColumnStretch(1, 1)  # Coluna do campo de texto se expande
+        search_grid.setColumnStretch(3, 1)  # Coluna do campo de texto se expande
         
-        # Layout para Código e botões
-        codigo_botoes_layout = QHBoxLayout()
+        # Código
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_search = ComboBoxEditavel()
+        self.codigo_search.setPlaceholderText("Digite o código")
+        search_grid.addWidget(codigo_label, 0, 0)
+        search_grid.addWidget(self.codigo_search, 0, 1)
         
-        # Campo Código
-        codigo_form = QFormLayout()
-        codigo_form.setLabelAlignment(Qt.AlignRight)
-        codigo_form.setVerticalSpacing(15)
-        codigo_form.setHorizontalSpacing(20)
+        # Nome
+        nome_label = QLabel("Nome:")
+        nome_label.setStyleSheet(label_style)
+        self.nome_search = ComboBoxEditavel()
+        self.nome_search.setPlaceholderText("Digite o nome da empresa")
+        search_grid.addWidget(nome_label, 0, 2)
+        search_grid.addWidget(self.nome_search, 0, 3)
         
-        self.codigo_label = QLabel("Código")
-        self.codigo_label.setFont(QFont("Arial", 12))
-        self.codigo_label.setStyleSheet("color: white;")
-        self.codigo_input = QLineEdit()
-        self.codigo_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.codigo_input.setMinimumHeight(35)
-        self.codigo_input.setMaximumWidth(150)
-        self.codigo_input.setReadOnly(True)  # Código é gerado pelo banco
-        codigo_form.addRow(self.codigo_label, self.codigo_input)
+        # CNPJ/CPF
+        documento_label = QLabel("CNPJ/CPF:")
+        documento_label.setStyleSheet(label_style)
+        self.documento_search = ComboBoxEditavel()
+        self.documento_search.setPlaceholderText("Digite o CNPJ ou CPF")
+        search_grid.addWidget(documento_label, 1, 0)
+        search_grid.addWidget(self.documento_search, 1, 1)
         
-        codigo_botoes_layout.addLayout(codigo_form)
-        codigo_botoes_layout.addStretch()
+        # Botões de pesquisa
+        search_btn_layout = QHBoxLayout()
         
-        # Botões
+        # Botão Pesquisar
+        self.btn_pesquisar = QPushButton("Pesquisar")
+        self.btn_pesquisar.setStyleSheet("""
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        try:
+            self.btn_pesquisar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogContentsView))
+        except:
+            pass
+        self.btn_pesquisar.clicked.connect(self.pesquisar)
+        search_btn_layout.addWidget(self.btn_pesquisar)
+        
+        # Botão Limpar Filtros
+        self.btn_limpar = QPushButton("Limpar Filtros")
+        self.btn_limpar.setStyleSheet("""
+            QPushButton {
+                background-color: #717171;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+        """)
+        try:
+            self.btn_limpar.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        except:
+            pass
+        self.btn_limpar.clicked.connect(self.limpar_filtros)
+        search_btn_layout.addWidget(self.btn_limpar)
+        
+        # Adicionar os botões à grid
+        search_grid.addLayout(search_btn_layout, 1, 3, 1, 1, Qt.AlignRight)
+        
+        search_layout.addLayout(search_grid)
+        main_layout.addWidget(search_frame)
+        
+        # Linha horizontal que separa a área de pesquisa da tabela e dos botões
+        separator = QLabel("")
+        separator.setStyleSheet("""
+            QLabel {
+                background-color: #1e5a78;
+                min-height: 1px;
+                max-height: 1px;
+                margin-top: 3px;
+                margin-bottom: 3px;
+            }
+        """)
+        main_layout.addWidget(separator)
+        
+        # Botões de ação na parte inferior
         botoes_layout = QHBoxLayout()
         botoes_layout.setSpacing(10)
         
+        # Criar um layout para o campo de código
+        codigo_layout = QHBoxLayout()
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #fffff0;
+                padding: 8px;
+                font-size: 12px;
+                border-radius: 4px;
+                color: black;
+            }
+        """)
+        self.codigo_input.setReadOnly(True)
+        self.codigo_input.setMaximumWidth(100)
+        codigo_layout.addWidget(codigo_label)
+        codigo_layout.addWidget(self.codigo_input)
+        codigo_layout.addStretch()
+        
+        # Botão Cadastrar
         self.btn_cadastrar = QPushButton("+ Cadastrar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_cadastrar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogNewFolder))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_cadastrar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -110,12 +253,12 @@ class CadastroEmpresa(QWidget):
         """)
         self.btn_cadastrar.clicked.connect(self.cadastrar_empresa)
         
+        # Botão Alterar
         self.btn_alterar = QPushButton("✎ Alterar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_alterar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_alterar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -128,14 +271,14 @@ class CadastroEmpresa(QWidget):
                 background-color: #e6e6e6;
             }
         """)
-        self.btn_alterar.clicked.connect(self.alterar_empresa)  # Conectar à função correta
+        self.btn_alterar.clicked.connect(self.alterar_empresa)
         
+        # Botão Excluir
         self.btn_excluir = QPushButton("✖ Excluir")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_excluir.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_excluir.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -150,15 +293,16 @@ class CadastroEmpresa(QWidget):
         """)
         self.btn_excluir.clicked.connect(self.excluir_empresa)
         
-        botoes_layout.addWidget(self.btn_cadastrar)
-        botoes_layout.addWidget(self.btn_alterar)
-        botoes_layout.addWidget(self.btn_excluir)
+        # Adicionar à direita
+        botoes_direita = QHBoxLayout()
+        botoes_direita.addWidget(self.btn_cadastrar)
+        botoes_direita.addWidget(self.btn_alterar)
+        botoes_direita.addWidget(self.btn_excluir)
         
-        codigo_botoes_layout.addLayout(botoes_layout)
+        botoes_layout.addLayout(codigo_layout)
+        botoes_layout.addLayout(botoes_direita)
         
-        main_layout.addLayout(form_layout)
-        main_layout.addLayout(codigo_botoes_layout)
-        main_layout.addSpacing(20)
+        main_layout.addLayout(botoes_layout)
         
         # Tabela de empresas
         self.table = QTableWidget()
@@ -190,17 +334,99 @@ class CadastroEmpresa(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.table.itemClicked.connect(self.selecionar_empresa)
         
-        main_layout.addWidget(self.table)
+        main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
         # Carregar dados do banco de dados
         self.carregar_empresas()
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
+
+
+    # Adicionar novos métodos para pesquisa
+    def pesquisar(self):
+        """Pesquisa empresas com base nos filtros selecionados"""
+        codigo = self.codigo_search.currentText().strip()
+        nome = self.nome_search.currentText().strip()
+        documento = self.documento_search.currentText().strip()
+        
+        try:
+            # Limpar tabela para os novos resultados
+            self.table.setRowCount(0)
+            
+            # Construir consulta SQL base
+            query = """
+            SELECT ID, NOME_EMPRESA, DOCUMENTO
+            FROM EMPRESAS
+            WHERE 1=1
+            """
+            
+            # Lista para armazenar os parâmetros de filtro
+            params = []
+            
+            # Adicionar condições conforme os filtros fornecidos
+            if codigo:
+                query += " AND ID = ?"
+                params.append(int(codigo))
+                
+            if nome:
+                query += " AND UPPER(NOME_EMPRESA) LIKE UPPER(?)"
+                params.append(f"%{nome}%")  # Busca parcial, case-insensitive
+                
+            if documento:
+                # Remover caracteres não numéricos para busca
+                documento_limpo = ''.join(filter(str.isdigit, documento))
+                if documento_limpo:
+                    query += " AND DOCUMENTO LIKE ?"
+                    params.append(f"%{documento_limpo}%")
+            
+            # Adicionar ordenação
+            query += " ORDER BY ID"
+            
+            # Executar a consulta
+            from base.banco import execute_query
+            empresas = execute_query(query, tuple(params) if params else None)
+            
+            # Verificar se encontrou resultados
+            if empresas and len(empresas) > 0:
+                # Preencher a tabela com os resultados
+                self.table.setRowCount(len(empresas))
+                
+                for row, (id_empresa, nome, documento) in enumerate(empresas):
+                    # Formatar CNPJ/CPF para exibição
+                    if documento and len(documento) == 14:  # CNPJ
+                        documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+                    elif documento and len(documento) == 11:  # CPF
+                        documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+                    else:
+                        documento_formatado = documento
+                    
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_empresa)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(documento_formatado))
+            else:
+                # Mensagem quando nenhuma empresa corresponde aos filtros
+                self.mostrar_mensagem("Aviso", "Nenhuma empresa encontrada com os filtros selecionados.")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao pesquisar empresas: {str(e)}", QMessageBox.Critical)
+
+    def limpar_filtros(self):
+        """Limpa todos os campos de pesquisa e carrega todas as empresas novamente"""
+        self.codigo_search.setCurrentIndex(-1)
+        self.codigo_search.clearEditText()
+        
+        self.nome_search.setCurrentIndex(-1)
+        self.nome_search.clearEditText()
+        
+        self.documento_search.setCurrentIndex(-1)
+        self.documento_search.clearEditText()
+        
+        # Recarregar todas as empresas
+        self.carregar_empresas()
         
     def carregar_empresas(self):
         """Carrega as empresas do banco de dados na tabela"""
@@ -226,21 +452,52 @@ class CadastroEmpresa(QWidget):
                     self.table.setItem(row, 0, QTableWidgetItem(str(id_empresa)))
                     self.table.setItem(row, 1, QTableWidgetItem(nome))
                     self.table.setItem(row, 2, QTableWidgetItem(documento_formatado))
+                
+                # Preencher os ComboBoxes com valores únicos
+                codigos = set()
+                nomes = set()
+                documentos = set()
+                
+                for id_empresa, nome, documento in empresas:
+                    codigos.add(str(id_empresa))
+                    nomes.add(nome)
+                    
+                    # Formatar CNPJ/CPF para exibição
+                    if documento and len(documento) == 14:  # CNPJ
+                        documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+                    elif documento and len(documento) == 11:  # CPF
+                        documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+                    else:
+                        documento_formatado = documento
+                    
+                    documentos.add(documento_formatado)
+                
+                # Limpar e adicionar aos ComboBoxes
+                self.codigo_search.clear()
+                self.nome_search.clear()
+                self.documento_search.clear()
+                
+                self.codigo_search.addItems(sorted(codigos))
+                self.nome_search.addItems(sorted(nomes))
+                self.documento_search.addItems(sorted(documentos))
                     
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao carregar empresas: {e}", QMessageBox.Critical)
     
     def selecionar_empresa(self, item):
+        """
+        Preenche o campo de código quando uma linha é selecionada
+        """
         row = item.row()
         
-        # Preencher os campos com os dados da linha selecionada
+        # Obter o código da linha selecionada
         codigo = self.table.item(row, 0).text()
-        nome = self.table.item(row, 1).text()
-        cnpj = self.table.item(row, 2).text()
         
+        # Preencher apenas o campo de código que mantivemos
         self.codigo_input.setText(codigo)
-        self.nome_input.setText(nome)
-        self.cnpj_input.setText(cnpj)
+        
+        # Destacar visualmente a linha selecionada na tabela
+        self.table.selectRow(row)
     
     def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
         """Exibe uma mensagem para o usuário"""

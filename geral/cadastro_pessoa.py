@@ -5,7 +5,7 @@ import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
-                             QMessageBox, QStyle, QComboBox)
+                             QMessageBox, QStyle, QComboBox, QGridLayout)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
 try:
@@ -20,6 +20,64 @@ except (ImportError, ModuleNotFoundError):
         from formulario_pessoa import FormularioPessoa
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Classe para os ComboBox editáveis
+class ComboBoxEditavel(QComboBox):
+    def __init__(self, parent=None):
+        super(ComboBoxEditavel, self).__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.completer().setCaseSensitivity(Qt.CaseInsensitive)
+        
+        # Definir como vazio ao inicializar
+        self.clearEditText()  # Limpa o texto no editor
+        
+        # Estilo do ComboBox com seta para baixo
+        self.setStyleSheet("""
+            QComboBox {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
+                border-radius: 4px;
+            }
+            QComboBox:focus {
+                border: 1px solid #0078d7;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #cccccc;
+                border-left-style: solid;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow {
+                width: 14px;
+                height: 14px;
+                image: url(ico-img/down-arrow.png);
+            }
+            QComboBox QAbstractItemView {
+                background-color: #fffff0;
+                selection-background-color: #0078d7;
+                selection-color: white;
+                border: 1px solid #cccccc;
+            }
+        """)
+        
+    def showPopup(self):
+        """Sobrescreve o método de mostrar popup para garantir que o texto atual não seja selecionado"""
+        super().showPopup()
+        
+    def addItems(self, items):
+        """Sobrescreve o método addItems para não selecionar o primeiro item"""
+        super().addItems(items)
+        self.setCurrentIndex(-1)  # Definir índice como -1 (nenhum selecionado)
+        self.clearEditText()  # Limpar o texto do editor
 
 class CadastroPessoa(QWidget):
     def __init__(self, parent=None):
@@ -54,127 +112,182 @@ class CadastroPessoa(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Título da tela
-        title_label = QLabel("Cadastro de Pessoa")
+        title_label = QLabel("Cadastro de Clientes")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_label.setStyleSheet("color: white; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
         
-        # Formulário
-        form_layout = QFormLayout()
-        form_layout.setLabelAlignment(Qt.AlignRight)
-        form_layout.setVerticalSpacing(15)
-        form_layout.setHorizontalSpacing(20)
+        # Área de pesquisa
+        search_frame = QFrame()
+        search_frame.setStyleSheet("background-color: #043b57;")
+        search_layout = QVBoxLayout(search_frame)
         
-        # Campo Nome
-        self.nome_label = QLabel("Nome:")
-        self.nome_label.setFont(QFont("Arial", 12))
-        self.nome_label.setStyleSheet("color: white;")
-        self.nome_input = QLineEdit()
-        self.nome_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.nome_input.setMinimumHeight(35)
-        form_layout.addRow(self.nome_label, self.nome_input)
+        # Estilos
+        label_style = "color: white; font-size: 14px;"
         
-        # Campo CNPJ/CPF
-        self.documento_label = QLabel("CNPJ")
-        self.documento_label.setFont(QFont("Arial", 12))
-        self.documento_label.setStyleSheet("color: white;")
-        self.documento_input = QLineEdit()
-        self.documento_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.documento_input.setMinimumHeight(35)
-        self.documento_input.textChanged.connect(self.formatar_documento)
-        self.documento_input.setPlaceholderText("00.000.000/0001-00")
-        form_layout.addRow(self.documento_label, self.documento_input)
+        # Linha de pesquisa
+        search_grid = QGridLayout()
+        search_grid.setColumnStretch(1, 1)  # Coluna do campo de texto se expande
+        search_grid.setColumnStretch(3, 1)  # Coluna do campo de texto se expande
         
-        # Layout para Código e Tipo de Pessoa (lado a lado)
-        codigo_tipo_layout = QHBoxLayout()
+        # Código
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_search = ComboBoxEditavel()
+        self.codigo_search.setPlaceholderText("Digite o código")
+        search_grid.addWidget(codigo_label, 0, 0)
+        search_grid.addWidget(self.codigo_search, 0, 1)
         
-        # Campo Código
-        codigo_form = QFormLayout()
-        codigo_form.setLabelAlignment(Qt.AlignRight)
-        codigo_form.setVerticalSpacing(15)
-        codigo_form.setHorizontalSpacing(20)
+        # Nome
+        nome_label = QLabel("Nome:")
+        nome_label.setStyleSheet(label_style)
+        self.nome_search = ComboBoxEditavel()
+        self.nome_search.setPlaceholderText("Digite o nome da pessoa")
+        search_grid.addWidget(nome_label, 0, 2)
+        search_grid.addWidget(self.nome_search, 0, 3)
         
-        self.codigo_label = QLabel("Código")
-        self.codigo_label.setFont(QFont("Arial", 12))
-        self.codigo_label.setStyleSheet("color: white;")
-        self.codigo_input = QLineEdit()
-        self.codigo_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.codigo_input.setMinimumHeight(35)
-        self.codigo_input.setMaximumWidth(150)
-        codigo_form.addRow(self.codigo_label, self.codigo_input)
+        # CNPJ/CPF
+        documento_label = QLabel("CNPJ/CPF:")
+        documento_label.setStyleSheet(label_style)
+        self.documento_search = ComboBoxEditavel()
+        self.documento_search.setPlaceholderText("Digite o CNPJ ou CPF")
+        search_grid.addWidget(documento_label, 1, 0)
+        search_grid.addWidget(self.documento_search, 1, 1)
         
         # Tipo de Pessoa
-        tipo_form = QFormLayout()
-        tipo_form.setLabelAlignment(Qt.AlignRight)
-        tipo_form.setVerticalSpacing(15)
-        tipo_form.setHorizontalSpacing(20)
-        
-        self.tipo_label = QLabel("Tipo de Pessoa:")
-        self.tipo_label.setFont(QFont("Arial", 12))
-        self.tipo_label.setStyleSheet("color: white;")
-        self.tipo_combo = QComboBox()
-        # Atualizar o estilo do ComboBox Tipo de Pessoa
-        # Substitua o estilo do ComboBox existente por este:
-
-        self.tipo_combo.setStyleSheet("""
+        tipo_label = QLabel("Tipo:")
+        tipo_label.setStyleSheet(label_style)
+        self.tipo_search = QComboBox()
+        self.tipo_search.setStyleSheet("""
             QComboBox {
                 background-color: white;
                 border: 1px solid #cccccc;
-                padding: 8px;
-                font-size: 12px;
-                min-height: 35px;
+                padding: 5px;
+                font-size: 14px;
+                border-radius: 4px;
+                color: black;
+                min-height: 25px;
+                max-height: 25px;
             }
-            QComboBox::drop-down {
-                border: 0px;
+            QComboBox::drop-down { 
+                border: none; 
             }
-            QComboBox::down-arrow {
-                image: url(down_arrow.png);
-                width: 12px;
-                height: 12px;
+            QComboBox:hover { 
+                border: 1px solid #0078d7; 
             }
             QComboBox QAbstractItemView {
                 background-color: white;
-                border: 1px solid #cccccc;
-                selection-background-color: #1a5f96;
+                color: black;
+                selection-background-color: #0078d7;
                 selection-color: white;
+                border: 1px solid #cccccc;
             }
         """)
-        self.tipo_combo.addItems(["Jurídica", "Física"])
-        self.tipo_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
-        tipo_form.addRow(self.tipo_label, self.tipo_combo)
+        self.tipo_search.addItems(["Todos", "Jurídica", "Física"])
+        search_grid.addWidget(tipo_label, 1, 2)
+        search_grid.addWidget(self.tipo_search, 1, 3)
         
-        codigo_tipo_layout.addLayout(codigo_form)
-        codigo_tipo_layout.addStretch()
-        codigo_tipo_layout.addLayout(tipo_form)
+        # Botões de pesquisa
+        search_btn_layout = QHBoxLayout()
         
-        # Campo Cidade
-        cidade_form = QHBoxLayout()
-        cidade_form.setSpacing(10)
+        # Botão Pesquisar
+        self.btn_pesquisar = QPushButton("Pesquisar")
+        self.btn_pesquisar.setStyleSheet("""
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        try:
+            self.btn_pesquisar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogContentsView))
+        except:
+            pass
+        self.btn_pesquisar.clicked.connect(self.pesquisar)
+        search_btn_layout.addWidget(self.btn_pesquisar)
         
-        self.cidade_label = QLabel("Cidade")
-        self.cidade_label.setFont(QFont("Arial", 12))
-        self.cidade_label.setStyleSheet("color: white;")
-        self.cidade_input = QLineEdit()
-        self.cidade_input.setStyleSheet("background-color: #fffff0; padding: 8px; font-size: 12px;")
-        self.cidade_input.setMinimumHeight(35)
+        # Botão Limpar Filtros
+        self.btn_limpar = QPushButton("Limpar Filtros")
+        self.btn_limpar.setStyleSheet("""
+            QPushButton {
+                background-color: #717171;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                font-size: 12px;
+                border-radius: 4px;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+        """)
+        try:
+            self.btn_limpar.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        except:
+            pass
+        self.btn_limpar.clicked.connect(self.limpar_filtros)
+        search_btn_layout.addWidget(self.btn_limpar)
         
-        cidade_layout = QFormLayout()
-        cidade_layout.setLabelAlignment(Qt.AlignRight)
-        cidade_layout.setVerticalSpacing(15)
-        cidade_layout.setHorizontalSpacing(20)
-        cidade_layout.addRow(self.cidade_label, self.cidade_input)
+        # Adicionar os botões à grid
+        search_grid.addLayout(search_btn_layout, 2, 3, 1, 1, Qt.AlignRight)
         
-        # Botões
+        search_layout.addLayout(search_grid)
+        main_layout.addWidget(search_frame)
+        
+        # Linha horizontal que separa a área de pesquisa da tabela
+        separator = QLabel("")
+        separator.setStyleSheet("""
+            QLabel {
+                background-color: #1e5a78;
+                min-height: 1px;
+                max-height: 1px;
+                margin-top: 3px;
+                margin-bottom: 3px;
+            }
+        """)
+        main_layout.addWidget(separator)
+        
+        # Botões de ação na parte inferior
         botoes_layout = QHBoxLayout()
         botoes_layout.setSpacing(10)
         
+        # Criar um layout para o campo de código
+        codigo_layout = QHBoxLayout()
+        codigo_label = QLabel("Código:")
+        codigo_label.setStyleSheet(label_style)
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #fffff0;
+                padding: 8px;
+                font-size: 12px;
+                border-radius: 4px;
+                color: black;
+            }
+        """)
+        self.codigo_input.setReadOnly(True)
+        self.codigo_input.setMaximumWidth(100)
+        codigo_layout.addWidget(codigo_label)
+        codigo_layout.addWidget(self.codigo_input)
+        codigo_layout.addStretch()
+        
+        # Botão Cadastrar
         self.btn_cadastrar = QPushButton("Cadastrar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_cadastrar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogNewFolder))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_cadastrar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -189,12 +302,12 @@ class CadastroPessoa(QWidget):
         """)
         self.btn_cadastrar.clicked.connect(self.cadastrar_pessoa)
         
+        # Botão Alterar
         self.btn_alterar = QPushButton("Alterar")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_alterar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_alterar.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -209,12 +322,12 @@ class CadastroPessoa(QWidget):
         """)
         self.btn_alterar.clicked.connect(self.alterar_pessoa)
         
+        # Botão Excluir
         self.btn_excluir = QPushButton("Excluir")
-        # Usar ícone do sistema em vez de arquivo de imagem
         try:
             self.btn_excluir.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
         except:
-            pass  # Se falhar, continua sem ícone
+            pass
         self.btn_excluir.setStyleSheet("""
             QPushButton {
                 background-color: #fffff0;
@@ -229,16 +342,16 @@ class CadastroPessoa(QWidget):
         """)
         self.btn_excluir.clicked.connect(self.excluir_pessoa)
         
-        botoes_layout.addWidget(self.btn_cadastrar)
-        botoes_layout.addWidget(self.btn_alterar)
-        botoes_layout.addWidget(self.btn_excluir)
+        # Adicionar à direita
+        botoes_direita = QHBoxLayout()
+        botoes_direita.addWidget(self.btn_cadastrar)
+        botoes_direita.addWidget(self.btn_alterar)
+        botoes_direita.addWidget(self.btn_excluir)
         
-        # Adicionar os layouts ao layout principal
-        main_layout.addLayout(form_layout)
-        main_layout.addLayout(codigo_tipo_layout)
-        main_layout.addLayout(cidade_layout)
+        botoes_layout.addLayout(codigo_layout)
+        botoes_layout.addLayout(botoes_direita)
+        
         main_layout.addLayout(botoes_layout)
-        main_layout.addSpacing(20)
         
         # Tabela de pessoas
         self.table = QTableWidget()
@@ -274,13 +387,111 @@ class CadastroPessoa(QWidget):
         
         self.table.itemClicked.connect(self.selecionar_pessoa)
         
-        main_layout.addWidget(self.table)
+        main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
-        # Carregar dados de teste
+        # Carregar dados do banco de dados
         self.carregar_pessoas()
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
+
+    # Método para selecionar pessoa (modificado para simplificar)
+    def selecionar_pessoa(self, item):
+        """
+        Preenche apenas o campo de código quando uma linha é selecionada
+        """
+        row = item.row()
+        
+        # Obter o código da linha selecionada
+        codigo = self.table.item(row, 0).text()
+        
+        # Preencher apenas o campo de código que mantivemos
+        self.codigo_input.setText(codigo)
+        
+        # Destacar visualmente a linha selecionada na tabela
+        self.table.selectRow(row)
+
+    # Métodos de pesquisa e limpeza de filtros
+    def pesquisar(self):
+        """Pesquisa pessoas com base nos filtros selecionados"""
+        codigo = self.codigo_search.currentText().strip()
+        nome = self.nome_search.currentText().strip()
+        documento = self.documento_search.currentText().strip()
+        tipo = self.tipo_search.currentText()
+        
+        try:
+            # Limpar tabela para os novos resultados
+            self.table.setRowCount(0)
+            
+            # Construir consulta SQL base
+            query = """
+            SELECT ID, NOME, TIPO_PESSOA
+            FROM PESSOAS
+            WHERE 1=1
+            """
+            
+            # Lista para armazenar os parâmetros de filtro
+            params = []
+            
+            # Adicionar condições conforme os filtros fornecidos
+            if codigo:
+                query += " AND ID = ?"
+                params.append(int(codigo))
+                
+            if nome:
+                query += " AND UPPER(NOME) LIKE UPPER(?)"
+                params.append(f"%{nome}%")  # Busca parcial, case-insensitive
+                
+            if documento:
+                # Remover caracteres não numéricos para busca
+                documento_limpo = ''.join(filter(str.isdigit, documento))
+                if documento_limpo:
+                    query += " AND DOCUMENTO LIKE ?"
+                    params.append(f"%{documento_limpo}%")
+            
+            # Filtrar pelo tipo de pessoa
+            if tipo != "Todos":
+                query += " AND TIPO_PESSOA = ?"
+                params.append(tipo)
+            
+            # Adicionar ordenação
+            query += " ORDER BY ID"
+            
+            # Executar a consulta
+            from base.banco import execute_query
+            pessoas = execute_query(query, tuple(params) if params else None)
+            
+            # Verificar se encontrou resultados
+            if pessoas and len(pessoas) > 0:
+                # Preencher a tabela com os resultados
+                self.table.setRowCount(len(pessoas))
+                
+                for row, (id_pessoa, nome, tipo_pessoa) in enumerate(pessoas):
+                    self.table.setItem(row, 0, QTableWidgetItem(str(id_pessoa)))
+                    self.table.setItem(row, 1, QTableWidgetItem(nome))
+                    self.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
+            else:
+                # Mensagem quando nenhuma pessoa corresponde aos filtros
+                self.mostrar_mensagem("Aviso", "Nenhuma pessoa encontrada com os filtros selecionados.")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao pesquisar pessoas: {str(e)}", QMessageBox.Critical)
+
+    def limpar_filtros(self):
+        """Limpa todos os campos de pesquisa e carrega todas as pessoas novamente"""
+        self.codigo_search.setCurrentIndex(-1)
+        self.codigo_search.clearEditText()
+        
+        self.nome_search.setCurrentIndex(-1)
+        self.nome_search.clearEditText()
+        
+        self.documento_search.setCurrentIndex(-1)
+        self.documento_search.clearEditText()
+        
+        self.tipo_search.setCurrentIndex(0)  # "Todos"
+        
+        # Recarregar todas as pessoas
+        self.carregar_pessoas()
     
     def atualizar_tipo_documento(self):
         """Atualiza o label CNPJ/CPF baseado no tipo de pessoa selecionado"""
@@ -302,7 +513,7 @@ class CadastroPessoa(QWidget):
     
     def formatar_documento(self, texto):
         """Formata o CNPJ/CPF durante a digitação"""
-        # Remover caracteres não numéricos
+        # Remover caracteres não numéricos para verificação
         texto_limpo = ''.join(filter(str.isdigit, texto))
         
         # Verificar se é CPF ou CNPJ
@@ -464,26 +675,54 @@ class CadastroPessoa(QWidget):
                     self.table.setItem(row, 0, QTableWidgetItem(str(id_pessoa)))
                     self.table.setItem(row, 1, QTableWidgetItem(nome))
                     self.table.setItem(row, 2, QTableWidgetItem(tipo_pessoa))
+                
+                # Preencher os ComboBoxes com valores únicos
+                codigos = set()
+                nomes = set()
+                documentos = set()
+                tipos = set()
+                
+                # Obter dados específicos para os ComboBoxes
+                try:
+                    # Consulta para obter códigos, nomes e documentos
+                    from base.banco import execute_query
+                    pessoas_detalhadas = execute_query("""
+                        SELECT ID, NOME, DOCUMENTO, TIPO_PESSOA
+                        FROM PESSOAS
+                        ORDER BY ID
+                    """)
+                    
+                    if pessoas_detalhadas:
+                        for id_pessoa, nome, documento, tipo_pessoa in pessoas_detalhadas:
+                            codigos.add(str(id_pessoa))
+                            if nome:
+                                nomes.add(nome)
+                            if documento:
+                                # Formatar CNPJ/CPF para exibição
+                                if len(documento) == 14:  # CNPJ
+                                    documento_formatado = f"{documento[:2]}.{documento[2:5]}.{documento[5:8]}/{documento[8:12]}-{documento[12:]}"
+                                elif len(documento) == 11:  # CPF
+                                    documento_formatado = f"{documento[:3]}.{documento[3:6]}.{documento[6:9]}-{documento[9:]}"
+                                else:
+                                    documento_formatado = documento
+                                documentos.add(documento_formatado)
+                            if tipo_pessoa:
+                                tipos.add(tipo_pessoa)
+                except Exception as e:
+                    print(f"Erro ao obter dados detalhados: {e}")
+                
+                # Limpar e adicionar aos ComboBoxes
+                self.codigo_search.clear()
+                self.nome_search.clear()
+                self.documento_search.clear()
+                
+                self.codigo_search.addItems(sorted(codigos))
+                self.nome_search.addItems(sorted(nomes))
+                self.documento_search.addItems(sorted(documentos))
                     
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao carregar pessoas: {e}", QMessageBox.Critical)
 
-    
-    def selecionar_pessoa(self, item):
-        row = item.row()
-        
-        # Preencher os campos com os dados da linha selecionada
-        codigo = self.table.item(row, 0).text()
-        nome = self.table.item(row, 1).text()
-        tipo = self.table.item(row, 2).text()
-        
-        self.codigo_input.setText(codigo)
-        self.nome_input.setText(nome)
-        
-        # Ajustar o combo de tipo de pessoa
-        index = 0 if tipo == "Jurídica" else 1
-        self.tipo_combo.setCurrentIndex(index)
-    
     def mostrar_mensagem(self, titulo, mensagem, tipo=QMessageBox.Information):
         """Exibe uma mensagem para o usuário com estilo personalizado"""
         msg_box = QMessageBox()
@@ -613,7 +852,7 @@ class FormularioPessoa(QWidget):
         
         # Título
         titulo_layout = QVBoxLayout()
-        titulo = QLabel("Cadastro de Pessoa")
+        titulo = QLabel("Cadastro de Clientes")
         titulo.setFont(QFont("Arial", 16, QFont.Bold))
         titulo.setStyleSheet("color: white; margin-bottom: 20px;")
         titulo.setAlignment(Qt.AlignCenter)

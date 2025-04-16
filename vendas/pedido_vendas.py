@@ -1,58 +1,46 @@
 import sys
 import os
+from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QPushButton, QLabel, QLineEdit,
                            QTableWidget, QTableWidgetItem, QHeaderView,
-                           QAbstractItemView, QFrame, QStyle, QDateEdit, QMessageBox)
+                           QAbstractItemView, QFrame, QStyle, QDateEdit, 
+                           QMessageBox, QComboBox)
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
 from PyQt5.QtCore import Qt, QSize, QDate
 
+# Importar funções do banco de dados
+from base.banco import (verificar_tabela_pedidos_venda, listar_pedidos_venda,
+                       buscar_pedido_por_id, buscar_pedido_por_numero,
+                       criar_pedido, atualizar_pedido, excluir_pedido,
+                       buscar_pedidos_por_filtro, obter_vendedores_pedidos,
+                       obter_clientes_pedidos, obter_cidades_pedidos,
+                       listar_funcionarios, listar_pessoas, listar_produtos)
 
-# Primeiro definimos a classe do formulário que antes estava em outro arquivo
-class FormularioPedidoVendas(QWidget):
-    def __init__(self, janela_parent=None, num_pedido=None, cliente=None):
-        super().__init__()
-        self.janela_parent = janela_parent
-        self.num_pedido = num_pedido
-        self.cliente = cliente
-        self.initUI()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Agora tente importar novamente
+from formulario_pedido_vendas import FormularioPedidoVendas
+
+JANELA_LARGURA = 800
+JANELA_ALTURA = 600
+
+# Classe para os ComboBox editáveis
+class ComboBoxEditavel(QComboBox):
+    def __init__(self, parent=None):
+        super(ComboBoxEditavel, self).__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.completer().setCaseSensitivity(Qt.CaseInsensitive)
         
-        # Se estiver alterando um pedido existente, preencher os campos
-        if self.num_pedido and self.cliente:
-            self.preencher_campos()
+        # Definir como vazio ao inicializar
+        self.clearEditText()  # Limpa o texto no editor
         
-    def create_palette(self):
-        """Cria uma paleta com cor de fundo azul escuro"""
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor("#003b57"))
-        palette.setColor(QPalette.WindowText, Qt.white)
-        return palette
-    
-    def initUI(self):
-        # Layout principal
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
-        
-        # Fundo para todo o aplicativo
-        self.setAutoFillBackground(True)
-        self.setPalette(self.create_palette())
-        
-        # Layout para o título centralizado (sem botão voltar)
-        header_layout = QHBoxLayout()
-        
-        # Título centralizado
-        titulo = QLabel("Cadastro de Pedido de vendas")
-        titulo.setFont(QFont("Arial", 24, QFont.Bold))
-        titulo.setStyleSheet("color: white;")
-        titulo.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(titulo)
-        
-        main_layout.addLayout(header_layout)
-        
-        # Estilo comum para QLineEdit
-        lineedit_style = """
-            QLineEdit {
+        # Estilo do ComboBox com seta para baixo
+        self.setStyleSheet("""
+            QComboBox {
                 background-color: #fffff0;
                 border: 1px solid #cccccc;
                 padding: 6px;
@@ -61,250 +49,50 @@ class FormularioPedidoVendas(QWidget):
                 max-height: 30px;
                 border-radius: 4px;
             }
-            QLineEdit:focus {
+            QComboBox:focus {
                 border: 1px solid #0078d7;
             }
-        """
-        
-        # Estilo para DateEdit com ícone de calendário
-        dateedit_style = """
-            QDateEdit {
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #cccccc;
+                border-left-style: solid;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow {
+                width: 14px;
+                height: 14px;
+                image: url(ico-img/down-arrow.png);
+            }
+            QComboBox QAbstractItemView {
                 background-color: #fffff0;
+                selection-background-color: #0078d7;
+                selection-color: white;
                 border: 1px solid #cccccc;
-                padding: 6px;
-                font-size: 13px;
-                min-height: 20px;
-                max-height: 30px;
-                border-radius: 4px;
-            }
-            QDateEdit:focus {
-                border: 1px solid #0078d7;
-            }
-            QDateEdit::drop-down {
-                border: none;
-            }
-            QDateEdit::down-arrow {
-                width: 16px;
-                height: 16px;
-                image: url(ico-img/calendar-outline.svg);
-            }
-        """
-        
-        # Primeira linha - Número do Pedido e Cliente
-        linha1_layout = QHBoxLayout()
-        linha1_layout.setSpacing(10)
-        
-        # Campo Número do Pedido
-        num_pedido_label = QLabel("Num. Pedido:")
-        num_pedido_label.setStyleSheet("color: white; font-size: 16px;")
-        linha1_layout.addWidget(num_pedido_label)
-        
-        self.num_pedido_input = QLineEdit()
-        self.num_pedido_input.setStyleSheet(lineedit_style)
-        self.num_pedido_input.setFixedWidth(150)
-        if self.num_pedido:
-            self.num_pedido_input.setText(self.num_pedido)
-        linha1_layout.addWidget(self.num_pedido_input)
-        
-        # Campo Cliente
-        cliente_label = QLabel("Cliente:")
-        cliente_label.setStyleSheet("color: white; font-size: 16px;")
-        linha1_layout.addWidget(cliente_label)
-        
-        self.cliente_input = QLineEdit()
-        self.cliente_input.setStyleSheet(lineedit_style)
-        if self.cliente:
-            self.cliente_input.setText(self.cliente)
-        linha1_layout.addWidget(self.cliente_input, 1)
-        
-        main_layout.addLayout(linha1_layout)
-        
-        # Segunda linha - Vendedor e Valor
-        linha2_layout = QHBoxLayout()
-        linha2_layout.setSpacing(10)
-        
-        # Campo Vendedor
-        vendedor_label = QLabel("Vendedor:")
-        vendedor_label.setStyleSheet("color: white; font-size: 16px;")
-        linha2_layout.addWidget(vendedor_label)
-        
-        self.vendedor_input = QLineEdit()
-        self.vendedor_input.setStyleSheet(lineedit_style)
-        linha2_layout.addWidget(self.vendedor_input, 1)
-        
-        # Campo Valor
-        valor_label = QLabel("Valor:")
-        valor_label.setStyleSheet("color: white; font-size: 16px;")
-        linha2_layout.addWidget(valor_label)
-        
-        self.valor_input = QLineEdit()
-        self.valor_input.setStyleSheet(lineedit_style)
-        self.valor_input.setFixedWidth(150)
-        linha2_layout.addWidget(self.valor_input)
-        
-        main_layout.addLayout(linha2_layout)
-        
-        # Terceira linha - Produto e Data
-        linha3_layout = QHBoxLayout()
-        linha3_layout.setSpacing(10)
-        
-        # Campo Produto
-        produto_label = QLabel("Produto:")
-        produto_label.setStyleSheet("color: white; font-size: 16px;")
-        linha3_layout.addWidget(produto_label)
-        
-        self.produto_input = QLineEdit()
-        self.produto_input.setStyleSheet(lineedit_style)
-        linha3_layout.addWidget(self.produto_input, 1)
-        
-        # Campo Data
-        data_label = QLabel("Data:")
-        data_label.setStyleSheet("color: white; font-size: 16px;")
-        linha3_layout.addWidget(data_label)
-        
-        self.data_input = QDateEdit()
-        self.data_input.setCalendarPopup(True)
-        self.data_input.setDate(QDate.currentDate())
-        self.data_input.setStyleSheet(dateedit_style)
-        
-        # Configurar calendário
-        try:
-            calendar = self.data_input.calendarWidget()
-            calendar.setStyleSheet("""
-                QCalendarWidget {
-                    background-color: #003b57;
-                }
-                QCalendarWidget QWidget {
-                    background-color: #003b57;
-                }
-                QCalendarWidget QAbstractItemView:enabled {
-                    background-color: #003b57;
-                    color: white;
-                    selection-background-color: #005079;
-                    selection-color: white;
-                }
-                QCalendarWidget QToolButton {
-                    background-color: #003b57;
-                    color: white;
-                }
-                QCalendarWidget QMenu {
-                    background-color: #003b57;
-                    color: white;
-                }
-            """)
-        except:
-            pass
-            
-        linha3_layout.addWidget(self.data_input)
-        
-        main_layout.addLayout(linha3_layout)
-        
-        # Botão Incluir
-        self.btn_incluir = QPushButton("Incluir")
-        self.btn_incluir.setStyleSheet("""
-            QPushButton {
-                background-color: #00ff9d;
-                color: black;
-                border: none;
-                padding: 15px 0;
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 4px;
-                margin: 20px 0;
-            }
-            QPushButton:hover {
-                background-color: #00e088;
-            }
-            QPushButton:pressed {
-                background-color: #00cc7a;
             }
         """)
-        self.btn_incluir.clicked.connect(self.incluir)
-        main_layout.addWidget(self.btn_incluir)
         
-        # Adicionar espaço no final
-        main_layout.addStretch()
-    
-    def preencher_campos(self):
-        """Preenche os campos com os dados do pedido para alteração"""
-        # Aqui você pode implementar a lógica para buscar os dados completos
-        # do pedido e preencher todos os campos. Por agora, vamos simular alguns dados
-        self.vendedor_input.setText("Carlos")
-        self.valor_input.setText("R$ 2.450,00")
-        self.produto_input.setText("Produto XYZ")
+    def showPopup(self):
+        """Sobrescreve o método de mostrar popup para garantir que o texto atual não seja selecionado"""
+        super().showPopup()
         
-        # Mudando o texto do botão para indicar alteração
-        self.btn_incluir.setText("Alterar")
-    
-    # Método voltar foi removido
-    
-    def incluir(self):
-        """Inclui ou altera um pedido"""
-        # Validar campos obrigatórios
-        num_pedido = self.num_pedido_input.text()
-        cliente = self.cliente_input.text()
-        vendedor = self.vendedor_input.text()
-        valor = self.valor_input.text()
-        produto = self.produto_input.text()
-        
-        if not num_pedido or not cliente or not vendedor or not valor or not produto:
-            self.mostrar_mensagem("Atenção", "Preencha todos os campos obrigatórios!")
-            return
-        
-        # Aqui você implementaria a lógica para salvar os dados
-        # Por agora, vamos apenas mostrar uma mensagem de sucesso
-        
-        # Verificar se é inclusão ou alteração
-        if self.num_pedido:
-            mensagem = "Pedido alterado com sucesso!"
-        else:
-            mensagem = "Pedido incluído com sucesso!"
-        
-        self.mostrar_mensagem("Sucesso", mensagem)
-        
-        # Fechar a janela após a inclusão/alteração
-        if self.janela_parent:
-            self.janela_parent.close()
-    
-    def mostrar_mensagem(self, titulo, texto):
-        """Exibe uma caixa de mensagem"""
-        msg_box = QMessageBox()
-        if "Atenção" in titulo:
-            msg_box.setIcon(QMessageBox.Warning)
-        else:
-            msg_box.setIcon(QMessageBox.Information)
-        
-        msg_box.setWindowTitle(titulo)
-        msg_box.setText(texto)
-        msg_box.setStyleSheet("""
-            QMessageBox { 
-                background-color: #003b57;
-            }
-            QLabel { 
-                color: white;
-                background-color: #003b57;
-            }
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 5px 15px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        msg_box.exec_()
+    def addItems(self, items):
+        """Sobrescreve o método addItems para não selecionar o primeiro item"""
+        super().addItems(items)
+        self.setCurrentIndex(-1)  # Definir índice como -1 (nenhum selecionado)
+        self.clearEditText()  # Limpar o texto do editor
 
-
-# Classe principal de Pedido de Vendas
+# Classe principal para a tela de Pedido de Vendas
 class PedidoVendasWindow(QWidget):
     def __init__(self, janela_parent=None):
         super().__init__()
         self.janela_parent = janela_parent
+        self.form_window = None  # Para armazenar a referência da janela de formulário
         self.initUI()
+        self.setMinimumSize(JANELA_LARGURA, JANELA_ALTURA)
         
     def create_palette(self):
         """Cria uma paleta com cor de fundo azul escuro"""
@@ -323,7 +111,7 @@ class PedidoVendasWindow(QWidget):
         self.setAutoFillBackground(True)
         self.setPalette(self.create_palette())
         
-        # Layout para o título centralizado (sem botão voltar)
+        # Layout para o título centralizado
         header_layout = QHBoxLayout()
         
         # Título centralizado
@@ -335,22 +123,6 @@ class PedidoVendasWindow(QWidget):
         
         main_layout.addLayout(header_layout)
         
-        # Estilo comum para QLineEdit
-        lineedit_style = """
-            QLineEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 6px;
-                font-size: 13px;
-                min-height: 20px;
-                max-height: 30px;
-                border-radius: 4px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #0078d7;
-            }
-        """
-        
         # Estilo para DateEdit com ícone de calendário
         dateedit_style = """
             QDateEdit {
@@ -366,41 +138,130 @@ class PedidoVendasWindow(QWidget):
                 border: 1px solid #0078d7;
             }
             QDateEdit::drop-down {
-                border: none;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #cccccc;
+                border-left-style: solid;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
             }
             QDateEdit::down-arrow {
-                width: 16px;
-                height: 16px;
+                width: 14px;
+                height: 14px;
                 image: url(ico-img/calendar-outline.svg);
             }
         """
         
-        # Primeira linha de filtros
+        # Primeira linha de filtros - Nome
+        filtro_layout0 = QHBoxLayout()
+        filtro_layout0.setSpacing(10)
+        
+        # Campo Nome (Cliente) - ComboBox Editável
+        nome_label = QLabel("Nome:")
+        nome_label.setStyleSheet("color: white; font-size: 16px;")
+        nome_label.setFixedWidth(80)  # Fixar largura para alinhamento
+        filtro_layout0.addWidget(nome_label)
+        
+        self.nome_input = ComboBoxEditavel()
+        
+        # Preencher com nomes de clientes existentes
+        try:
+            clientes = obter_clientes_pedidos()
+            self.nome_input.addItems(clientes)
+            # Também adicionar clientes da tabela PESSOAS
+            pessoas = listar_pessoas()
+            for pessoa in pessoas:
+                nome = pessoa[1]  # Nome da pessoa
+                if nome and nome not in clientes:
+                    self.nome_input.addItem(nome)
+            
+            # Garantir que o ComboBox comece vazio
+            self.nome_input.setCurrentIndex(-1)
+            self.nome_input.clearEditText()
+        except Exception as e:
+            print(f"Erro ao carregar nomes de clientes: {e}")
+        
+        filtro_layout0.addWidget(self.nome_input, 1)
+        
+        main_layout.addLayout(filtro_layout0)
+        
+        # Segunda linha de filtros - Vendedor
         filtro_layout1 = QHBoxLayout()
         filtro_layout1.setSpacing(10)
         
-        # Campo Vendedor
+        # Campo Vendedor - ComboBox Editável
         vendedor_label = QLabel("Vendedor:")
         vendedor_label.setStyleSheet("color: white; font-size: 16px;")
+        vendedor_label.setFixedWidth(80)  # Fixar largura para alinhamento
         filtro_layout1.addWidget(vendedor_label)
         
-        self.vendedor_input = QLineEdit()
-        self.vendedor_input.setStyleSheet(lineedit_style)
+        self.vendedor_input = ComboBoxEditavel()
+        
+        # Preencher com vendedores existentes
+        try:
+            # Obter vendedores de pedidos anteriores
+            vendedores = obter_vendedores_pedidos()
+            
+            # Obter funcionários da tabela FUNCIONARIOS
+            funcionarios = listar_funcionarios()
+            
+            # Combinar as listas, evitando duplicatas
+            todos_vendedores = set(vendedores)
+            for funcionario in funcionarios:
+                todos_vendedores.add(funcionario[1])  # Nome do funcionário
+            
+            # Adicionar ao combobox
+            self.vendedor_input.addItems(sorted(todos_vendedores))
+            
+            # Garantir que o ComboBox comece vazio
+            self.vendedor_input.setCurrentIndex(-1)
+            self.vendedor_input.clearEditText()
+        except Exception as e:
+            print(f"Erro ao carregar vendedores: {e}")
+        
         filtro_layout1.addWidget(self.vendedor_input, 1)
         
         main_layout.addLayout(filtro_layout1)
         
-        # Segunda linha de filtros
+        # Terceira linha de filtros - Cidade e Data Entrada
         filtro_layout2 = QHBoxLayout()
         filtro_layout2.setSpacing(10)
         
-        # Campo Cidade
+        # Campo Cidade - ComboBox Editável
         cidade_label = QLabel("Cidade:")
         cidade_label.setStyleSheet("color: white; font-size: 16px;")
+        cidade_label.setFixedWidth(80)  # Fixar largura para alinhamento
         filtro_layout2.addWidget(cidade_label)
         
-        self.cidade_input = QLineEdit()
-        self.cidade_input.setStyleSheet(lineedit_style)
+        self.cidade_input = ComboBoxEditavel()
+        
+        # Preencher com cidades existentes
+        try:
+            # Obter cidades de pedidos anteriores
+            cidades_pedidos = obter_cidades_pedidos()
+            
+            # Obter cidades das pessoas cadastradas
+            pessoas = listar_pessoas()
+            
+            # Combinar as listas, evitando duplicatas
+            todas_cidades = set(cidades_pedidos)
+            for pessoa in pessoas:
+                cidade = pessoa[9] if len(pessoa) > 9 else None  # Índice da cidade
+                if cidade and cidade.strip():
+                    todas_cidades.add(cidade)
+            
+            # Adicionar ao combobox
+            self.cidade_input.addItems(sorted(todas_cidades))
+            
+            # Garantir que o ComboBox comece vazio
+            self.cidade_input.setCurrentIndex(-1)
+            self.cidade_input.clearEditText()
+        except Exception as e:
+            print(f"Erro ao carregar cidades: {e}")
+        
+        # Adicionar cidade ao layout com peso 1
         filtro_layout2.addWidget(self.cidade_input, 1)
         
         # Campo Data de Entrada
@@ -412,6 +273,7 @@ class PedidoVendasWindow(QWidget):
         self.data_entrada.setCalendarPopup(True)
         self.data_entrada.setDate(QDate.currentDate())
         self.data_entrada.setStyleSheet(dateedit_style)
+        self.data_entrada.setFixedWidth(120)
         
         # Configurar calendário para data de entrada
         try:
@@ -445,37 +307,85 @@ class PedidoVendasWindow(QWidget):
         
         main_layout.addLayout(filtro_layout2)
         
-        # Terceira linha de filtros
+        # Quarta linha de filtros - Data de Saída e Botão Filtrar
         filtro_layout3 = QHBoxLayout()
-        # Zera margens internas (esquerda, topo, direita, base)
-        filtro_layout3.setContentsMargins(0, 0, 0, 0)
-        # Espaçamento mínimo entre widgets
-        filtro_layout3.setSpacing(5)
-
+        filtro_layout3.setSpacing(10)
+        
         # Campo Data de Saída
         data_saida_label = QLabel("Data de Saída")
         data_saida_label.setStyleSheet("color: white; font-size: 16px;")
+        data_saida_label.setFixedWidth(100)  # Fixar largura para alinhamento
         filtro_layout3.addWidget(data_saida_label)
-
+        
         self.data_saida = QDateEdit()
         self.data_saida.setCalendarPopup(True)
         self.data_saida.setDate(QDate.currentDate())
         self.data_saida.setStyleSheet(dateedit_style)
-        self.data_saida.setFixedWidth(120)  # ou ajuste pro tamanho que quiser
-        filtro_layout3.addWidget(self.data_saida)
-
-        # Depois do date edit, stretch para empurrar tudo à esquerda
-        filtro_layout3.addStretch()
-
-        main_layout.addLayout(filtro_layout3)
-
-
+        self.data_saida.setFixedWidth(120)
         
-        # Botões de ação
+        # Configurar calendário para data de saída
+        try:
+            calendar = self.data_saida.calendarWidget()
+            calendar.setStyleSheet("""
+                QCalendarWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QWidget {
+                    background-color: #003b57;
+                }
+                QCalendarWidget QAbstractItemView:enabled {
+                    background-color: #003b57;
+                    color: white;
+                    selection-background-color: #005079;
+                    selection-color: white;
+                }
+                QCalendarWidget QToolButton {
+                    background-color: #003b57;
+                    color: white;
+                }
+                QCalendarWidget QMenu {
+                    background-color: #003b57;
+                    color: white;
+                }
+            """)
+        except:
+            pass
+            
+        filtro_layout3.addWidget(self.data_saida)
+        
+        # Adicionar espaço para empurrar o botão Filtrar para a direita
+        filtro_layout3.addStretch(1)
+        
+        # Botão Filtrar
+        self.btn_filtrar = QPushButton("Filtrar")
+        self.btn_filtrar.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d7;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #0063b1;
+            }
+        """)
+        self.btn_filtrar.clicked.connect(self.carregar_dados)
+        self.btn_filtrar.setFixedWidth(100)
+        filtro_layout3.addWidget(self.btn_filtrar)
+        
+        main_layout.addLayout(filtro_layout3)
+        
+        # Espaço vertical entre filtros e botões CRUD
+        main_layout.addSpacing(10)
+        
+        # Botões de ação (CRUD)
         acoes_layout = QHBoxLayout()
         acoes_layout.setSpacing(15)
         
-        # Espaço para alinhar os botões como na imagem
+        # Espaço para alinhar os botões à direita
         acoes_layout.addStretch()
         
         # Estilo para os botões
@@ -484,7 +394,7 @@ class PedidoVendasWindow(QWidget):
                 background-color: #fffff0;
                 color: black;
                 border: 1px solid #cccccc;
-                padding: 10px 20px;
+                padding: 8px 15px;
                 font-size: 14px;
                 border-radius: 4px;
                 text-align: left;
@@ -556,7 +466,7 @@ class PedidoVendasWindow(QWidget):
         
         # Configurar tabela
         self.tabela.setColumnCount(5)
-        self.tabela.setHorizontalHeaderLabels(["Num. Pedido", "Nome", "Valor", "Data", "Vendedor"])
+        self.tabela.setHorizontalHeaderLabels(["Num. Pedido", "Cliente", "Valor", "Data", "Vendedor"])
         self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.tabela.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.tabela.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -568,42 +478,125 @@ class PedidoVendasWindow(QWidget):
         self.tabela.setSelectionMode(QTableWidget.SingleSelection)
         self.tabela.itemSelectionChanged.connect(self.selecionar_item)
         
-        # Adicionar alguns exemplos de dados
-        self.carregar_dados_exemplo()
+        # Carregar dados do banco
+        self.carregar_dados()
         
         main_layout.addWidget(self.tabela)
+        
+        # Garantir que todos os ComboBoxes comecem vazios
+        for child in self.findChildren(ComboBoxEditavel):
+            child.setCurrentIndex(-1)
+            child.clearEditText()
     
-    def carregar_dados_exemplo(self):
-        """Carrega dados de exemplo na tabela"""
-        # Limpar tabela
-        self.tabela.setRowCount(0)
-        
-        # Dados de exemplo (número do pedido, nome, valor, data, vendedor)
-        dados = [
-            ("00001", "Empresa ABC Ltda", "R$ 2.450,00", "01/04/2023", "Carlos"),
-            ("00002", "João Silva", "R$ 890,50", "05/04/2023", "Maria"),
-            ("00003", "Distribuidora XYZ", "R$ 5.780,00", "08/04/2023", "Pedro"),
-            ("00004", "Ana Souza", "R$ 1.200,00", "12/04/2023", "Carlos"),
-            ("00005", "Mercado Central", "R$ 3.450,00", "15/04/2023", "Maria")
-        ]
-        
-        # Adicionar linhas
-        for row, (num_pedido, nome, valor, data, vendedor) in enumerate(dados):
-            self.tabela.insertRow(row)
-            self.tabela.setItem(row, 0, QTableWidgetItem(num_pedido))
-            self.tabela.setItem(row, 1, QTableWidgetItem(nome))
-            self.tabela.setItem(row, 2, QTableWidgetItem(valor))
-            self.tabela.setItem(row, 3, QTableWidgetItem(data))
-            self.tabela.setItem(row, 4, QTableWidgetItem(vendedor))
+    def carregar_dados(self, limpar_filtros=False):
+        """Carrega dados do banco na tabela, com opção para limpar filtros"""
+        try:
+            # Limpar os filtros se solicitado
+            if limpar_filtros:
+                self.nome_input.setCurrentIndex(-1)
+                self.nome_input.clearEditText()
+                self.vendedor_input.setCurrentIndex(-1)
+                self.vendedor_input.clearEditText()
+                self.cidade_input.setCurrentIndex(-1)
+                self.cidade_input.clearEditText()
+                # Definir datas para o dia atual
+                self.data_entrada.setDate(QDate.currentDate())
+                self.data_saida.setDate(QDate.currentDate())
+                
+            # Limpar tabela
+            self.tabela.setRowCount(0)
+            
+            # Obter filtros
+            vendedor = self.vendedor_input.currentText()
+            nome = self.nome_input.currentText()
+            cidade = self.cidade_input.currentText()
+            data_inicial = self.data_entrada.date().toString("dd/MM/yyyy")
+            data_final = self.data_saida.date().toString("dd/MM/yyyy")
+            
+            # Buscar pedidos com os filtros
+            pedidos = buscar_pedidos_por_filtro(
+                vendedor=vendedor if vendedor else "",
+                cliente=nome if nome else "",
+                cidade=cidade if cidade else "",
+                data_inicial=data_inicial if data_inicial else None,
+                data_final=data_final if data_final else None
+            )
+            
+            # Se não houver pedidos com os filtros, tentar buscar todos
+            if not pedidos:
+                try:
+                    pedidos = listar_pedidos_venda()
+                except Exception as e:
+                    print(f"Erro ao listar pedidos: {e}")
+                    # Criar alguns dados de exemplo se não houver dados no banco
+                    pedidos = [
+                        (1, "00001", "Empresa ABC Ltda", "Carlos", 2450.00, datetime.now(), "Pendente"),
+                        (2, "00002", "João Silva", "Maria", 890.50, datetime.now(), "Pendente"),
+                        (3, "00003", "Distribuidora XYZ", "Pedro", 5780.00, datetime.now(), "Pendente")
+                    ]
+            
+            # Adicionar linhas na tabela
+            for row, pedido in enumerate(pedidos):
+                self.tabela.insertRow(row)
+                
+                # ID, NUMERO_PEDIDO, CLIENTE, VENDEDOR, VALOR, DATA_PEDIDO, STATUS
+                id_pedido = pedido[0]
+                num_pedido = pedido[1]
+                cliente = pedido[2]
+                vendedor = pedido[3]
+                valor = pedido[4]
+                data = pedido[5]
+                
+                # Formatar os dados
+                valor_formatado = f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if valor else ""
+                
+                if isinstance(data, datetime):
+                    data_formatada = data.strftime("%d/%m/%Y")
+                else:
+                    data_formatada = str(data) if data else ""
+                
+                # Preencher as células
+                self.tabela.setItem(row, 0, QTableWidgetItem(num_pedido))
+                self.tabela.setItem(row, 1, QTableWidgetItem(cliente))
+                self.tabela.setItem(row, 2, QTableWidgetItem(valor_formatado))
+                self.tabela.setItem(row, 3, QTableWidgetItem(data_formatada))
+                self.tabela.setItem(row, 4, QTableWidgetItem(vendedor))
+                
+                # Armazenar o ID na primeira coluna como dado oculto
+                self.tabela.item(row, 0).setData(Qt.UserRole, id_pedido)
+                
+        except Exception as e:
+            print(f"Erro ao carregar dados: {e}")
+            self.mostrar_mensagem("Erro", f"Não foi possível carregar os pedidos: {str(e)}")
+    
+    def atualizar_apos_inclusao(self):
+        """Método específico para atualizar a tabela após inclusão de um pedido"""
+        print("Método atualizar_apos_inclusao chamado")
+        # Carregar dados sem filtro para mostrar o novo pedido
+        self.carregar_dados(limpar_filtros=True)
     
     def selecionar_item(self):
         """Preenche os campos quando uma linha é selecionada"""
         selected_rows = self.tabela.selectionModel().selectedRows()
         if selected_rows:
             row = selected_rows[0].row()
-            # Aqui você poderia preencher campos se necessário
-    
-    # Método voltar foi removido
+            
+            # Preencher os campos de filtro com os dados da linha selecionada
+            vendedor = self.tabela.item(row, 4).text()
+            cliente = self.tabela.item(row, 1).text()
+            
+            # Definir os valores nos comboboxes
+            index = self.vendedor_input.findText(vendedor)
+            if index >= 0:
+                self.vendedor_input.setCurrentIndex(index)
+            else:
+                self.vendedor_input.setCurrentText(vendedor)
+            
+            index = self.nome_input.findText(cliente)
+            if index >= 0:
+                self.nome_input.setCurrentIndex(index)
+            else:
+                self.nome_input.setCurrentText(cliente)
     
     def alterar(self):
         """Altera os dados de um pedido"""
@@ -613,6 +606,7 @@ class PedidoVendasWindow(QWidget):
             return
         
         row = selected_rows[0].row()
+        id_pedido = self.tabela.item(row, 0).data(Qt.UserRole)  # Obter ID armazenado
         num_pedido = self.tabela.item(row, 0).text()
         nome = self.tabela.item(row, 1).text()
         
@@ -627,12 +621,14 @@ class PedidoVendasWindow(QWidget):
             return
         
         row = selected_rows[0].row()
+        id_pedido = self.tabela.item(row, 0).data(Qt.UserRole)  # Obter ID armazenado
+        num_pedido = self.tabela.item(row, 0).text()
         
         # Criar uma caixa de diálogo de confirmação com estilo personalizado
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Question)
         msg_box.setWindowTitle("Confirmar Exclusão")
-        msg_box.setText(f"Deseja realmente excluir o pedido {self.tabela.item(row, 0).text()}?")
+        msg_box.setText(f"Deseja realmente excluir o pedido {num_pedido}?")
         msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         msg_box.setDefaultButton(QMessageBox.No)
         msg_box.setStyleSheet("""
@@ -659,37 +655,67 @@ class PedidoVendasWindow(QWidget):
         resposta = msg_box.exec_()
         
         if resposta == QMessageBox.Yes:
-            self.tabela.removeRow(row)
-            self.mostrar_mensagem("Sucesso", "Pedido excluído com sucesso!")
+            try:
+                # Excluir do banco de dados
+                sucesso = excluir_pedido(id_pedido)
+                
+                if sucesso:
+                    # Remover da tabela
+                    self.tabela.removeRow(row)
+                    self.mostrar_mensagem("Sucesso", "Pedido excluído com sucesso!")
+                else:
+                    self.mostrar_mensagem("Erro", "Não foi possível excluir o pedido!")
+            except Exception as e:
+                print(f"Erro ao excluir pedido: {e}")
+                self.mostrar_mensagem("Erro", f"Não foi possível excluir o pedido: {str(e)}")
     
     def cadastrar(self):
         """Abre a tela de cadastro de pedido"""
+        # Limpar os filtros antes de abrir o formulário
+        self.nome_input.setCurrentIndex(-1)
+        self.nome_input.clearEditText()
+        self.vendedor_input.setCurrentIndex(-1)
+        self.vendedor_input.clearEditText()
+        self.cidade_input.setCurrentIndex(-1)
+        self.cidade_input.clearEditText()
+        
+        # Abrir o formulário
         self.abrir_formulario()
     
     def abrir_formulario(self, num_pedido=None, cliente=None):
         """Abre o formulário de pedido, para cadastro ou alteração"""
         try:
-            # Como estamos usando a classe FormularioPedidoVendas definida no mesmo arquivo,
-            # não precisamos importá-la
-            
-            # Criar uma instância do formulário
+            # Criar uma instância do formulário diretamente
             self.form_window = QMainWindow()
             self.form_window.setWindowTitle("Cadastro de Pedido de vendas")
             self.form_window.setGeometry(100, 100, 800, 600)
             self.form_window.setStyleSheet("background-color: #003b57;")
             
-            # Configurar o widget central
+            # Usar a classe FormularioPedidoVendas definida neste mesmo arquivo
             formulario_pedido_widget = FormularioPedidoVendas(
                 janela_parent=self.form_window,
                 num_pedido=num_pedido,
-                cliente=cliente
+                cliente=cliente,
+                tela_principal=self  # Passar uma referência direta para esta instância
             )
             self.form_window.setCentralWidget(formulario_pedido_widget)
+            
+            # Adicionar conexão para atualizar ao fechar o formulário
+            self.form_window.closeEvent = lambda event: self.form_fechado(event)
             
             # Mostrar a janela de formulário
             self.form_window.show()
         except Exception as e:
+            print(f"Erro ao abrir formulário: {e}")
             self.mostrar_mensagem("Erro", f"Não foi possível abrir o formulário: {str(e)}")
+    
+    def form_fechado(self, event):
+        """Método chamado quando o formulário é fechado"""
+        # Recarregar dados na tabela
+        self.carregar_dados()
+        
+        # Continuar com o evento de fechamento normalmente
+        event.accept()
     
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
@@ -729,13 +755,34 @@ class PedidoVendasWindow(QWidget):
 # Para testar a aplicação
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Verificar se a pasta de ícones existe, se não, criar
+    icones_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img")
+    if not os.path.exists(icones_dir):
+        try:
+            os.makedirs(icones_dir)
+            print(f"Diretório de ícones criado: {icones_dir}")
+        except Exception as e:
+            print(f"Não foi possível criar o diretório de ícones: {e}")
+    
+    # Verificar se a tabela de pedidos existe
+    try:
+        verificar_tabela_pedidos_venda()
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela de pedidos: {e}")
+    
+    # Criar a janela principal
     window = QMainWindow()
     window.setWindowTitle("Sistema - Pedido de Vendas")
     window.setGeometry(100, 100, 1000, 600)
     window.setStyleSheet("background-color: #003b57;")
     
-    pedido_vendas_widget = PedidoVendasWindow(window)  # Passa a janela como parent
+    # Criar o widget de pedidos de vendas
+    pedido_vendas_widget = PedidoVendasWindow(window)
     window.setCentralWidget(pedido_vendas_widget)
     
+    # Mostrar a janela
     window.show()
+    
+    # Iniciar o loop de eventos
     sys.exit(app.exec_())

@@ -1,10 +1,32 @@
+#fornercedores
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QLineEdit, QTableWidget, 
-                             QTableWidgetItem, QHeaderView, QMessageBox, QComboBox, QStyle)
+                             QTableWidgetItem, QHeaderView, QMessageBox, QComboBox, QStyle,
+                             QGroupBox, QGridLayout)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
+
+# Importar o módulo de banco de dados
+try:
+    from base.banco import (verificar_tabela_fornecedores, listar_fornecedores,
+                        buscar_fornecedor_por_id, buscar_fornecedor_por_codigo,
+                        criar_fornecedor, atualizar_fornecedor, excluir_fornecedor,
+                        buscar_fornecedores_por_filtro)
+except ImportError:
+    # Tentar um caminho alternativo
+    try:
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from base.banco import (verificar_tabela_fornecedores, listar_fornecedores,
+                            buscar_fornecedor_por_id, buscar_fornecedor_por_codigo,
+                            criar_fornecedor, atualizar_fornecedor, excluir_fornecedor,
+                            buscar_fornecedores_por_filtro)
+    except ImportError:
+        print("ERRO: Não foi possível importar o módulo banco.py!")
+
+JANELA_LARGURA = 800
+JANELA_ALTURA = 600
 
 # Definir classe placeholder para o caso de falha na importação
 class FormularioFornecedoresDummy(QWidget):
@@ -61,6 +83,16 @@ class FornecedoresWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
+        
+        # Definir tamanho mínimo para o widget
+        self.setMinimumSize(JANELA_LARGURA, JANELA_ALTURA)
+        
+        # Verificar e criar a tabela de fornecedores se não existir
+        try:
+            verificar_tabela_fornecedores()
+        except Exception as e:
+            print(f"ERRO ao verificar/criar tabela de fornecedores: {e}")
+        
         self.initUI()
         
     def create_palette(self):
@@ -93,122 +125,148 @@ class FornecedoresWindow(QWidget):
         
         main_layout.addLayout(header_layout)
         
-        # Linha 1: Código e Nome
-        linha1_layout = QHBoxLayout()
+        # Grupo de Pesquisa
+        search_group = QGroupBox("Pesquisar Fornecedores")
+        search_group.setStyleSheet("""
+            QGroupBox {
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 15px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 10px;
+            }
+        """)
+        
+        search_layout = QGridLayout(search_group)
+        search_layout.setSpacing(10)
+        
+        # Estilo comum para campos de pesquisa
+        search_style = """
+            QLineEdit, QComboBox {
+                background-color: #fffff0;
+                border: 1px solid #cccccc;
+                padding: 5px;
+                font-size: 13px;
+                border-radius: 4px;
+                color: black;
+            }
+            QLineEdit:focus, QComboBox:focus {
+                border: 1px solid #0078d7;
+            }
+        """
         
         # Campo Código
         codigo_label = QLabel("Código:")
-        codigo_label.setStyleSheet("color: white; font-size: 14px;")
-        linha1_layout.addWidget(codigo_label)
+        codigo_label.setStyleSheet("color: white;")
+        search_layout.addWidget(codigo_label, 0, 0)
         
-        self.codigo_input = QLineEdit()
-        self.codigo_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
-            }
-            QLineEdit:focus {
-                border: 1px solid #0078d7;
-            }
-        """)
-        self.codigo_input.setFixedWidth(150)
-        linha1_layout.addWidget(self.codigo_input)
+        self.codigo_search = QLineEdit()
+        self.codigo_search.setStyleSheet(search_style)
+        self.codigo_search.setPlaceholderText("Digite o código")
+        search_layout.addWidget(self.codigo_search, 0, 1)
         
         # Campo Nome
         nome_label = QLabel("Nome:")
-        nome_label.setStyleSheet("color: white; font-size: 14px;")
-        linha1_layout.addWidget(nome_label)
+        nome_label.setStyleSheet("color: white;")
+        search_layout.addWidget(nome_label, 0, 2)
         
-        self.nome_input = QLineEdit()
-        self.nome_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
-            }
-            QLineEdit:focus {
-                border: 1px solid #0078d7;
-            }
-        """)
-        linha1_layout.addWidget(self.nome_input, 1)  # 1 para expandir
+        self.nome_search = QLineEdit()
+        self.nome_search.setStyleSheet(search_style)
+        self.nome_search.setPlaceholderText("Digite o nome")
+        search_layout.addWidget(self.nome_search, 0, 3)
         
-        main_layout.addLayout(linha1_layout)
+        # Campo CNPJ
+        cnpj_label = QLabel("CNPJ:")
+        cnpj_label.setStyleSheet("color: white;")
+        search_layout.addWidget(cnpj_label, 1, 0)
         
-        # Linha 2: Fantasia e Tipo
-        linha2_layout = QHBoxLayout()
-        
-        # Campo Fantasia
-        fantasia_label = QLabel("Fantasia:")
-        fantasia_label.setStyleSheet("color: white; font-size: 14px;")
-        linha2_layout.addWidget(fantasia_label)
-        
-        self.fantasia_input = QLineEdit()
-        self.fantasia_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
-            }
-            QLineEdit:focus {
-                border: 1px solid #0078d7;
-            }
-        """)
-        linha2_layout.addWidget(self.fantasia_input, 1)  # 1 para expandir
+        self.cnpj_search = QLineEdit()
+        self.cnpj_search.setStyleSheet(search_style)
+        self.cnpj_search.setPlaceholderText("Digite o CNPJ")
+        search_layout.addWidget(self.cnpj_search, 1, 1)
         
         # Campo Tipo
         tipo_label = QLabel("Tipo:")
-        tipo_label.setStyleSheet("color: white; font-size: 14px;")
-        linha2_layout.addWidget(tipo_label)
+        tipo_label.setStyleSheet("color: white;")
+        search_layout.addWidget(tipo_label, 1, 2)
         
-        self.tipo_combo = QComboBox()
-        self.tipo_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox QAbstractItemView {
-                background-color: white;
-                color: black;
-                selection-background-color: #0078d7;
-                selection-color: white;
-            }
-            QComboBox:hover {
-                border: 1px solid #0078d7;
-            }
-            QComboBox::item:hover {
+        self.tipo_search = QComboBox()
+        self.tipo_search.setStyleSheet(search_style)
+        self.tipo_search.addItem("Todos")
+        self.tipo_search.addItem("Fabricante")
+        self.tipo_search.addItem("Distribuidor")
+        self.tipo_search.addItem("Atacadista")
+        self.tipo_search.addItem("Varejista")
+        self.tipo_search.addItem("Importador")
+        search_layout.addWidget(self.tipo_search, 1, 3)
+        
+        # Botões de Pesquisa
+        button_layout = QHBoxLayout()
+        
+        # Botão Pesquisar
+        self.btn_pesquisar = QPushButton("Pesquisar")
+        try:
+            self.btn_pesquisar.setIcon(self.style().standardIcon(QStyle.SP_FileDialogContentsView))
+        except:
+            pass
+        self.btn_pesquisar.setStyleSheet("""
+            QPushButton {
                 background-color: #0078d7;
                 color: white;
+                border: none;
+                padding: 8px 15px;
+                font-size: 14px;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: #005fa3;
+            }
+            QPushButton:pressed {
+                background-color: #004c82;
             }
         """)
-        self.tipo_combo.addItem("Selecione um tipo")
-        self.tipo_combo.addItem("Fabricante")
-        self.tipo_combo.addItem("Distribuidor")
-        self.tipo_combo.addItem("Atacadista")
-        self.tipo_combo.addItem("Varejista")
-        self.tipo_combo.addItem("Importador")
-        self.tipo_combo.setFixedWidth(300)
-        linha2_layout.addWidget(self.tipo_combo)
+        self.btn_pesquisar.clicked.connect(self.pesquisar)
+        button_layout.addWidget(self.btn_pesquisar)
         
-        main_layout.addLayout(linha2_layout)
+        # Botão Limpar Filtros
+        self.btn_limpar = QPushButton("Limpar Filtros")
+        try:
+            self.btn_limpar.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        except:
+            pass
+        self.btn_limpar.setStyleSheet("""
+            QPushButton {
+                background-color: #e0e0e0;
+                color: black;
+                border: none;
+                padding: 8px 15px;
+                font-size: 14px;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+            QPushButton:pressed {
+                background-color: #c0c0c0;
+            }
+        """)
+        self.btn_limpar.clicked.connect(self.limpar_filtros)
+        button_layout.addWidget(self.btn_limpar)
         
-        # Layout para os botões
+        search_layout.addLayout(button_layout, 2, 0, 1, 4, Qt.AlignCenter)
+        
+        main_layout.addWidget(search_group)
+        
+        # Layout para os botões de ação
         botoes_layout = QHBoxLayout()
         botoes_layout.setSpacing(20)
         
@@ -338,32 +396,57 @@ class FornecedoresWindow(QWidget):
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.verticalHeader().setVisible(False)
         
+        # Para manter a funcionalidade de seleção, mas sem os campos visíveis
+        self.codigo_input = QLineEdit()
+        self.codigo_input.setVisible(False)
+        self.nome_input = QLineEdit()
+        self.nome_input.setVisible(False)
+        self.fantasia_input = QLineEdit()
+        self.fantasia_input.setVisible(False)
+        self.tipo_combo = QComboBox()
+        self.tipo_combo.setVisible(False)
+        
         self.tabela.itemClicked.connect(self.selecionar_fornecedor)
         
         # Adicionar tabela ao layout principal
         main_layout.addWidget(self.tabela)
         
-        # Dados iniciais para testes
-        self.carregar_dados_teste()
+        # Carregar dados do banco de dados
+        self.carregar_fornecedores()
     
-    def carregar_dados_teste(self):
-        """Carrega alguns dados de teste na tabela"""
-        dados_teste = [
-            ("1", "Fornecedor A LTDA", "Empresa A", "Fabricante"),
-            ("2", "Distribuidora Nacional S.A.", "Nacional", "Distribuidor"),
-            ("3", "Importadora Internacional", "Imp. Int.", "Importador")
-        ]
-        
-        self.tabela.setRowCount(len(dados_teste))
-        
-        for i, (codigo, nome, fantasia, tipo) in enumerate(dados_teste):
-            self.tabela.setItem(i, 0, QTableWidgetItem(codigo))
-            self.tabela.setItem(i, 1, QTableWidgetItem(nome))
-            self.tabela.setItem(i, 2, QTableWidgetItem(fantasia))
-            self.tabela.setItem(i, 3, QTableWidgetItem(tipo))
+    def carregar_fornecedores(self):
+        """Carrega os fornecedores do banco de dados na tabela"""
+        try:
+            # Limpar a tabela
+            self.tabela.setRowCount(0)
+            
+            # Buscar fornecedores no banco de dados
+            fornecedores = listar_fornecedores()
+            
+            if not fornecedores:
+                print("Nenhum fornecedor encontrado")
+                return
+            
+            # Preencher a tabela com os dados
+            self.tabela.setRowCount(len(fornecedores))
+            
+            for i, fornecedor in enumerate(fornecedores):
+                # Assumindo que a função listar_fornecedores retorna os campos na ordem:
+                # ID, CODIGO, NOME, FANTASIA, TIPO
+                self.tabela.setItem(i, 0, QTableWidgetItem(str(fornecedor[1])))  # CODIGO
+                self.tabela.setItem(i, 1, QTableWidgetItem(str(fornecedor[2])))  # NOME
+                self.tabela.setItem(i, 2, QTableWidgetItem(str(fornecedor[3] or "")))  # FANTASIA
+                self.tabela.setItem(i, 3, QTableWidgetItem(str(fornecedor[4] or "")))  # TIPO
+                
+                # Armazenar o ID como dado (não visível)
+                self.tabela.item(i, 0).setData(Qt.UserRole, fornecedor[0])
+            
+        except Exception as e:
+            print(f"Erro ao carregar fornecedores: {e}")
+            self.mostrar_mensagem("Erro", f"Erro ao carregar fornecedores: {str(e)}", QMessageBox.Critical)
     
     def selecionar_fornecedor(self, item):
-        """Seleciona um fornecedor na tabela e preenche os campos"""
+        """Seleciona um fornecedor na tabela e armazena os dados (sem exibir nos campos)"""
         row = item.row()
         
         codigo = self.tabela.item(row, 0).text()
@@ -371,6 +454,7 @@ class FornecedoresWindow(QWidget):
         fantasia = self.tabela.item(row, 2).text()
         tipo = self.tabela.item(row, 3).text()
         
+        # Armazenar valores nos campos ocultos
         self.codigo_input.setText(codigo)
         self.nome_input.setText(nome)
         self.fantasia_input.setText(fantasia)
@@ -379,7 +463,50 @@ class FornecedoresWindow(QWidget):
         if index >= 0:
             self.tipo_combo.setCurrentIndex(index)
     
-    # Método voltar foi removido
+    def pesquisar(self):
+        """Pesquisa fornecedores com base nos filtros selecionados"""
+        codigo = self.codigo_search.text().strip()
+        nome = self.nome_search.text().strip()
+        cnpj = self.cnpj_search.text().strip()
+        tipo = self.tipo_search.currentText()
+        
+        try:
+            # Limpar tabela para os novos resultados
+            self.tabela.setRowCount(0)
+            
+            # Buscar fornecedores com base nos filtros
+            fornecedores = buscar_fornecedores_por_filtro(codigo, nome, cnpj, tipo)
+            
+            # Verificar se encontrou resultados
+            if fornecedores and len(fornecedores) > 0:
+                # Preencher a tabela com os resultados
+                self.tabela.setRowCount(len(fornecedores))
+                
+                for i, fornecedor in enumerate(fornecedores):
+                    # ID, CODIGO, NOME, FANTASIA, TIPO, CNPJ
+                    self.tabela.setItem(i, 0, QTableWidgetItem(str(fornecedor[1])))  # CODIGO
+                    self.tabela.setItem(i, 1, QTableWidgetItem(str(fornecedor[2])))  # NOME
+                    self.tabela.setItem(i, 2, QTableWidgetItem(str(fornecedor[3] or "")))  # FANTASIA
+                    self.tabela.setItem(i, 3, QTableWidgetItem(str(fornecedor[4] or "")))  # TIPO
+                    
+                    # Armazenar o ID como dado (não visível)
+                    self.tabela.item(i, 0).setData(Qt.UserRole, fornecedor[0])
+            else:
+                # Mensagem quando nenhum fornecedor corresponde aos filtros
+                self.mostrar_mensagem("Aviso", "Nenhum fornecedor encontrado com os filtros selecionados.")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao pesquisar fornecedores: {str(e)}", QMessageBox.Critical)
+
+    def limpar_filtros(self):
+        """Limpa todos os campos de pesquisa e carrega todos os fornecedores novamente"""
+        self.codigo_search.clear()
+        self.nome_search.clear()
+        self.cnpj_search.clear()
+        self.tipo_search.setCurrentIndex(0)  # "Todos"
+        
+        # Recarregar todos os fornecedores
+        self.carregar_fornecedores()
     
     def alterar(self):
         """Abre o formulário para alteração de fornecedor selecionado"""
@@ -405,20 +532,61 @@ class FornecedoresWindow(QWidget):
         
         formulario = FormularioFornecedores(cadastro_tela=self, janela_parent=self.janela_formulario)
         
-        # Preencher os dados do fornecedor selecionado no formulário
-        codigo = self.codigo_input.text()
-        nome = self.nome_input.text()
-        fantasia = self.fantasia_input.text()
-        tipo = self.tipo_combo.currentText()
-        
-        formulario.codigo_input.setText(codigo)
-        formulario.nome_input.setText(nome)
-        formulario.fantasia_input.setText(fantasia)
-        
-        # Selecionar o tipo no combobox
-        tipo_index = formulario.tipo_combo.findText(tipo)
-        if tipo_index >= 0:
-            formulario.tipo_combo.setCurrentIndex(tipo_index)
+        # Buscar fornecedor no banco de dados pelo código
+        try:
+            codigo = self.codigo_input.text()
+            fornecedor = buscar_fornecedor_por_codigo(codigo)
+            
+            if fornecedor:
+                # Guardar o ID do fornecedor para atualização
+                formulario.fornecedor_id = fornecedor[0]
+                
+                # Preencher os dados do fornecedor selecionado no formulário
+                formulario.codigo_input.setText(str(fornecedor[1]))  # CODIGO
+                formulario.nome_input.setText(str(fornecedor[2]))  # NOME
+                formulario.fantasia_input.setText(str(fornecedor[3] or ""))  # FANTASIA
+                
+                # Selecionar o tipo no combobox
+                tipo = str(fornecedor[4] or "")
+                tipo_index = formulario.tipo_combo.findText(tipo)
+                if tipo_index >= 0:
+                    formulario.tipo_combo.setCurrentIndex(tipo_index)
+                
+                # Preencher o CNPJ e outros campos
+                # CNPJ é o campo 5
+                if fornecedor[5]:
+                    formulario.cnpj_input.setText(str(fornecedor[5]))
+                
+                # Data de cadastro é o campo 6
+                if fornecedor[6]:
+                    from PyQt5.QtCore import QDate
+                    data = fornecedor[6]
+                    if hasattr(data, 'year') and hasattr(data, 'month') and hasattr(data, 'day'):
+                        formulario.data_input.setDate(QDate(data.year, data.month, data.day))
+                
+                # Endereço: CEP(7), RUA(8), BAIRRO(9), CIDADE(10), ESTADO(11)
+                if fornecedor[7]:
+                    formulario.cep_input.setText(str(fornecedor[7]))
+                if fornecedor[8]:
+                    formulario.rua_input.setText(str(fornecedor[8]))
+                if fornecedor[9]:
+                    formulario.bairro_input.setText(str(fornecedor[9]))
+                if fornecedor[10]:
+                    formulario.cidade_input.setText(str(fornecedor[10]))
+                if fornecedor[11]:
+                    formulario.estado_input.setText(str(fornecedor[11]))
+            else:
+                self.mostrar_mensagem("Não encontrado", 
+                                    f"Fornecedor com código {codigo} não encontrado no banco de dados.", 
+                                    QMessageBox.Warning)
+                return
+                
+        except Exception as e:
+            print(f"Erro ao buscar fornecedor para alteração: {e}")
+            self.mostrar_mensagem("Erro", 
+                                f"Erro ao buscar fornecedor: {str(e)}", 
+                                QMessageBox.Critical)
+            return
         
         self.janela_formulario.setCentralWidget(formulario)
         self.janela_formulario.show()
@@ -445,26 +613,33 @@ class FornecedoresWindow(QWidget):
         resposta = msg_box.exec_()
         
         if resposta == QMessageBox.Yes:
-            # Busca a linha pelo código
-            encontrado = False
-            for row in range(self.tabela.rowCount()):
-                if self.tabela.item(row, 0).text() == codigo:
-                    self.tabela.removeRow(row)
+            try:
+                # Buscar fornecedor no banco de dados
+                fornecedor = buscar_fornecedor_por_codigo(codigo)
+                
+                if fornecedor:
+                    # Excluir o fornecedor
+                    excluir_fornecedor(fornecedor[0])  # Passar o ID
                     
-                    # Limpa os campos
+                    # Limpar os campos
                     self.codigo_input.clear()
                     self.nome_input.clear()
                     self.fantasia_input.clear()
                     self.tipo_combo.setCurrentIndex(0)
                     
+                    # Recarregar a tabela
+                    self.carregar_fornecedores()
+                    
                     self.mostrar_mensagem("Sucesso", f"Fornecedor '{nome}' excluído com sucesso!")
-                    encontrado = True
-                    break
-            
-            if not encontrado:
-                self.mostrar_mensagem("Não encontrado", 
-                                    f"Fornecedor com código {codigo} não encontrado.", 
-                                    QMessageBox.Warning)
+                else:
+                    self.mostrar_mensagem("Não encontrado", 
+                                        f"Fornecedor com código {codigo} não encontrado no banco de dados.", 
+                                        QMessageBox.Warning)
+            except Exception as e:
+                print(f"Erro ao excluir fornecedor: {e}")
+                self.mostrar_mensagem("Erro", 
+                                    f"Erro ao excluir fornecedor: {str(e)}", 
+                                    QMessageBox.Critical)
     
     def cadastrar(self):
         """Abre a tela de cadastro de fornecedores"""
@@ -502,12 +677,33 @@ class FornecedoresMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sistema de Cadastro de Fornecedores")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, JANELA_LARGURA, JANELA_ALTURA)
+        self.setMinimumSize(JANELA_LARGURA, JANELA_ALTURA)  # Garante tamanho mínimo
         self.setStyleSheet("background-color: #003b57;")
         
         cadastro_widget = FornecedoresWindow(self)
         self.setCentralWidget(cadastro_widget)
 
+    def abrir_fornecedores_sistema_principal(parent=None):
+        """
+        Função para abrir a janela de fornecedores a partir do sistema principal
+        """
+        janela = QMainWindow(parent)
+        janela.setWindowTitle("Fornecedores")
+        janela.setGeometry(100, 100, JANELA_LARGURA, JANELA_ALTURA)
+        janela.setMinimumSize(JANELA_LARGURA, JANELA_ALTURA)  # Define tamanho mínimo
+        janela.setStyleSheet("background-color: #003b57;")
+        
+        # Criar o widget principal
+        fornecedores_widget = FornecedoresWindow(janela)
+        janela.setCentralWidget(fornecedores_widget)
+        
+        # Mostrar como janela independente
+        janela.setWindowFlags(Qt.Window)
+        janela.show()
+        
+        return janela
+    
 # Para testar a aplicação
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -7,7 +7,7 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSettings
 from principal import MainWindow
 # Alterar a importação para usar o novo módulo
-from base.banco import validar_login, criar_usuario_padrao, verificar_tabela_usuarios
+from base.banco import validar_login, verificar_tabela_usuarios
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -34,7 +34,7 @@ class LoginWindow(QMainWindow):
         """Inicializa o banco de dados e cria as tabelas necessárias"""
         try:
             verificar_tabela_usuarios()
-            criar_usuario_padrao()
+            # criar_usuario_padrao()
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao inicializar banco de dados: {e}")
     

@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
+
+
 class MenuButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
@@ -94,19 +96,19 @@ class MainWindow(QMainWindow):
         
         btn_geral.add_menu_actions([
             "Cadastro de empresa",
-            "Cadastro Pessoas (clientes)",
+            "Cadastro de Clientes",
             "Cadastro Funcionários",
             "Consulta CNPJ"
         ], self)
         
         btn_produtos.add_menu_actions([
             "Produtos",
-            "Grupo de produtos",
-            "Un - unidade de medida"
+            #"Grupo de produtos",
+            #"Un - unidade de medida"
         ], self)
         
         btn_compras.add_menu_actions(["Fornecedores"], self)
-        btn_vendas.add_menu_actions(["Clientes", "Pedido de vendas"], self)
+        btn_vendas.add_menu_actions([ "Pedido de vendas"], self)
         btn_financeiro.add_menu_actions([
             "Recebimento de clientes",
             "Gerar lançamento Financeiro",
@@ -114,7 +116,7 @@ class MainWindow(QMainWindow):
             "Conta corrente",
             "Classes financeiras"
         ], self)
-        btn_relatorios.add_menu_actions(["Fiscal NF-e, SAT, NFC-e", "Estoque"], self)
+        btn_relatorios.add_menu_actions(["Fiscal NF-e, SAT, NFC-e"], self)
         #btn_notas.add_menu_actions(["Manutenção de notas"], self)
         btn_ferramentas.add_menu_actions(["Configuração de estação"], self)
         
@@ -170,7 +172,7 @@ class MainWindow(QMainWindow):
         # mapeamentos
         self.action_to_py_file = {
             "Cadastro de empresa": os.path.join("geral", "cadastro_empresa.py"),
-            "Cadastro Pessoas (clientes)": os.path.join("geral", "cadastro_pessoa.py"),
+            "Cadastro de Clientes": os.path.join("geral", "cadastro_pessoa.py"),
             "Cadastro Funcionários": os.path.join("geral", "cadastro_funcionarios.py"),
             "Consulta CNPJ": os.path.join("geral", "consulta_cnpj.py"),
             "Produtos": os.path.join("produtos_e_servicos", "produtos.py"),
@@ -193,7 +195,7 @@ class MainWindow(QMainWindow):
         self.action_to_class = {
             # GERAL
             "Cadastro de empresa":          "CadastroEmpresaWindow",
-            "Cadastro Pessoas (clientes)":  "CadastroPessoaWindow",
+            "Cadastro de Clientes":  "CadastroPessoaWindow",
             "Cadastro Funcionários":        "CadastroFuncionariosWindow",
             "Consulta CNPJ":                "ConsultaCNPJWindow",
             # PRODUTOS E SERVIÇOS

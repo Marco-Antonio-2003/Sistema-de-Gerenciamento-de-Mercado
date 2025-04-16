@@ -1,6 +1,8 @@
 """
 Módulo para gerenciar conexões com o banco de dados Firebird
 """
+
+#banco.py
 import os
 import sys
 import fdb  # Módulo para conexão com Firebird
@@ -259,31 +261,7 @@ def verificar_tabela_usuarios():
         print(f"Erro ao verificar/criar tabela: {e}")
         raise Exception(f"Erro ao verificar/criar tabela de usuários: {str(e)}")
 
-def criar_usuario_padrao():
-    """
-    Cria um usuário padrão admin se não existir nenhum usuário
-    
-    Returns:
-        bool: True se o usuário foi criado ou já existe
-    """
-    try:
-        # Verificar se já existe algum usuário
-        query_check = "SELECT COUNT(*) FROM USUARIOS"
-        result = execute_query(query_check)
-        
-        # Se não existe nenhum usuário, criar um padrão
-        if result[0][0] == 0:
-            print("Nenhum usuário encontrado. Criando usuário padrão...")
-            criar_usuario("admin", "admin", "MB SISTEMA")
-            print("Usuário padrão criado com sucesso.")
-            return True
-        else:
-            print(f"Já existem {result[0][0]} usuários cadastrados. Usuário padrão não será criado.")
-        
-        return True
-    except Exception as e:
-        print(f"Erro na criação do usuário padrão: {e}")
-        raise Exception(f"Erro ao criar usuário padrão: {str(e)}")
+# Função removida: criar_usuario_padrao()
 
 def listar_usuarios():
     """
@@ -1504,22 +1482,2210 @@ def excluir_funcionario(id_funcionario):
         print(f"Erro ao excluir funcionário: {e}")
         raise Exception(f"Erro ao excluir funcionário: {str(e)}")
 
+# Adicione estas funções ao arquivo banco.py
+
+def verificar_tabela_produtos():
+    """
+    Verifica se a tabela PRODUTOS existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'PRODUTOS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela PRODUTOS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE PRODUTOS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20) NOT NULL,
+                NOME VARCHAR(100) NOT NULL,
+                CODIGO_BARRAS VARCHAR(50),
+                MARCA VARCHAR(50),
+                GRUPO VARCHAR(50),
+                PRECO_CUSTO DECIMAL(10,2),
+                PRECO_VENDA DECIMAL(10,2),
+                QUANTIDADE_ESTOQUE INTEGER,
+                UNIQUE (CODIGO)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela PRODUTOS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_PRODUTOS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER PRODUTOS_BI FOR PRODUTOS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_PRODUTOS_ID, 1);
+                    END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            return True
+        else:
+            print("Tabela PRODUTOS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de produtos: {str(e)}")
+
+def listar_produtos():
+    """
+    Lista todos os produtos cadastrados
+    
+    Returns:
+        list: Lista de tuplas com dados dos produtos
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+               PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        ORDER BY CODIGO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar produtos: {e}")
+        raise Exception(f"Erro ao listar produtos: {str(e)}")
+
+def buscar_produto_por_id(id_produto):
+    """
+    Busca um produto pelo ID
+    
+    Args:
+        id_produto (int): ID do produto
+        
+    Returns:
+        tuple: Dados do produto ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+               PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_produto,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar produto: {e}")
+        raise Exception(f"Erro ao buscar produto: {str(e)}")
+
+def buscar_produto_por_codigo(codigo):
+    """
+    Busca um produto pelo código
+    
+    Args:
+        codigo (str): Código do produto
+        
+    Returns:
+        tuple: Dados do produto ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+               PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE CODIGO = ?
+        """
+        result = execute_query(query, (codigo,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar produto por código: {e}")
+        raise Exception(f"Erro ao buscar produto por código: {str(e)}")
+
+def criar_produto(codigo, nome, codigo_barras=None, marca=None, grupo=None, 
+                preco_custo=0, preco_venda=0, quantidade_estoque=0):
+    """
+    Cria um novo produto no banco de dados
+    
+    Args:
+        codigo (str): Código do produto
+        nome (str): Nome do produto
+        codigo_barras (str, optional): Código de barras
+        marca (str, optional): Marca do produto
+        grupo (str, optional): Grupo/categoria do produto
+        preco_custo (float, optional): Preço de custo
+        preco_venda (float, optional): Preço de venda
+        quantidade_estoque (int, optional): Quantidade em estoque
+    
+    Returns:
+        int: ID do produto criado
+    """
+    try:
+        # Verificar se já existe um produto com o mesmo código
+        produto_existente = buscar_produto_por_codigo(codigo)
+        if produto_existente:
+            raise Exception(f"Já existe um produto cadastrado com o código {codigo}")
+        
+        # Sanitizar e converter dados
+        codigo = str(codigo).strip()[:20]
+        nome = str(nome).strip()[:100]
+        codigo_barras = str(codigo_barras).strip()[:50] if codigo_barras else None
+        marca = str(marca).strip()[:50] if marca else None
+        grupo = str(grupo).strip()[:50] if grupo and grupo != "Selecione um grupo" else None
+        
+        # Garantir que os valores numéricos são do tipo correto
+        try:
+            preco_custo = float(preco_custo) if preco_custo else 0
+            preco_venda = float(preco_venda) if preco_venda else 0
+            quantidade_estoque = int(quantidade_estoque) if quantidade_estoque else 0
+        except (ValueError, TypeError):
+            preco_custo = 0
+            preco_venda = 0
+            quantidade_estoque = 0
+        
+        # Inserir o produto
+        query = """
+        INSERT INTO PRODUTOS (
+            CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+            PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            codigo, nome, codigo_barras, marca, grupo,
+            preco_custo, preco_venda, quantidade_estoque
+        )
+        
+        execute_query(query, params)
+        
+        # Retornar o ID do produto inserido
+        produto_inserido = buscar_produto_por_codigo(codigo)
+        if produto_inserido:
+            return produto_inserido[0]  # ID é o primeiro item da tupla
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao criar produto: {e}")
+        raise Exception(f"Erro ao criar produto: {str(e)}")
+
+def atualizar_produto(id_produto, codigo, nome, codigo_barras=None, marca=None, grupo=None, 
+                    preco_custo=0, preco_venda=0, quantidade_estoque=0):
+    """
+    Atualiza um produto existente
+    
+    Args:
+        id_produto (int): ID do produto a ser atualizado
+        codigo (str): Código do produto
+        nome (str): Nome do produto
+        codigo_barras (str, optional): Código de barras
+        marca (str, optional): Marca do produto
+        grupo (str, optional): Grupo/categoria do produto
+        preco_custo (float, optional): Preço de custo
+        preco_venda (float, optional): Preço de venda
+        quantidade_estoque (int, optional): Quantidade em estoque
+    
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se o produto existe
+        produto = buscar_produto_por_id(id_produto)
+        if not produto:
+            raise Exception(f"Produto com ID {id_produto} não encontrado")
+        
+        # Verificar se o código sendo alterado já está em uso
+        if codigo != produto[1]:  # Comparar com o código atual (índice 1)
+            produto_existente = buscar_produto_por_codigo(codigo)
+            if produto_existente:
+                raise Exception(f"Já existe outro produto com o código {codigo}")
+        
+        # Sanitizar e converter dados
+        codigo = str(codigo).strip()[:20]
+        nome = str(nome).strip()[:100]
+        codigo_barras = str(codigo_barras).strip()[:50] if codigo_barras else None
+        marca = str(marca).strip()[:50] if marca else None
+        grupo = str(grupo).strip()[:50] if grupo and grupo != "Selecione um grupo" else None
+        
+        # Garantir que os valores numéricos são do tipo correto
+        try:
+            preco_custo = float(preco_custo) if preco_custo is not None else 0
+            preco_venda = float(preco_venda) if preco_venda is not None else 0
+            quantidade_estoque = int(quantidade_estoque) if quantidade_estoque is not None else 0
+        except (ValueError, TypeError):
+            preco_custo = 0
+            preco_venda = 0
+            quantidade_estoque = 0
+        
+        # Atualizar o produto
+        query = """
+        UPDATE PRODUTOS SET
+            CODIGO = ?,
+            NOME = ?,
+            CODIGO_BARRAS = ?,
+            MARCA = ?,
+            GRUPO = ?,
+            PRECO_CUSTO = ?,
+            PRECO_VENDA = ?,
+            QUANTIDADE_ESTOQUE = ?
+        WHERE ID = ?
+        """
+        
+        params = (
+            codigo, nome, codigo_barras, marca, grupo,
+            preco_custo, preco_venda, quantidade_estoque,
+            id_produto
+        )
+        
+        execute_query(query, params)
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar produto: {e}")
+        raise Exception(f"Erro ao atualizar produto: {str(e)}")
+
+def excluir_produto(id_produto):
+    """
+    Exclui um produto do banco de dados
+    
+    Args:
+        id_produto (int): ID do produto a ser excluído
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se o produto existe
+        produto = buscar_produto_por_id(id_produto)
+        if not produto:
+            raise Exception(f"Produto com ID {id_produto} não encontrado")
+        
+        # Excluir o produto
+        query = """
+        DELETE FROM PRODUTOS
+        WHERE ID = ?
+        """
+        execute_query(query, (id_produto,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir produto: {e}")
+        raise Exception(f"Erro ao excluir produto: {str(e)}")
+
+def buscar_produto_por_barras(codigo_barras):
+    """
+    Busca um produto pelo código de barras
+    
+    Args:
+        codigo_barras (str): Código de barras do produto
+        
+    Returns:
+        dict: Dicionário com dados do produto ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+               PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE CODIGO_BARRAS = ?
+        """
+        result = execute_query(query, (codigo_barras,))
+        if result and len(result) > 0:
+            # Converter para dicionário para facilitar o acesso
+            produto = {
+                "id": result[0][0],
+                "codigo": result[0][1],
+                "nome": result[0][2],
+                "barras": result[0][3],
+                "marca": result[0][4],
+                "grupo": result[0][5],
+                "preco_compra": result[0][6],
+                "preco_venda": result[0][7],
+                "estoque": result[0][8]
+            }
+            return produto
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar produto por código de barras: {e}")
+        return None
+    
+def buscar_produtos_por_filtro(codigo="", nome="", codigo_barras="", grupo="", marca=""):
+    """
+    Busca produtos no banco de dados com base em filtros específicos
+    
+    Args:
+        codigo (str, optional): Código do produto
+        nome (str, optional): Nome do produto (busca parcial)
+        codigo_barras (str, optional): Código de barras do produto
+        grupo (str, optional): Grupo/categoria do produto
+        marca (str, optional): Marca do produto
+        
+    Returns:
+        list: Lista de produtos que correspondem aos filtros
+    """
+    try:
+        # Construir consulta SQL base
+        query = """
+        SELECT ID, CODIGO, NOME, CODIGO_BARRAS, MARCA, GRUPO,
+               PRECO_CUSTO, PRECO_VENDA, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE 1=1
+        """
+        
+        # Lista para armazenar os parâmetros de filtro
+        params = []
+        
+        # Adicionar condições conforme os filtros fornecidos
+        if codigo:
+            query += " AND CODIGO = ?"
+            params.append(codigo)
+            
+        if nome:
+            query += " AND UPPER(NOME) LIKE UPPER(?)"
+            params.append(f"%{nome}%")  # Busca parcial, case-insensitive
+            
+        if codigo_barras:
+            query += " AND CODIGO_BARRAS = ?"
+            params.append(codigo_barras)
+            
+        if grupo:
+            query += " AND UPPER(GRUPO) = UPPER(?)"
+            params.append(grupo)
+            
+        if marca:
+            query += " AND UPPER(MARCA) = UPPER(?)"
+            params.append(marca)
+        
+        # Adicionar ordenação
+        query += " ORDER BY CODIGO"
+        
+        # Executar a consulta
+        from base.banco import execute_query
+        result = execute_query(query, tuple(params) if params else None)
+        
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar produtos por filtro: {e}")
+        raise Exception(f"Erro ao buscar produtos: {str(e)}")
+# Adicione estas funções ao arquivo banco.py
+
+def verificar_tabela_marcas():
+    """
+    Verifica se a tabela MARCAS existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'MARCAS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela MARCAS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE MARCAS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                NOME VARCHAR(50) NOT NULL,
+                UNIQUE (NOME)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela MARCAS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_MARCAS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER MARCAS_BI FOR MARCAS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_MARCAS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Adicionar marcas iniciais
+            marcas_iniciais = ["Nestlé", "Unilever", "Procter & Gamble", "Coca-Cola", 
+                              "Camil", "Dell", "Samsung", "Lacoste", "OMO"]
+            for marca in marcas_iniciais:
+                try:
+                    query_insert = "INSERT INTO MARCAS (NOME) VALUES (?)"
+                    execute_query(query_insert, (marca,))
+                except Exception as e:
+                    print(f"Aviso ao inserir marca inicial {marca}: {e}")
+            
+            return True
+        else:
+            print("Tabela MARCAS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de marcas: {str(e)}")
+
+def verificar_tabela_grupos():
+    """
+    Verifica se a tabela GRUPOS existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'GRUPOS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela GRUPOS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE GRUPOS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                NOME VARCHAR(50) NOT NULL,
+                UNIQUE (NOME)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela GRUPOS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_GRUPOS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER GRUPOS_BI FOR GRUPOS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_GRUPOS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Adicionar grupos iniciais
+            grupos_iniciais = ["Alimentos", "Bebidas", "Limpeza", "Higiene", 
+                             "Hortifruti", "Eletrônicos", "Vestuário", "Outros"]
+            for grupo in grupos_iniciais:
+                try:
+                    query_insert = "INSERT INTO GRUPOS (NOME) VALUES (?)"
+                    execute_query(query_insert, (grupo,))
+                except Exception as e:
+                    print(f"Aviso ao inserir grupo inicial {grupo}: {e}")
+            
+            return True
+        else:
+            print("Tabela GRUPOS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de grupos: {str(e)}")
+
+def listar_marcas():
+    """
+    Lista todas as marcas cadastradas
+    
+    Returns:
+        list: Lista de marcas
+    """
+    try:
+        query = """
+        SELECT NOME FROM MARCAS
+        ORDER BY NOME
+        """
+        result = execute_query(query)
+        # Converter resultado para lista simples
+        marcas = [marca[0] for marca in result]
+        return marcas
+    except Exception as e:
+        print(f"Erro ao listar marcas: {e}")
+        raise Exception(f"Erro ao listar marcas: {str(e)}")
+
+def listar_grupos():
+    """
+    Lista todos os grupos cadastrados
+    
+    Returns:
+        list: Lista de grupos
+    """
+    try:
+        query = """
+        SELECT NOME FROM GRUPOS
+        ORDER BY NOME
+        """
+        result = execute_query(query)
+        # Converter resultado para lista simples
+        grupos = [grupo[0] for grupo in result]
+        return grupos
+    except Exception as e:
+        print(f"Erro ao listar grupos: {e}")
+        raise Exception(f"Erro ao listar grupos: {str(e)}")
+
+def adicionar_marca(nome):
+    """
+    Adiciona uma nova marca
+    
+    Args:
+        nome (str): Nome da marca
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se já existe uma marca com este nome
+        query_check = """
+        SELECT COUNT(*) FROM MARCAS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome,))
+        
+        if result[0][0] > 0:
+            print(f"Marca '{nome}' já existe")
+            return False
+        
+        # Inserir a nova marca
+        query_insert = """
+        INSERT INTO MARCAS (NOME) VALUES (?)
+        """
+        execute_query(query_insert, (nome,))
+        print(f"Marca '{nome}' adicionada com sucesso")
+        return True
+    except Exception as e:
+        print(f"Erro ao adicionar marca: {e}")
+        raise Exception(f"Erro ao adicionar marca: {str(e)}")
+
+def atualizar_marca(nome_antigo, nome_novo):
+    """
+    Atualiza o nome de uma marca
+    
+    Args:
+        nome_antigo (str): Nome atual da marca
+        nome_novo (str): Novo nome da marca
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se a marca existe
+        query_check = """
+        SELECT COUNT(*) FROM MARCAS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome_antigo,))
+        
+        if result[0][0] == 0:
+            print(f"Marca '{nome_antigo}' não encontrada")
+            return False
+        
+        # Verificar se o novo nome já existe (ignorando caso)
+        if nome_antigo.upper() != nome_novo.upper():
+            result = execute_query(query_check, (nome_novo,))
+            if result[0][0] > 0:
+                print(f"Já existe uma marca com o nome '{nome_novo}'")
+                return False
+        
+        # Atualizar a marca
+        query_update = """
+        UPDATE MARCAS
+        SET NOME = ?
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        execute_query(query_update, (nome_novo, nome_antigo))
+        
+        # Também atualizar os produtos que usam esta marca
+        query_update_produtos = """
+        UPDATE PRODUTOS
+        SET MARCA = ?
+        WHERE UPPER(MARCA) = UPPER(?)
+        """
+        execute_query(query_update_produtos, (nome_novo, nome_antigo))
+        
+        print(f"Marca atualizada de '{nome_antigo}' para '{nome_novo}'")
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar marca: {e}")
+        raise Exception(f"Erro ao atualizar marca: {str(e)}")
+
+def excluir_marca(nome):
+    """
+    Exclui uma marca
+    
+    Args:
+        nome (str): Nome da marca a ser excluída
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se a marca existe
+        query_check = """
+        SELECT COUNT(*) FROM MARCAS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome,))
+        
+        if result[0][0] == 0:
+            print(f"Marca '{nome}' não encontrada")
+            return False
+        
+        # Verificar se há produtos com esta marca
+        query_check_produtos = """
+        SELECT COUNT(*) FROM PRODUTOS
+        WHERE UPPER(MARCA) = UPPER(?)
+        """
+        result = execute_query(query_check_produtos, (nome,))
+        
+        if result[0][0] > 0:
+            # Atualizar produtos para remover a marca
+            query_update_produtos = """
+            UPDATE PRODUTOS
+            SET MARCA = NULL
+            WHERE UPPER(MARCA) = UPPER(?)
+            """
+            execute_query(query_update_produtos, (nome,))
+            print(f"Atualizado {result[0][0]} produtos que usavam a marca '{nome}'")
+        
+        # Excluir a marca
+        query_delete = """
+        DELETE FROM MARCAS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        execute_query(query_delete, (nome,))
+        
+        print(f"Marca '{nome}' excluída com sucesso")
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir marca: {e}")
+        raise Exception(f"Erro ao excluir marca: {str(e)}")
+
+def adicionar_grupo(nome):
+    """
+    Adiciona um novo grupo
+    
+    Args:
+        nome (str): Nome do grupo
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se já existe um grupo com este nome
+        query_check = """
+        SELECT COUNT(*) FROM GRUPOS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome,))
+        
+        if result[0][0] > 0:
+            print(f"Grupo '{nome}' já existe")
+            return False
+        
+        # Inserir o novo grupo
+        query_insert = """
+        INSERT INTO GRUPOS (NOME) VALUES (?)
+        """
+        execute_query(query_insert, (nome,))
+        
+        print(f"Grupo '{nome}' adicionado com sucesso")
+        return True
+    except Exception as e:
+        print(f"Erro ao adicionar grupo: {e}")
+        raise Exception(f"Erro ao adicionar grupo: {str(e)}")
+
+def atualizar_grupo(nome_antigo, nome_novo):
+    """
+    Atualiza o nome de um grupo
+    
+    Args:
+        nome_antigo (str): Nome atual do grupo
+        nome_novo (str): Novo nome do grupo
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se o grupo existe
+        query_check = """
+        SELECT COUNT(*) FROM GRUPOS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome_antigo,))
+        
+        if result[0][0] == 0:
+            print(f"Grupo '{nome_antigo}' não encontrado")
+            return False
+        
+        # Verificar se o novo nome já existe (ignorando caso)
+        if nome_antigo.upper() != nome_novo.upper():
+            result = execute_query(query_check, (nome_novo,))
+            if result[0][0] > 0:
+                print(f"Já existe um grupo com o nome '{nome_novo}'")
+                return False
+        
+        # Atualizar o grupo
+        query_update = """
+        UPDATE GRUPOS
+        SET NOME = ?
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        execute_query(query_update, (nome_novo, nome_antigo))
+        
+        # Também atualizar os produtos que usam este grupo
+        query_update_produtos = """
+        UPDATE PRODUTOS
+        SET GRUPO = ?
+        WHERE UPPER(GRUPO) = UPPER(?)
+        """
+        execute_query(query_update_produtos, (nome_novo, nome_antigo))
+        
+        print(f"Grupo atualizado de '{nome_antigo}' para '{nome_novo}'")
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar grupo: {e}")
+        raise Exception(f"Erro ao atualizar grupo: {str(e)}")
+
+def excluir_grupo(nome):
+    """
+    Exclui um grupo
+    
+    Args:
+        nome (str): Nome do grupo a ser excluído
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se o grupo existe
+        query_check = """
+        SELECT COUNT(*) FROM GRUPOS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome,))
+        
+        if result[0][0] == 0:
+            print(f"Grupo '{nome}' não encontrado")
+            return False
+        
+        # Verificar se há produtos com este grupo
+        query_check_produtos = """
+        SELECT COUNT(*) FROM PRODUTOS
+        WHERE UPPER(GRUPO) = UPPER(?)
+        """
+        result = execute_query(query_check_produtos, (nome,))
+        
+        if result[0][0] > 0:
+            # Atualizar produtos para remover o grupo
+            query_update_produtos = """
+            UPDATE PRODUTOS
+            SET GRUPO = NULL
+            WHERE UPPER(GRUPO) = UPPER(?)
+            """
+            execute_query(query_update_produtos, (nome,))
+            print(f"Atualizado {result[0][0]} produtos que usavam o grupo '{nome}'")
+        
+        # Excluir o grupo
+        query_delete = """
+        DELETE FROM GRUPOS
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        execute_query(query_delete, (nome,))
+        
+        print(f"Grupo '{nome}' excluído com sucesso")
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir grupo: {e}")
+        raise Exception(f"Erro ao excluir grupo: {str(e)}")
+
+
+
+def verificar_tabela_fornecedores():
+    """
+    Verifica se a tabela FORNECEDORES existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'FORNECEDORES'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela FORNECEDORES não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE FORNECEDORES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20) NOT NULL,
+                NOME VARCHAR(100) NOT NULL,
+                FANTASIA VARCHAR(100),
+                TIPO VARCHAR(20),
+                CNPJ VARCHAR(20),
+                DATA_CADASTRO DATE,
+                CEP VARCHAR(10),
+                RUA VARCHAR(100),
+                BAIRRO VARCHAR(50),
+                CIDADE VARCHAR(50),
+                ESTADO CHAR(2),
+                UNIQUE (CODIGO)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela FORNECEDORES criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_FORNECEDORES_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER FORNECEDORES_BI FOR FORNECEDORES
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_FORNECEDORES_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            return True
+        else:
+            print("Tabela FORNECEDORES já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de fornecedores: {str(e)}")
+
+def listar_fornecedores():
+    """
+    Lista todos os fornecedores cadastrados
+    
+    Returns:
+        list: Lista de tuplas com dados dos fornecedores
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, FANTASIA, TIPO
+        FROM FORNECEDORES
+        ORDER BY CODIGO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar fornecedores: {e}")
+        raise Exception(f"Erro ao listar fornecedores: {str(e)}")
+
+def buscar_fornecedor_por_id(id_fornecedor):
+    """
+    Busca um fornecedor pelo ID
+    
+    Args:
+        id_fornecedor (int): ID do fornecedor
+        
+    Returns:
+        tuple: Dados do fornecedor ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM FORNECEDORES
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_fornecedor,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar fornecedor: {e}")
+        raise Exception(f"Erro ao buscar fornecedor: {str(e)}")
+
+def buscar_fornecedor_por_codigo(codigo):
+    """
+    Busca um fornecedor pelo código
+    
+    Args:
+        codigo (str): Código do fornecedor
+        
+    Returns:
+        tuple: Dados do fornecedor ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM FORNECEDORES
+        WHERE CODIGO = ?
+        """
+        result = execute_query(query, (codigo,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar fornecedor por código: {e}")
+        raise Exception(f"Erro ao buscar fornecedor por código: {str(e)}")
+
+def buscar_fornecedor_por_cnpj(cnpj):
+    """
+    Busca um fornecedor pelo CNPJ
+    
+    Args:
+        cnpj (str): CNPJ do fornecedor (apenas números)
+        
+    Returns:
+        tuple: Dados do fornecedor ou None se não encontrado
+    """
+    try:
+        # Remover caracteres não numéricos para busca
+        cnpj_limpo = ''.join(filter(str.isdigit, str(cnpj)))
+        
+        query = """
+        SELECT * FROM FORNECEDORES
+        WHERE CNPJ = ?
+        """
+        result = execute_query(query, (cnpj_limpo,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar fornecedor por CNPJ: {e}")
+        raise Exception(f"Erro ao buscar fornecedor por CNPJ: {str(e)}")
+
+def criar_fornecedor(codigo, nome, fantasia=None, tipo=None, cnpj=None, 
+                    data_cadastro=None, cep=None, rua=None, bairro=None, 
+                    cidade=None, estado=None):
+    """
+    Cria um novo fornecedor no banco de dados
+    
+    Args:
+        codigo (str): Código do fornecedor (será gerado automaticamente pelo banco)
+        nome (str): Nome do fornecedor
+        fantasia (str, optional): Nome fantasia
+        tipo (str, optional): Tipo do fornecedor
+        cnpj (str, optional): CNPJ do fornecedor
+        data_cadastro (date, optional): Data de cadastro
+        cep (str, optional): CEP
+        rua (str, optional): Rua/Logradouro
+        bairro (str, optional): Bairro
+        cidade (str, optional): Cidade
+        estado (str, optional): Estado (UF)
+    
+    Returns:
+        int: ID do fornecedor criado
+    """
+    try:
+        # Gerar código automático baseado no próximo ID
+        query_nextid = """
+        SELECT COALESCE(MAX(ID), 0) + 1 FROM FORNECEDORES
+        """
+        next_id = execute_query(query_nextid)[0][0]
+        codigo_gerado = str(next_id)  # Usamos o ID como código
+        
+        # Sanitizar e converter dados
+        nome = str(nome).strip()[:100]
+        fantasia = str(fantasia).strip()[:100] if fantasia else None
+        tipo = str(tipo).strip()[:20] if tipo and tipo != "Selecione um tipo" else None
+        
+        # Tratar CNPJ - remover caracteres não numéricos
+        cnpj_limpo = ''.join(filter(str.isdigit, str(cnpj))) if cnpj else None
+        
+        # Verificar se já existe um fornecedor com o mesmo CNPJ
+        if cnpj_limpo:
+            fornecedor_por_cnpj = buscar_fornecedor_por_cnpj(cnpj_limpo)
+            if fornecedor_por_cnpj:
+                raise Exception(f"Já existe um fornecedor cadastrado com este CNPJ")
+        
+        # Sanitizar demais campos
+        cep = ''.join(filter(str.isdigit, str(cep))) if cep else None
+        rua = str(rua).strip()[:100] if rua else None
+        bairro = str(bairro).strip()[:50] if bairro else None
+        cidade = str(cidade).strip()[:50] if cidade else None
+        estado = str(estado).strip().upper()[:2] if estado else None
+        
+        # Converter data para formato do banco (se for string)
+        if isinstance(data_cadastro, str):
+            # Assumindo formato dd/mm/yyyy
+            try:
+                from datetime import datetime
+                partes = data_cadastro.split('/')
+                if len(partes) == 3:
+                    data_cadastro = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+            except Exception as e:
+                print(f"Erro ao converter data: {e}")
+                data_cadastro = None
+        
+        # Inserir o fornecedor com o código gerado
+        query = """
+        INSERT INTO FORNECEDORES (
+            CODIGO, NOME, FANTASIA, TIPO, CNPJ,
+            DATA_CADASTRO, CEP, RUA, BAIRRO, CIDADE, ESTADO
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            codigo_gerado, nome, fantasia, tipo, cnpj_limpo,
+            data_cadastro, cep, rua, bairro, cidade, estado
+        )
+        
+        execute_query(query, params)
+        
+        # Retornar o ID do fornecedor inserido
+        fornecedor_inserido = buscar_fornecedor_por_codigo(codigo_gerado)
+        if fornecedor_inserido:
+            return fornecedor_inserido[0]  # ID é o primeiro item da tupla
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao criar fornecedor: {e}")
+        raise Exception(f"Erro ao criar fornecedor: {str(e)}")
+
+
+# Ajuste para o formulario_fornecedores.py - Modificar a cor do texto nas mensagens
+# Substitua o método mostrar_mensagem na classe TiposFornecedoresDialog
+
+def mostrar_mensagem(self, titulo, texto):
+    """Exibe uma caixa de mensagem"""
+    msg_box = QMessageBox()
+    if "Aviso" in titulo:
+        msg_box.setIcon(QMessageBox.Warning)
+    elif "Erro" in titulo:
+        msg_box.setIcon(QMessageBox.Critical)
+    else:
+        msg_box.setIcon(QMessageBox.Information)
+    
+    msg_box.setWindowTitle(titulo)
+    msg_box.setText(texto)
+    msg_box.setStyleSheet("""
+        QMessageBox { 
+            background-color: white;
+        }
+        QLabel { 
+            color: white;  /* Alterado para branco */
+            background-color: #003b57; /* Cor de fundo escura para contraste */
+        }
+        QPushButton {
+            background-color: #003b57;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 2px;
+        }
+    """)
+    msg_box.exec_()
+
+# Ajuste para o método incluir na classe FormularioFornecedores
+# Substituir a parte que cria um novo fornecedor
+
+def incluir(self):
+    """Inclui um novo fornecedor ou atualiza um existente"""
+    # Validar campos obrigatórios
+    nome = self.nome_input.text()
+    fantasia = self.fantasia_input.text()
+    tipo_index = self.tipo_combo.currentIndex()
+    documento = self.documento_input.text()
+    
+    if not nome or tipo_index == 0 or not documento:
+        self.mostrar_mensagem("Atenção", "Preencha todos os campos obrigatórios (Nome, Tipo e Documento)!")
+        return
+    
+    # Obter o tipo de pessoa e definir o código
+    tipo_pessoa = "Jurídica" if self.tipo_pessoa_combo.currentIndex() == 0 else "Física"
+    tipo = self.tipo_combo.currentText()
+    
+    # Obter os dados complementares
+    cep = self.cep_input.text()
+    rua = self.rua_input.text()
+    bairro = self.bairro_input.text()
+    cidade = self.cidade_input.text()
+    estado = self.estado_input.text()
+    
+    # Obter a data de cadastro
+    data_cadastro = self.data_input.date().toString("dd/MM/yyyy")
+    
+    try:
+        # Verificar se é inclusão ou atualização
+        if self.fornecedor_id is None:
+            # Criar novo fornecedor - o código será gerado automaticamente pelo método criar_fornecedor
+            id_fornecedor = criar_fornecedor(
+                # Passamos uma string vazia e o banco gerará o código
+                "",
+                nome, fantasia, tipo, documento, data_cadastro,
+                cep, rua, bairro, cidade, estado
+            )
+            
+            mensagem = "Fornecedor incluído com sucesso!"
+        else:
+            # Para atualização, precisamos obter o código existente
+            fornecedor_existente = buscar_fornecedor_por_id(self.fornecedor_id)
+            codigo_existente = fornecedor_existente[1] if fornecedor_existente else ""
+            
+            # Atualizar fornecedor existente
+            atualizar_fornecedor(
+                self.fornecedor_id, codigo_existente, nome, fantasia, tipo, documento, 
+                data_cadastro, cep, rua, bairro, cidade, estado
+            )
+            
+            mensagem = "Fornecedor atualizado com sucesso!"
+        
+        # Recarregar a tabela da tela de cadastro
+        if self.cadastro_tela and hasattr(self.cadastro_tela, 'carregar_fornecedores'):
+            self.cadastro_tela.carregar_fornecedores()
+        
+        # Mostrar mensagem de sucesso
+        self.mostrar_mensagem("Sucesso", mensagem)
+        
+        # Fechar a janela de formulário após a inclusão
+        if self.janela_parent:
+            self.janela_parent.close()
+            
+    except Exception as e:
+        print(f"Erro ao salvar fornecedor: {e}")
+        self.mostrar_mensagem("Erro", f"Não foi possível salvar o fornecedor: {str(e)}")
+
+def atualizar_fornecedor(id_fornecedor, codigo, nome, fantasia=None, tipo=None, cnpj=None, 
+                        data_cadastro=None, cep=None, rua=None, bairro=None, 
+                        cidade=None, estado=None):
+    """
+    Atualiza um fornecedor existente
+    
+    Args:
+        id_fornecedor (int): ID do fornecedor a ser atualizado
+        codigo (str): Código do fornecedor
+        nome (str): Nome do fornecedor
+        fantasia (str, optional): Nome fantasia
+        tipo (str, optional): Tipo do fornecedor
+        cnpj (str, optional): CNPJ do fornecedor
+        data_cadastro (date, optional): Data de cadastro
+        cep (str, optional): CEP
+        rua (str, optional): Rua/Logradouro
+        bairro (str, optional): Bairro
+        cidade (str, optional): Cidade
+        estado (str, optional): Estado (UF)
+    
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se o fornecedor existe
+        fornecedor = buscar_fornecedor_por_id(id_fornecedor)
+        if not fornecedor:
+            raise Exception(f"Fornecedor com ID {id_fornecedor} não encontrado")
+        
+        # Verificar se o código sendo alterado já está em uso
+        if codigo != fornecedor[1]:  # Comparar com o código atual (índice 1)
+            fornecedor_existente = buscar_fornecedor_por_codigo(codigo)
+            if fornecedor_existente:
+                raise Exception(f"Já existe outro fornecedor com o código {codigo}")
+        
+        # Sanitizar e converter dados
+        codigo = str(codigo).strip()[:20]
+        nome = str(nome).strip()[:100]
+        fantasia = str(fantasia).strip()[:100] if fantasia else None
+        tipo = str(tipo).strip()[:20] if tipo and tipo != "Selecione um tipo" else None
+        
+        # Tratar CNPJ - remover caracteres não numéricos
+        cnpj_limpo = ''.join(filter(str.isdigit, str(cnpj))) if cnpj else None
+        
+        # Verificar se outro fornecedor já usa este CNPJ
+        if cnpj_limpo:
+            fornecedor_por_cnpj = buscar_fornecedor_por_cnpj(cnpj_limpo)
+            if fornecedor_por_cnpj and fornecedor_por_cnpj[0] != id_fornecedor:
+                raise Exception(f"Já existe outro fornecedor cadastrado com este CNPJ")
+        
+        # Sanitizar demais campos
+        cep = ''.join(filter(str.isdigit, str(cep))) if cep else None
+        rua = str(rua).strip()[:100] if rua else None
+        bairro = str(bairro).strip()[:50] if bairro else None
+        cidade = str(cidade).strip()[:50] if cidade else None
+        estado = str(estado).strip().upper()[:2] if estado else None
+        
+        # Converter data para formato do banco (se for string)
+        if isinstance(data_cadastro, str):
+            # Assumindo formato dd/mm/yyyy
+            try:
+                from datetime import datetime
+                partes = data_cadastro.split('/')
+                if len(partes) == 3:
+                    data_cadastro = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+            except Exception as e:
+                print(f"Erro ao converter data: {e}")
+                data_cadastro = None
+        
+        # Atualizar o fornecedor
+        query = """
+        UPDATE FORNECEDORES SET
+            CODIGO = ?,
+            NOME = ?,
+            FANTASIA = ?,
+            TIPO = ?,
+            CNPJ = ?,
+            DATA_CADASTRO = ?,
+            CEP = ?,
+            RUA = ?,
+            BAIRRO = ?,
+            CIDADE = ?,
+            ESTADO = ?
+        WHERE ID = ?
+        """
+        
+        params = (
+            codigo, nome, fantasia, tipo, cnpj_limpo,
+            data_cadastro, cep, rua, bairro, cidade, estado,
+            id_fornecedor
+        )
+        
+        execute_query(query, params)
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar fornecedor: {e}")
+        raise Exception(f"Erro ao atualizar fornecedor: {str(e)}")
+
+def excluir_fornecedor(id_fornecedor):
+    """
+    Exclui um fornecedor do banco de dados
+    
+    Args:
+        id_fornecedor (int): ID do fornecedor a ser excluído
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se o fornecedor existe
+        fornecedor = buscar_fornecedor_por_id(id_fornecedor)
+        if not fornecedor:
+            raise Exception(f"Fornecedor com ID {id_fornecedor} não encontrado")
+        
+        # Excluir o fornecedor
+        query = """
+        DELETE FROM FORNECEDORES
+        WHERE ID = ?
+        """
+        execute_query(query, (id_fornecedor,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir fornecedor: {e}")
+        raise Exception(f"Erro ao excluir fornecedor: {str(e)}")
+
+
 if __name__ == "__main__":
     try:
         print(f"Iniciando configuração do banco de dados: {DB_PATH}")
         verificar_tabela_usuarios()
         verificar_tabela_empresas()
         verificar_tabela_pessoas()
-        verificar_tabela_funcionarios()  # Adicionar esta linha
-        criar_usuario_padrao()
+        verificar_tabela_funcionarios()
+        verificar_tabela_produtos()
+        verificar_tabela_marcas()  # Nova tabela
+        verificar_tabela_grupos()  # Nova tabela
+        verificar_tabela_fornecedores()
         print("Banco de dados inicializado com sucesso!")
         
-        # Listar usuários
-        usuarios = listar_usuarios()
-        print("\nUsuários cadastrados:")
-        for usuario in usuarios:
-            print(f"ID: {usuario[0]}, Usuário: {usuario[1]}, Empresa: {usuario[2]}")
-        
+        # ...
     except Exception as e:
         print(f"Erro ao inicializar o banco de dados: {str(e)}")
 
+def buscar_fornecedores_por_filtro(codigo="", nome="", cnpj="", tipo=""):
+    """
+    Busca fornecedores no banco de dados com base em filtros específicos
+    
+    Args:
+        codigo (str, optional): Código do fornecedor
+        nome (str, optional): Nome do fornecedor (busca parcial)
+        cnpj (str, optional): CNPJ do fornecedor (busca parcial)
+        tipo (str, optional): Tipo do fornecedor
+        
+    Returns:
+        list: Lista de fornecedores que correspondem aos filtros
+    """
+    try:
+        # Construir consulta SQL base
+        query = """
+        SELECT ID, CODIGO, NOME, FANTASIA, TIPO, CNPJ
+        FROM FORNECEDORES
+        WHERE 1=1
+        """
+        
+        # Lista para armazenar os parâmetros de filtro
+        params = []
+        
+        # Adicionar condições conforme os filtros fornecidos
+        if codigo:
+            query += " AND CODIGO = ?"
+            params.append(codigo)
+            
+        if nome:
+            query += " AND UPPER(NOME) LIKE UPPER(?)"
+            params.append(f"%{nome}%")  # Busca parcial, case-insensitive
+            
+        if cnpj:
+            # Remover caracteres não numéricos para busca
+            cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
+            if cnpj_limpo:
+                query += " AND CNPJ LIKE ?"
+                params.append(f"%{cnpj_limpo}%")
+        
+        # Filtrar pelo tipo de fornecedor
+        if tipo and tipo != "Todos":
+            query += " AND TIPO = ?"
+            params.append(tipo)
+        
+        # Adicionar ordenação
+        query += " ORDER BY CODIGO"
+        
+        # Executar a consulta
+        result = execute_query(query, tuple(params) if params else None)
+        
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar fornecedores por filtro: {e}")
+        raise Exception(f"Erro ao buscar fornecedores: {str(e)}")
+
+def verificar_tabela_tipos_fornecedores():
+    """
+    Verifica se a tabela TIPOS_FORNECEDORES existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'TIPOS_FORNECEDORES'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela TIPOS_FORNECEDORES não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE TIPOS_FORNECEDORES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                NOME VARCHAR(50) NOT NULL,
+                UNIQUE (NOME)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela TIPOS_FORNECEDORES criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_TIPOS_FORNECEDORES_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER TIPOS_FORNECEDORES_BI FOR TIPOS_FORNECEDORES
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_TIPOS_FORNECEDORES_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Inserir tipos padrão
+            tipos_padrao = ["Fabricante", "Distribuidor", "Atacadista", "Varejista", "Importador"]
+            for tipo in tipos_padrao:
+                try:
+                    query_insert = "INSERT INTO TIPOS_FORNECEDORES (NOME) VALUES (?)"
+                    execute_query(query_insert, (tipo,))
+                    print(f"Tipo '{tipo}' inserido com sucesso.")
+                except Exception as e:
+                    print(f"Erro ao inserir tipo padrão '{tipo}': {e}")
+            
+            return True
+        else:
+            print("Tabela TIPOS_FORNECEDORES já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de tipos de fornecedores: {str(e)}")
+
+def listar_tipos_fornecedores():
+    """
+    Lista todos os tipos de fornecedores cadastrados
+    
+    Returns:
+        list: Lista de tipos de fornecedores
+    """
+    try:
+        query = """
+        SELECT ID, NOME FROM TIPOS_FORNECEDORES
+        ORDER BY NOME
+        """
+        result = execute_query(query)
+        return result
+    except Exception as e:
+        print(f"Erro ao listar tipos de fornecedores: {e}")
+        raise Exception(f"Erro ao listar tipos de fornecedores: {str(e)}")
+
+def adicionar_tipo_fornecedor(nome):
+    """
+    Adiciona um novo tipo de fornecedor
+    
+    Args:
+        nome (str): Nome do tipo de fornecedor
+        
+    Returns:
+        int: ID do tipo adicionado
+    """
+    try:
+        # Verificar se já existe um tipo com esse nome
+        query_check = """
+        SELECT COUNT(*) FROM TIPOS_FORNECEDORES
+        WHERE UPPER(NOME) = UPPER(?)
+        """
+        result = execute_query(query_check, (nome,))
+        
+        if result[0][0] > 0:
+            raise Exception(f"Já existe um tipo de fornecedor com o nome '{nome}'")
+        
+        # Inserir novo tipo
+        query_insert = """
+        INSERT INTO TIPOS_FORNECEDORES (NOME) VALUES (?)
+        """
+        
+        execute_query(query_insert, (nome,))
+        
+        # Obter o ID pelo nome
+        query_get_id = """
+        SELECT ID FROM TIPOS_FORNECEDORES
+        WHERE NOME = ?
+        """
+        result = execute_query(query_get_id, (nome,))
+        
+        if result and len(result) > 0:
+            return result[0][0]
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao adicionar tipo de fornecedor: {e}")
+        raise Exception(f"Erro ao adicionar tipo de fornecedor: {str(e)}")
+
+def atualizar_tipo_fornecedor(id_tipo, novo_nome):
+    """
+    Atualiza o nome de um tipo de fornecedor
+    
+    Args:
+        id_tipo (int): ID do tipo de fornecedor
+        novo_nome (str): Novo nome do tipo
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se já existe outro tipo com esse nome
+        query_check = """
+        SELECT COUNT(*) FROM TIPOS_FORNECEDORES
+        WHERE UPPER(NOME) = UPPER(?) AND ID <> ?
+        """
+        result = execute_query(query_check, (novo_nome, id_tipo))
+        
+        if result[0][0] > 0:
+            raise Exception(f"Já existe outro tipo de fornecedor com o nome '{novo_nome}'")
+        
+        # Atualizar o tipo
+        query_update = """
+        UPDATE TIPOS_FORNECEDORES 
+        SET NOME = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query_update, (novo_nome, id_tipo))
+        
+        # Atualizar fornecedores que usam este tipo (pelo nome antigo)
+        query_get_old_name = """
+        SELECT NOME FROM TIPOS_FORNECEDORES WHERE ID = ?
+        """
+        result = execute_query(query_get_old_name, (id_tipo,))
+        
+        if result and len(result) > 0:
+            nome_antigo = result[0][0]
+            
+            # Atualizar fornecedores
+            query_update_fornecedores = """
+            UPDATE FORNECEDORES
+            SET TIPO = ?
+            WHERE TIPO = ?
+            """
+            execute_query(query_update_fornecedores, (novo_nome, nome_antigo))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar tipo de fornecedor: {e}")
+        raise Exception(f"Erro ao atualizar tipo de fornecedor: {str(e)}")
+
+def excluir_tipo_fornecedor(id_tipo):
+    """
+    Exclui um tipo de fornecedor
+    
+    Args:
+        id_tipo (int): ID do tipo de fornecedor
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se existem fornecedores usando este tipo
+        query_get_name = """
+        SELECT NOME FROM TIPOS_FORNECEDORES WHERE ID = ?
+        """
+        result = execute_query(query_get_name, (id_tipo,))
+        
+        if not result or len(result) == 0:
+            raise Exception(f"Tipo de fornecedor com ID {id_tipo} não encontrado")
+        
+        nome_tipo = result[0][0]
+        
+        # Verificar uso do tipo
+        query_check_uso = """
+        SELECT COUNT(*) FROM FORNECEDORES
+        WHERE TIPO = ?
+        """
+        result = execute_query(query_check_uso, (nome_tipo,))
+        
+        if result[0][0] > 0:
+            raise Exception(f"Não é possível excluir o tipo '{nome_tipo}' pois está sendo usado por {result[0][0]} fornecedor(es)")
+        
+        # Excluir o tipo
+        query_delete = """
+        DELETE FROM TIPOS_FORNECEDORES
+        WHERE ID = ?
+        """
+        execute_query(query_delete, (id_tipo,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir tipo de fornecedor: {e}")
+        raise Exception(f"Erro ao excluir tipo de fornecedor: {str(e)}")
+
+# Adicione estas funções ao seu arquivo banco.py
+
+def verificar_tabela_pedidos_venda():
+    """
+    Verifica se a tabela PEDIDOS_VENDA existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'PEDIDOS_VENDA'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela PEDIDOS_VENDA não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE PEDIDOS_VENDA (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                NUMERO_PEDIDO VARCHAR(20) NOT NULL,
+                CLIENTE VARCHAR(100) NOT NULL,
+                CLIENTE_ID INTEGER,
+                VENDEDOR VARCHAR(100) NOT NULL,
+                VENDEDOR_ID INTEGER,
+                VALOR DECIMAL(15,2),
+                PRODUTO VARCHAR(100),
+                PRODUTO_ID INTEGER,
+                DATA_PEDIDO DATE,
+                CIDADE VARCHAR(50),
+                STATUS VARCHAR(20) DEFAULT 'Pendente',
+                OBSERVACAO VARCHAR(200),
+                UNIQUE (NUMERO_PEDIDO)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela PEDIDOS_VENDA criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_PEDIDOS_VENDA_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER PEDIDOS_VENDA_BI FOR PEDIDOS_VENDA
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_PEDIDOS_VENDA_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            return True
+        else:
+            print("Tabela PEDIDOS_VENDA já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de pedidos de venda: {str(e)}")
+
+def listar_pedidos_venda():
+    """
+    Lista todos os pedidos de venda cadastrados
+    
+    Returns:
+        list: Lista de tuplas com dados dos pedidos
+    """
+    try:
+        query = """
+        SELECT ID, NUMERO_PEDIDO, CLIENTE, VENDEDOR, VALOR, DATA_PEDIDO, STATUS
+        FROM PEDIDOS_VENDA
+        ORDER BY NUMERO_PEDIDO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar pedidos de venda: {e}")
+        raise Exception(f"Erro ao listar pedidos de venda: {str(e)}")
+
+def buscar_pedido_por_id(id_pedido):
+    """
+    Busca um pedido pelo ID
+    
+    Args:
+        id_pedido (int): ID do pedido
+        
+    Returns:
+        tuple: Dados do pedido ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM PEDIDOS_VENDA
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_pedido,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar pedido: {e}")
+        raise Exception(f"Erro ao buscar pedido: {str(e)}")
+
+def buscar_pedido_por_numero(numero_pedido):
+    """
+    Busca um pedido pelo número
+    
+    Args:
+        numero_pedido (str): Número do pedido
+        
+    Returns:
+        tuple: Dados do pedido ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM PEDIDOS_VENDA
+        WHERE NUMERO_PEDIDO = ?
+        """
+        result = execute_query(query, (numero_pedido,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar pedido por número: {e}")
+        raise Exception(f"Erro ao buscar pedido por número: {str(e)}")
+
+def gerar_numero_pedido():
+    """
+    Gera um novo número de pedido sequencial
+    
+    Returns:
+        str: Próximo número de pedido no formato '00001'
+    """
+    try:
+        query = """
+        SELECT COALESCE(MAX(ID), 0) + 1 FROM PEDIDOS_VENDA
+        """
+        result = execute_query(query)
+        next_id = result[0][0]
+        
+        # Formatar o número do pedido com zeros à esquerda (5 dígitos)
+        numero_pedido = f"{next_id:05d}"
+        return numero_pedido
+    except Exception as e:
+        print(f"Erro ao gerar número de pedido: {e}")
+        raise Exception(f"Erro ao gerar número de pedido: {str(e)}")
+
+def criar_pedido(id=None, cliente=None, cliente_id=None, vendedor=None, vendedor_id=None, 
+               valor=None, produto=None, produto_id=None, data_pedido=None, cidade=None, 
+               observacao=None, status="Pendente"):
+    """
+    Cria um novo pedido de venda no banco de dados
+    """
+    try:
+        # Gerar o próximo número de pedido
+        numero_pedido = gerar_numero_pedido()
+        
+        # Gerar ID explícito
+        query_id = "SELECT COALESCE(MAX(ID), 0) + 1 FROM PEDIDOS_VENDA"
+        proximo_id = execute_query(query_id)[0][0]
+        
+        # Sanitizar e converter dados
+        cliente = str(cliente).strip()[:100]
+        vendedor = str(vendedor).strip()[:100]
+        produto = str(produto).strip()[:100] if produto else None
+        cidade = str(cidade).strip()[:50] if cidade else None
+        observacao = str(observacao).strip()[:200] if observacao else None
+        status = str(status).strip()[:20] if status else "Pendente"
+        
+        # Converter valor para float
+        try:
+            valor_str = str(valor).replace('R$', '').replace('.', '').replace(',', '.').strip()
+            valor_float = float(valor_str)
+        except (ValueError, TypeError):
+            valor_float = 0
+        
+        # Converter data para formato do banco (se for string)
+        if isinstance(data_pedido, str):
+            try:
+                from datetime import datetime
+                partes = data_pedido.split('/')
+                if len(partes) == 3:
+                    data_pedido = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+            except Exception as e:
+                print(f"Erro ao converter data: {e}")
+                data_pedido = None
+        
+        # Inserir o pedido com ID explícito
+        query = """
+        INSERT INTO PEDIDOS_VENDA (
+            ID, NUMERO_PEDIDO, CLIENTE, CLIENTE_ID, VENDEDOR, VENDEDOR_ID,
+            VALOR, PRODUTO, PRODUTO_ID, DATA_PEDIDO, CIDADE, STATUS, OBSERVACAO
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            proximo_id, numero_pedido, cliente, cliente_id, vendedor, vendedor_id,
+            valor_float, produto, produto_id, data_pedido, cidade, status, observacao
+        )
+        
+        execute_query(query, params)
+        
+        return numero_pedido
+    except Exception as e:
+        print(f"Erro ao criar pedido: {e}")
+        raise Exception(f"Erro ao criar pedido: {str(e)}")
+
+def atualizar_pedido(id_pedido, cliente=None, cliente_id=None, vendedor=None, vendedor_id=None, 
+                   valor=None, produto=None, produto_id=None, data_pedido=None, cidade=None, 
+                   observacao=None, status=None):
+    """
+    Atualiza um pedido existente
+    
+    Args:
+        id_pedido (int): ID do pedido a ser atualizado
+        cliente (str, optional): Nome do cliente
+        cliente_id (int, optional): ID do cliente
+        vendedor (str, optional): Nome do vendedor
+        vendedor_id (int, optional): ID do vendedor
+        valor (float, optional): Valor do pedido
+        produto (str, optional): Nome do produto
+        produto_id (int, optional): ID do produto
+        data_pedido (date, optional): Data do pedido
+        cidade (str, optional): Cidade do cliente
+        observacao (str, optional): Observações adicionais
+        status (str, optional): Status do pedido
+    
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se o pedido existe
+        pedido = buscar_pedido_por_id(id_pedido)
+        if not pedido:
+            raise Exception(f"Pedido com ID {id_pedido} não encontrado")
+        
+        # Preparar os campos para atualização
+        campos_atualizacao = []
+        valores = []
+        
+        if cliente is not None:
+            campos_atualizacao.append("CLIENTE = ?")
+            valores.append(str(cliente).strip()[:100])
+            
+        if cliente_id is not None:
+            campos_atualizacao.append("CLIENTE_ID = ?")
+            valores.append(cliente_id)
+            
+        if vendedor is not None:
+            campos_atualizacao.append("VENDEDOR = ?")
+            valores.append(str(vendedor).strip()[:100])
+            
+        if vendedor_id is not None:
+            campos_atualizacao.append("VENDEDOR_ID = ?")
+            valores.append(vendedor_id)
+            
+        if valor is not None:
+            # Converter valor para float
+            try:
+                # Remover símbolos de moeda e substituir vírgula por ponto
+                valor_str = str(valor).replace('R$', '').replace('.', '').replace(',', '.').strip()
+                valor_float = float(valor_str)
+                campos_atualizacao.append("VALOR = ?")
+                valores.append(valor_float)
+            except (ValueError, TypeError):
+                pass  # Ignora se não for um valor válido
+            
+        if produto is not None:
+            campos_atualizacao.append("PRODUTO = ?")
+            valores.append(str(produto).strip()[:100])
+            
+        if produto_id is not None:
+            campos_atualizacao.append("PRODUTO_ID = ?")
+            valores.append(produto_id)
+            
+        if data_pedido is not None:
+            # Converter data para formato do banco (se for string)
+            if isinstance(data_pedido, str):
+                # Assumindo formato dd/mm/yyyy
+                try:
+                    from datetime import datetime
+                    partes = data_pedido.split('/')
+                    if len(partes) == 3:
+                        data_pedido = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+                except Exception as e:
+                    print(f"Erro ao converter data: {e}")
+                    data_pedido = None
+            
+            campos_atualizacao.append("DATA_PEDIDO = ?")
+            valores.append(data_pedido)
+            
+        if cidade is not None:
+            campos_atualizacao.append("CIDADE = ?")
+            valores.append(str(cidade).strip()[:50])
+            
+        if observacao is not None:
+            campos_atualizacao.append("OBSERVACAO = ?")
+            valores.append(str(observacao).strip()[:200])
+            
+        if status is not None:
+            campos_atualizacao.append("STATUS = ?")
+            valores.append(str(status).strip()[:20])
+        
+        # Se não houver campos para atualizar, retorna sucesso
+        if not campos_atualizacao:
+            return True
+        
+        # Construir a query de atualização
+        query = f"""
+        UPDATE PEDIDOS_VENDA SET
+            {", ".join(campos_atualizacao)}
+        WHERE ID = ?
+        """
+        
+        # Adicionar o ID do pedido aos parâmetros
+        valores.append(id_pedido)
+        
+        execute_query(query, tuple(valores))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar pedido: {e}")
+        raise Exception(f"Erro ao atualizar pedido: {str(e)}")
+
+def excluir_pedido(id_pedido):
+    """
+    Exclui um pedido do banco de dados
+    
+    Args:
+        id_pedido (int): ID do pedido a ser excluído
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se o pedido existe
+        pedido = buscar_pedido_por_id(id_pedido)
+        if not pedido:
+            raise Exception(f"Pedido com ID {id_pedido} não encontrado")
+        
+        # Excluir o pedido
+        query = """
+        DELETE FROM PEDIDOS_VENDA
+        WHERE ID = ?
+        """
+        execute_query(query, (id_pedido,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir pedido: {e}")
+        raise Exception(f"Erro ao excluir pedido: {str(e)}")
+
+def buscar_pedidos_por_filtro(vendedor="", cliente="", cidade="", data_inicial=None, data_final=None, status=None):
+    """
+    Busca pedidos de venda no banco de dados com base em filtros específicos
+    
+    Args:
+        vendedor (str, optional): Nome do vendedor (busca parcial)
+        cliente (str, optional): Nome do cliente (busca parcial)
+        cidade (str, optional): Cidade do cliente (busca parcial)
+        data_inicial (date, optional): Data inicial para filtro
+        data_final (date, optional): Data final para filtro
+        status (str, optional): Status do pedido
+        
+    Returns:
+        list: Lista de pedidos que correspondem aos filtros
+    """
+    try:
+        # Construir consulta SQL base
+        query = """
+        SELECT ID, NUMERO_PEDIDO, CLIENTE, VENDEDOR, VALOR, DATA_PEDIDO, STATUS
+        FROM PEDIDOS_VENDA
+        WHERE 1=1
+        """
+        
+        # Lista para armazenar os parâmetros de filtro
+        params = []
+        
+        # Adicionar condições conforme os filtros fornecidos
+        if vendedor:
+            query += " AND UPPER(VENDEDOR) LIKE UPPER(?)"
+            params.append(f"%{vendedor}%")  # Busca parcial, case-insensitive
+            
+        if cliente:
+            query += " AND UPPER(CLIENTE) LIKE UPPER(?)"
+            params.append(f"%{cliente}%")  # Busca parcial, case-insensitive
+            
+        if cidade:
+            query += " AND UPPER(CIDADE) LIKE UPPER(?)"
+            params.append(f"%{cidade}%")  # Busca parcial, case-insensitive
+            
+        if data_inicial:
+            # Converter data para formato do banco (se for string)
+            if isinstance(data_inicial, str):
+                # Assumindo formato dd/mm/yyyy
+                try:
+                    from datetime import datetime
+                    partes = data_inicial.split('/')
+                    if len(partes) == 3:
+                        data_inicial = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+                except Exception as e:
+                    print(f"Erro ao converter data inicial: {e}")
+                    data_inicial = None
+            
+            if data_inicial:
+                query += " AND DATA_PEDIDO >= ?"
+                params.append(data_inicial)
+                
+        if data_final:
+            # Converter data para formato do banco (se for string)
+            if isinstance(data_final, str):
+                # Assumindo formato dd/mm/yyyy
+                try:
+                    from datetime import datetime
+                    partes = data_final.split('/')
+                    if len(partes) == 3:
+                        data_final = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+                except Exception as e:
+                    print(f"Erro ao converter data final: {e}")
+                    data_final = None
+            
+            if data_final:
+                query += " AND DATA_PEDIDO <= ?"
+                params.append(data_final)
+                
+        if status:
+            query += " AND UPPER(STATUS) = UPPER(?)"
+            params.append(status)
+        
+        # Adicionar ordenação
+        query += " ORDER BY NUMERO_PEDIDO"
+        
+        # Executar a consulta
+        result = execute_query(query, tuple(params) if params else None)
+        
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar pedidos por filtro: {e}")
+        raise Exception(f"Erro ao buscar pedidos: {str(e)}")
+
+def obter_vendedores_pedidos():
+    """
+    Obtém lista de vendedores que têm pedidos cadastrados
+    
+    Returns:
+        list: Lista de nomes de vendedores
+    """
+    try:
+        query = """
+        SELECT DISTINCT VENDEDOR FROM PEDIDOS_VENDA
+        ORDER BY VENDEDOR
+        """
+        result = execute_query(query)
+        return [row[0] for row in result]
+    except Exception as e:
+        print(f"Erro ao obter vendedores: {e}")
+        raise Exception(f"Erro ao obter vendedores: {str(e)}")
+
+def obter_clientes_pedidos():
+    """
+    Obtém lista de clientes que têm pedidos cadastrados
+    
+    Returns:
+        list: Lista de nomes de clientes
+    """
+    try:
+        query = """
+        SELECT DISTINCT CLIENTE FROM PEDIDOS_VENDA
+        ORDER BY CLIENTE
+        """
+        result = execute_query(query)
+        return [row[0] for row in result]
+    except Exception as e:
+        print(f"Erro ao obter clientes: {e}")
+        raise Exception(f"Erro ao obter clientes: {str(e)}")
+
+def obter_cidades_pedidos():
+    """
+    Obtém lista de cidades que têm pedidos cadastrados
+    
+    Returns:
+        list: Lista de nomes de cidades
+    """
+    try:
+        query = """
+        SELECT DISTINCT CIDADE FROM PEDIDOS_VENDA
+        WHERE CIDADE IS NOT NULL AND CIDADE <> ''
+        ORDER BY CIDADE
+        """
+        result = execute_query(query)
+        return [row[0] for row in result]
+    except Exception as e:
+        print(f"Erro ao obter cidades: {e}")
+        raise Exception(f"Erro ao obter cidades: {str(e)}")
+
+# Adicionar à lista de inicialização no final do arquivo
+if __name__ == "__main__":
+    try:
+        print(f"Iniciando configuração do banco de dados: {DB_PATH}")
+        verificar_tabela_usuarios()
+        verificar_tabela_empresas()
+        verificar_tabela_pessoas()
+        verificar_tabela_funcionarios()
+        verificar_tabela_produtos()
+        verificar_tabela_marcas()
+        verificar_tabela_grupos()
+        verificar_tabela_fornecedores()
+        verificar_tabela_tipos_fornecedores()
+        verificar_tabela_pedidos_venda()  # Adicionar esta linha
+        print("Banco de dados inicializado com sucesso!")
+        
+    except Exception as e:
+        print(f"Erro ao inicializar o banco de dados: {str(e)}")

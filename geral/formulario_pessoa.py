@@ -56,7 +56,7 @@ class FormularioPessoa(QWidget):
         
         # Título
         titulo_layout = QVBoxLayout()
-        titulo = QLabel("Cadastro de Pessoa")
+        titulo = QLabel("Cadastro de Clientes")
         titulo.setFont(QFont("Arial", 16, QFont.Bold))
         titulo.setStyleSheet("color: white; margin-bottom: 20px;")
         titulo.setAlignment(Qt.AlignCenter)

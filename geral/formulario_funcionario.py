@@ -253,7 +253,9 @@ class FormularioFuncionario(QWidget):
         self.tipo_combo = QComboBox()
         self.tipo_combo.setStyleSheet(combo_style)  # Estilo específico para ComboBox
         self.tipo_combo.setFixedWidth(200)  # Largura fixa reduzida
-        self.tipo_combo.addItems(["Jurídica", "Física"])
+        self.tipo_combo.addItems(["Física", "Jurídica"])  # Inverter a ordem dos itens
+        self.tipo_combo.setCurrentIndex(0)  # Agora aponta para "Física"
+        # CORRIGIDO: Conectar explicitamente o sinal de mudança do combobox
         self.tipo_combo.currentIndexChanged.connect(self.atualizar_tipo_documento)
         
         tipo_layout = QFormLayout()
@@ -450,6 +452,9 @@ class FormularioFuncionario(QWidget):
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
         
+        # CORRIGIDO: Chamar explicitamente o método para configurar o tipo de documento inicial
+        self.atualizar_tipo_documento()
+        
         # Verificar e avisar se o módulo requests não estiver disponível
         if not REQUESTS_AVAILABLE:
             self.mostrar_mensagem("Atenção", 
@@ -497,16 +502,18 @@ class FormularioFuncionario(QWidget):
     def atualizar_tipo_documento(self):
         """Atualiza o label e placeholder do campo de documento conforme o tipo de pessoa"""
         tipo_pessoa = self.tipo_combo.currentText()
-        if tipo_pessoa == "Física":
-            self.cpf_label.setText("CPF:")
-            self.cpf_input.setPlaceholderText("000.000.000-00")
-        else:
+        # DEBUG - remover após verificar funcionamento
+        print("Tipo de Pessoa selecionado:", tipo_pessoa)
+        
+        if tipo_pessoa == "Jurídica":
             self.cpf_label.setText("CNPJ:")
             self.cpf_input.setPlaceholderText("00.000.000/0001-00")
-            # Limpar o campo se já tiver um CPF digitado
             texto = self.cpf_input.text()
             if texto and len(''.join(filter(str.isdigit, texto))) <= 11 and len(''.join(filter(str.isdigit, texto))) > 0:
                 self.cpf_input.clear()
+        else:
+            self.cpf_label.setText("CPF:")
+            self.cpf_input.setPlaceholderText("000.000.000-00")
     
     def formatar_telefone(self, texto):
         """Formata o telefone para (XX) XXXXX-XXXX"""
