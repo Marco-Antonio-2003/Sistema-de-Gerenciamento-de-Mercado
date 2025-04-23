@@ -8,7 +8,7 @@ a = Analysis(
     ['login.py'],
     pathex=[],
     binaries=[],
-    datas=[('geral', 'geral'), ('vendas', 'vendas'), ('produtos_e_servicos', 'produtos_e_servicos'), ('compras', 'compras'), ('financeiro', 'financeiro'), ('relatorios', 'relatorios'), ('notas_fiscais', 'notas_fiscais'), ('ferramentas', 'ferramentas'), ('ico-img', 'ico-img'), ],
+    datas=[('geral', 'geral'), ('vendas', 'vendas'), ('produtos_e_servicos', 'produtos_e_servicos'), ('compras', 'compras'), ('financeiro', 'financeiro'), ('relatorios', 'relatorios'), ('notas_fiscais', 'notas_fiscais'), ('ferramentas', 'ferramentas'), ('ico-img', 'ico-img'), ('ico-img\calendar-outline.svg', 'ico-img'), ('ico-img\down-arrow.png', 'ico-img'), ],
     hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi'],
     hookspath=[],
     hooksconfig={},

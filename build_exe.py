@@ -156,6 +156,26 @@ class FormularioEmpresa(QWidget):
             self.form_window.close()
 """)
     
+    # Verificar e criar pasta para ícones específicos na pasta de destino
+    print("Verificando ícones específicos...")
+    ico_img_dir = "ico-img"
+    if os.path.exists(ico_img_dir):
+        # Verificar se os ícones específicos existem
+        calendar_icon = os.path.join(ico_img_dir, "calendar-outline.svg")
+        down_arrow_icon = os.path.join(ico_img_dir, "down-arrow.png")
+        
+        if os.path.exists(calendar_icon):
+            print(f"Ícone de calendário encontrado: {calendar_icon}")
+        else:
+            print(f"AVISO: Ícone de calendário não encontrado em {calendar_icon}")
+            
+        if os.path.exists(down_arrow_icon):
+            print(f"Ícone de seta para baixo encontrado: {down_arrow_icon}")
+        else:
+            print(f"AVISO: Ícone de seta para baixo não encontrado em {down_arrow_icon}")
+    else:
+        print(f"AVISO: Diretório de ícones {ico_img_dir} não encontrado!")
+    
     # Criar arquivo spec personalizado
     print("Criando arquivo spec personalizado...")
     subprocess.run([
@@ -178,18 +198,36 @@ class FormularioEmpresa(QWidget):
     with open("MBSistema.spec", "r", encoding="utf-8") as f:
         spec_content = f.read()
     
-    # Modificar para incluir todos os diretórios
+    # Modificar para incluir todos os diretórios e arquivos específicos
     if "datas=[]" in spec_content:
+        # Incluir diretórios completos
         data_dirs = [
             "geral", "vendas", "produtos_e_servicos", "compras", 
-            "financeiro", "relatorios", "notas_fiscais", "ferramentas",
-            "ico-img"
+            "financeiro", "relatorios", "notas_fiscais", "ferramentas"
         ]
         
+        # Adicionar diretório de ícones e arquivos específicos
         data_str = "datas=["
+        
+        # Adicionar diretórios completos
         for d in data_dirs:
             if os.path.exists(d):
                 data_str += f"('{d}', '{d}'), "
+        
+        # Adicionar diretório de ícones com tratamento especial
+        if os.path.exists(ico_img_dir):
+            data_str += f"('{ico_img_dir}', '{ico_img_dir}'), "
+            
+            # Adicionar arquivos específicos de ícones individualmente para garantir
+            calendar_icon = os.path.join(ico_img_dir, "calendar-outline.svg")
+            down_arrow_icon = os.path.join(ico_img_dir, "down-arrow.png")
+            
+            if os.path.exists(calendar_icon):
+                data_str += f"('{calendar_icon}', '{ico_img_dir}'), "
+            
+            if os.path.exists(down_arrow_icon):
+                data_str += f"('{down_arrow_icon}', '{ico_img_dir}'), "
+        
         data_str += "]"
         
         spec_content = spec_content.replace("datas=[]", data_str)
@@ -208,8 +246,25 @@ class FormularioEmpresa(QWidget):
     print("Compilando o executável...")
     subprocess.run(["pyinstaller", "MBSistema.spec"])
     
-    print("\nCompilação concluída!")
-    print("O executável está disponível em: dist/MBSistema.exe")
+    # Verificar se a compilação foi bem-sucedida
+    exe_path = os.path.join("dist", "MBSistema.exe")
+    if os.path.exists(exe_path):
+        print("\nCompilação concluída com sucesso!")
+        print(f"O executável está disponível em: {exe_path}")
+        
+        # Verificar se a pasta ico-img foi incluída no executável
+        dist_ico_img = os.path.join("dist", "ico-img")
+        if not os.path.exists(dist_ico_img):
+            print("\nAVISO: A pasta ico-img não foi encontrada no diretório dist.")
+            print("Copiando manualmente a pasta ico-img para o diretório dist...")
+            
+            # Copiar manualmente a pasta ico-img para o diretório dist
+            if os.path.exists(ico_img_dir):
+                shutil.copytree(ico_img_dir, dist_ico_img)
+                print("Pasta ico-img copiada com sucesso para o diretório dist.")
+    else:
+        print("\nAVISO: A compilação pode não ter sido concluída corretamente.")
+        print("Verifique as mensagens de erro acima.")
 
 if __name__ == "__main__":
     main()

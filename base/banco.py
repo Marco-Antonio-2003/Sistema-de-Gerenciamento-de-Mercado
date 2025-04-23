@@ -6,6 +6,7 @@ Módulo para gerenciar conexões com o banco de dados Firebird
 import os
 import sys
 import fdb  # Módulo para conexão com Firebird
+from PyQt5.QtWidgets import QMessageBox
 
 # Função para encontrar o caminho do banco de dados
 def get_db_path():
@@ -3671,6 +3672,1447 @@ def obter_cidades_pedidos():
         print(f"Erro ao obter cidades: {e}")
         raise Exception(f"Erro ao obter cidades: {str(e)}")
 
+# Adicione estas funções ao arquivo base/banco.py
+
+def verificar_tabela_recebimentos_clientes():
+    """
+    Verifica se a tabela RECEBIMENTOS_CLIENTES existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'RECEBIMENTOS_CLIENTES'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela RECEBIMENTOS_CLIENTES não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE RECEBIMENTOS_CLIENTES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20) NOT NULL,
+                CLIENTE VARCHAR(100) NOT NULL,
+                CLIENTE_ID INTEGER,
+                VENCIMENTO DATE,
+                VALOR DECIMAL(15,2) NOT NULL,
+                DATA_RECEBIMENTO DATE,
+                STATUS VARCHAR(20) DEFAULT 'Pendente'
+            )
+            """
+            execute_query(query_create)
+            print("Tabela RECEBIMENTOS_CLIENTES criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_RECEBIMENTOS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER RECEBIMENTOS_BI FOR RECEBIMENTOS_CLIENTES
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_RECEBIMENTOS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Adicionar dados de exemplo
+            inserir_dados_exemplo_recebimentos()
+            
+            return True
+        else:
+            print("Tabela RECEBIMENTOS_CLIENTES já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de recebimentos: {str(e)}")
+
+def inserir_dados_exemplo_recebimentos():
+    """
+    Insere dados de exemplo na tabela de recebimentos para teste
+    """
+    try:
+        # Verificar se já existem dados na tabela
+        query_check = "SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES"
+        result = execute_query(query_check)
+        
+        if result[0][0] > 0:
+            print("Tabela RECEBIMENTOS_CLIENTES já possui dados. Pulando inserção de exemplos.")
+            return
+        
+        # Dados de exemplo
+        from datetime import datetime, timedelta
+        hoje = datetime.now().date()
+        
+        # Datas de vencimento (em dias a partir de hoje)
+        vencimentos = [1, 5, 10, 15, 30]
+        
+        dados = [
+            ("001", "Empresa ABC Ltda", None, hoje + timedelta(days=vencimentos[0]), 5000.00),
+            ("002", "João Silva", None, hoje + timedelta(days=vencimentos[1]), 1200.00),
+            ("003", "Distribuidora XYZ", None, hoje + timedelta(days=vencimentos[2]), 3500.00),
+            ("004", "Ana Souza", None, hoje + timedelta(days=vencimentos[3]), 750.00),
+            ("005", "Mercado Central", None, hoje + timedelta(days=vencimentos[4]), 2100.00)
+        ]
+        
+        # Inserir dados de exemplo
+        query_insert = """
+        INSERT INTO RECEBIMENTOS_CLIENTES (
+            CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS
+        ) VALUES (?, ?, ?, ?, ?, 'Pendente')
+        """
+        
+        for dado in dados:
+            execute_query(query_insert, dado)
+            
+        print("Dados de exemplo inseridos com sucesso na tabela RECEBIMENTOS_CLIENTES.")
+    except Exception as e:
+        print(f"Erro ao inserir dados de exemplo: {e}")
+        # Não propagar o erro, apenas registrar
+
+def listar_recebimentos_pendentes():
+    """
+    Lista todos os recebimentos pendentes
+    
+    Returns:
+        list: Lista de tuplas com dados dos recebimentos pendentes
+    """
+    try:
+        # Log para depuração
+        print("Buscando recebimentos pendentes...")
+        
+        query = """
+        SELECT ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS, VALOR_ORIGINAL
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE STATUS = 'Pendente'
+        ORDER BY VENCIMENTO
+        """
+        result = execute_query(query)
+        
+        # Depuração: mostrar quantos registros foram encontrados
+        print(f"Encontrados {len(result) if result else 0} recebimentos pendentes.")
+        
+        return result
+    except Exception as e:
+        print(f"Erro ao listar recebimentos pendentes: {e}")
+        raise Exception(f"Erro ao listar recebimentos pendentes: {str(e)}")
+    
+
+def buscar_recebimento_por_id(id_recebimento):
+    """
+    Busca um recebimento pelo ID
+    
+    Args:
+        id_recebimento (int): ID do recebimento
+        
+    Returns:
+        tuple: Dados do recebimento ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM RECEBIMENTOS_CLIENTES
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_recebimento,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar recebimento: {e}")
+        raise Exception(f"Erro ao buscar recebimento: {str(e)}")
+
+def dar_baixa_recebimento(id_recebimento, valor_pago, data_pagamento, criar_novo=True):
+    """
+    Dá baixa em um recebimento
+    
+    Args:
+        id_recebimento (int): ID do recebimento
+        valor_pago (float): Valor pago
+        data_pagamento (date): Data do pagamento
+        criar_novo (bool, optional): Se deve criar um novo registro para o pagamento. Defaults to True.
+    """
+    try:
+        # Se deve criar um novo registro para o pagamento
+        if criar_novo:
+            # Gerar ID explícito para o registro de pagamento
+            query_id = "SELECT COALESCE(MAX(ID), 0) + 1 FROM RECEBIMENTOS_CLIENTES"
+            proximo_id = execute_query(query_id)[0][0]
+            
+            # Buscar dados do recebimento original
+            recebimento = buscar_recebimento_por_id(id_recebimento)
+            if not recebimento:
+                raise Exception(f"Recebimento ID {id_recebimento} não encontrado")
+            
+            # Extrair dados
+            codigo = recebimento[1]
+            cliente = recebimento[2]
+            cliente_id = recebimento[3]
+            
+            # Inserir registro de pagamento
+            query = """
+            INSERT INTO RECEBIMENTOS_CLIENTES (
+                ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Recebido')
+            """
+            
+            params = (
+                proximo_id, codigo, cliente, cliente_id, data_pagamento, valor_pago, data_pagamento
+            )
+            
+            execute_query(query, params)
+            
+            # Atualizar status do recebimento original
+            query_update = """
+            UPDATE RECEBIMENTOS_CLIENTES
+            SET STATUS = 'Recebido'
+            WHERE ID = ?
+            """
+            
+            execute_query(query_update, (id_recebimento,))
+        else:
+            # Apenas registrar o pagamento sem criar novo registro
+            # Inserir registro de pagamento
+            query = """
+            INSERT INTO RECEBIMENTOS_CLIENTES (
+                CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            ) 
+            SELECT CODIGO, CLIENTE, CLIENTE_ID, ?, ?, ?, 'Recebido'
+            FROM RECEBIMENTOS_CLIENTES
+            WHERE ID = ?
+            """
+            
+            execute_query(query, (data_pagamento, valor_pago, data_pagamento, id_recebimento))
+            
+        return True
+    except Exception as e:
+        print(f"Erro ao dar baixa no recebimento: {e}")
+        raise Exception(f"Erro ao dar baixa no recebimento: {str(e)}")
+
+
+def listar_recebimentos(filtro_status=None, data_inicial=None, data_final=None):
+    """
+    Lista recebimentos com filtros opcionais
+    
+    Args:
+        filtro_status (str, optional): Filtrar por status ('Pendente', 'Recebido', None para todos)
+        data_inicial (date, optional): Filtrar por data de vencimento a partir desta data
+        data_final (date, optional): Filtrar por data de vencimento até esta data
+        
+    Returns:
+        list: Lista de tuplas com dados dos recebimentos
+    """
+    try:
+        # Construir a consulta SQL de base
+        query = """
+        SELECT ID, CODIGO, CLIENTE, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE 1=1
+        """
+        
+        # Lista para armazenar os parâmetros
+        params = []
+        
+        # Adicionar filtros conforme necessário
+        if filtro_status:
+            query += " AND STATUS = ?"
+            params.append(filtro_status)
+        
+        if data_inicial:
+            query += " AND VENCIMENTO >= ?"
+            params.append(data_inicial)
+        
+        if data_final:
+            query += " AND VENCIMENTO <= ?"
+            params.append(data_final)
+        
+        # Adicionar ordenação
+        query += " ORDER BY VENCIMENTO"
+        
+        # Executar a consulta
+        return execute_query(query, tuple(params) if params else None)
+    except Exception as e:
+        print(f"Erro ao listar recebimentos: {e}")
+        raise Exception(f"Erro ao listar recebimentos: {str(e)}")
+    
+def verificar_tabela_recebimentos_clientes():
+    """Verifica se a tabela RECEBIMENTOS_CLIENTES existe e cria se necessário"""
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS
+        WHERE RDB$RELATION_NAME = 'RECEBIMENTOS_CLIENTES'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, criar
+        if result[0][0] == 0:
+            query_create = """
+            CREATE TABLE RECEBIMENTOS_CLIENTES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20),
+                CLIENTE VARCHAR(100),
+                CLIENTE_ID INTEGER,
+                VENCIMENTO DATE,
+                VALOR DECIMAL(15,2),
+                DATA_RECEBIMENTO DATE,
+                STATUS VARCHAR(20),
+                VALOR_ORIGINAL DECIMAL(15,2)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela RECEBIMENTOS_CLIENTES criada com sucesso!")
+        else:
+            # Verificar se a coluna VALOR_ORIGINAL existe
+            query_check_column = """
+            SELECT COUNT(*) FROM RDB$RELATION_FIELDS
+            WHERE RDB$RELATION_NAME = 'RECEBIMENTOS_CLIENTES'
+            AND RDB$FIELD_NAME = 'VALOR_ORIGINAL'
+            """
+            result = execute_query(query_check_column)
+            
+            # Se a coluna não existe, adicionar
+            if result[0][0] == 0:
+                query_add_column = """
+                ALTER TABLE RECEBIMENTOS_CLIENTES
+                ADD VALOR_ORIGINAL DECIMAL(15,2)
+                """
+                execute_query(query_add_column)
+                
+                # Atualizar valores existentes
+                query_update = """
+                UPDATE RECEBIMENTOS_CLIENTES
+                SET VALOR_ORIGINAL = VALOR
+                WHERE VALOR_ORIGINAL IS NULL
+                """
+                execute_query(query_update)
+                
+                print("Coluna VALOR_ORIGINAL adicionada com sucesso!")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        return False
+
+
+def inserir_dados_exemplo_recebimentos():
+    """
+    Insere dados de exemplo na tabela de recebimentos para teste
+    """
+    try:
+        # Verificar se já existem dados na tabela
+        query_check = "SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES"
+        result = execute_query(query_check)
+        
+        if result[0][0] > 0:
+            print("Tabela RECEBIMENTOS_CLIENTES já possui dados. Pulando inserção de exemplos.")
+            return
+        
+        # Dados de exemplo
+        from datetime import datetime, timedelta
+        hoje = datetime.now().date()
+        
+        # Datas de vencimento (em dias a partir de hoje)
+        vencimentos = [1, 5, 10, 15, 30]
+        
+        dados = [
+            ("001", "Empresa ABC Ltda", None, hoje + timedelta(days=vencimentos[0]), 5000.00),
+            ("002", "João Silva", None, hoje + timedelta(days=vencimentos[1]), 1200.00),
+            ("003", "Distribuidora XYZ", None, hoje + timedelta(days=vencimentos[2]), 3500.00),
+            ("004", "Ana Souza", None, hoje + timedelta(days=vencimentos[3]), 750.00),
+            ("005", "Mercado Central", None, hoje + timedelta(days=vencimentos[4]), 2100.00)
+        ]
+        
+        # Inserir dados de exemplo
+        query_insert = """
+        INSERT INTO RECEBIMENTOS_CLIENTES (
+            CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS
+        ) VALUES (?, ?, ?, ?, ?, 'Pendente')
+        """
+        
+        for dado in dados:
+            execute_query(query_insert, dado)
+            
+        print("Dados de exemplo inseridos com sucesso na tabela RECEBIMENTOS_CLIENTES.")
+    except Exception as e:
+        print(f"Erro ao inserir dados de exemplo: {e}")
+        # Não propagar o erro, apenas registrar
+
+def listar_recebimentos_pendentes():
+    """
+    Lista todos os recebimentos pendentes
+    
+    Returns:
+        list: Lista de tuplas com dados dos recebimentos pendentes
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE STATUS = 'Pendente'
+        ORDER BY VENCIMENTO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar recebimentos pendentes: {e}")
+        raise Exception(f"Erro ao listar recebimentos pendentes: {str(e)}")
+
+def listar_recebimentos_concluidos():
+    """
+    Lista todos os recebimentos já recebidos/baixados
+    
+    Returns:
+        list: Lista de tuplas com dados dos recebimentos concluídos
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, CLIENTE, DATA_RECEBIMENTO, VALOR
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE STATUS = 'Recebido'
+        ORDER BY DATA_RECEBIMENTO DESC
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar recebimentos concluídos: {e}")
+        raise Exception(f"Erro ao listar recebimentos concluídos: {str(e)}")
+
+def buscar_recebimento_por_id(id_recebimento):
+    """
+    Busca um recebimento pelo ID
+    
+    Args:
+        id_recebimento (int): ID do recebimento
+        
+    Returns:
+        tuple: Dados do recebimento ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT * FROM RECEBIMENTOS_CLIENTES
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_recebimento,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar recebimento: {e}")
+        raise Exception(f"Erro ao buscar recebimento: {str(e)}")
+
+def buscar_recebimentos_por_cliente(cliente):
+    """
+    Busca recebimentos por nome de cliente (busca parcial)
+    
+    Args:
+        cliente (str): Nome do cliente (parcial)
+        
+    Returns:
+        list: Lista de recebimentos encontrados
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, CLIENTE, VENCIMENTO, VALOR, STATUS
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE UPPER(CLIENTE) LIKE UPPER(?)
+        ORDER BY VENCIMENTO
+        """
+        return execute_query(query, (f"%{cliente}%",))
+    except Exception as e:
+        print(f"Erro ao buscar recebimentos por cliente: {e}")
+        raise Exception(f"Erro ao buscar recebimentos por cliente: {str(e)}")
+
+def filtrar_recebimentos(codigo=None, cliente=None, data_inicio=None, data_fim=None, status=None):
+    """
+    Filtra recebimentos com base em vários critérios
+    
+    Args:
+        codigo (str, optional): Código do recebimento
+        cliente (str, optional): Nome do cliente (busca parcial)
+        data_inicio (date, optional): Data de vencimento inicial
+        data_fim (date, optional): Data de vencimento final
+        status (str, optional): Status do recebimento ('Pendente', 'Recebido')
+        
+    Returns:
+        list: Lista de recebimentos filtrados
+    """
+    try:
+        # Montar a query base
+        query = """
+        SELECT ID, CODIGO, CLIENTE, VENCIMENTO, VALOR, STATUS
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE 1=1
+        """
+        
+        # Lista para armazenar os parâmetros
+        params = []
+        
+        # Adicionar filtros se fornecidos
+        if codigo:
+            query += " AND CODIGO = ?"
+            params.append(codigo)
+            
+        if cliente:
+            query += " AND UPPER(CLIENTE) LIKE UPPER(?)"
+            params.append(f"%{cliente}%")
+            
+        if data_inicio:
+            query += " AND VENCIMENTO >= ?"
+            params.append(data_inicio)
+            
+        if data_fim:
+            query += " AND VENCIMENTO <= ?"
+            params.append(data_fim)
+            
+        if status:
+            query += " AND STATUS = ?"
+            params.append(status)
+            
+        # Ordenação
+        query += " ORDER BY VENCIMENTO"
+        
+        return execute_query(query, tuple(params) if params else None)
+    except Exception as e:
+        print(f"Erro ao filtrar recebimentos: {e}")
+        raise Exception(f"Erro ao filtrar recebimentos: {str(e)}")
+
+def criar_recebimento(codigo, cliente, cliente_id=None, vencimento=None, valor=0, valor_original=None):
+    """
+    Cria um novo recebimento no banco de dados
+    
+    Args:
+        codigo (str): Código do recebimento
+        cliente (str): Nome do cliente
+        cliente_id (int, optional): ID do cliente
+        vencimento (date, optional): Data de vencimento
+        valor (float): Valor do recebimento
+        valor_original (float, optional): Valor original antes de pagamento parcial
+    
+    Returns:
+        int: ID do recebimento criado
+    """
+    try:
+        # Gerar ID explícito
+        query_id = "SELECT COALESCE(MAX(ID), 0) + 1 FROM RECEBIMENTOS_CLIENTES"
+        proximo_id = execute_query(query_id)[0][0]
+        
+        # Sanitizar e converter dados
+        codigo = str(codigo).strip()[:20]
+        cliente = str(cliente).strip()[:100]
+        
+        # Converter valor para float
+        try:
+            valor_float = float(valor)
+        except (ValueError, TypeError):
+            valor_float = 0
+        
+        # Converter data para formato do banco (se for string)
+        if isinstance(vencimento, str):
+            try:
+                from datetime import datetime
+                partes = vencimento.split('/')
+                if len(partes) == 3:
+                    vencimento = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+            except Exception as e:
+                print(f"Erro ao converter data: {e}")
+                vencimento = None
+        
+        # Inserir o recebimento com ID explícito
+        query = """
+        INSERT INTO RECEBIMENTOS_CLIENTES (
+            ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS
+        ) VALUES (?, ?, ?, ?, ?, ?, 'Pendente')
+        """
+        
+        params = (
+            proximo_id, codigo, cliente, cliente_id, vencimento, valor_float
+        )
+        
+        execute_query(query, params)
+        
+        return proximo_id
+    except Exception as e:
+        print(f"Erro ao criar recebimento: {e}")
+        raise Exception(f"Erro ao criar recebimento: {str(e)}")
+
+
+# Nova função para recriar a tabela com estrutura melhorada
+def recriar_tabela_recebimentos():
+    """Recria a tabela RECEBIMENTOS_CLIENTES com estrutura melhorada"""
+    try:
+        conn = None
+        cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Backup dos dados existentes
+            cursor.execute("""
+            CREATE TABLE RECEBIMENTOS_BACKUP AS 
+            SELECT * FROM RECEBIMENTOS_CLIENTES
+            """)
+            
+            # Dropar a tabela antiga
+            cursor.execute("DROP TABLE RECEBIMENTOS_CLIENTES")
+            
+            # Criar nova tabela com restrições melhoradas
+            cursor.execute("""
+            CREATE TABLE RECEBIMENTOS_CLIENTES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(40) NOT NULL,
+                CLIENTE VARCHAR(100) NOT NULL,
+                CLIENTE_ID INTEGER,
+                VENCIMENTO DATE,
+                VALOR DECIMAL(15,2) NOT NULL,
+                DATA_RECEBIMENTO DATE,
+                STATUS VARCHAR(20) DEFAULT 'Pendente',
+                UNIQUE (CODIGO, STATUS)
+            )
+            """)
+            
+            # Recriar o gerador
+            try:
+                cursor.execute("DROP GENERATOR GEN_RECEBIMENTOS_ID")
+            except:
+                pass
+            
+            cursor.execute("CREATE GENERATOR GEN_RECEBIMENTOS_ID")
+            
+            # Recriar trigger
+            cursor.execute("""
+            CREATE TRIGGER RECEBIMENTOS_BI FOR RECEBIMENTOS_CLIENTES
+            ACTIVE BEFORE INSERT POSITION 0
+            AS
+            BEGIN
+                IF (NEW.ID IS NULL) THEN
+                    NEW.ID = GEN_ID(GEN_RECEBIMENTOS_ID, 1);
+            END
+            """)
+            
+            # Restaurar dados
+            cursor.execute("""
+            INSERT INTO RECEBIMENTOS_CLIENTES 
+            SELECT * FROM RECEBIMENTOS_BACKUP
+            """)
+            
+            conn.commit()
+            print("Tabela RECEBIMENTOS_CLIENTES recriada com sucesso!")
+            
+            # Remover backup
+            cursor.execute("DROP TABLE RECEBIMENTOS_BACKUP")
+            conn.commit()
+            
+            return True
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Erro ao recriar tabela: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+                
+    except Exception as e:
+        print(f"Erro ao recriar tabela: {e}")
+        return False
+
+
+# Função para limpar recebimentos antigos
+def limpar_recebimentos_antigos():
+    """Limpa recebimentos antigos já recebidos para liberar códigos"""
+    try:
+        conn = None
+        cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Contar quantos registros existem
+            cursor.execute("SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Recebido'")
+            count = cursor.fetchone()[0]
+            
+            if count > 0:
+                # Mover para tabela de histórico
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS RECEBIMENTOS_HISTORICO (
+                    ID INTEGER,
+                    CODIGO VARCHAR(40),
+                    CLIENTE VARCHAR(100),
+                    CLIENTE_ID INTEGER,
+                    VENCIMENTO DATE,
+                    VALOR DECIMAL(15,2),
+                    DATA_RECEBIMENTO DATE,
+                    STATUS VARCHAR(20),
+                    DATA_ARQUIVAMENTO TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """)
+                
+                cursor.execute("""
+                INSERT INTO RECEBIMENTOS_HISTORICO (ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS)
+                SELECT ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS 
+                FROM RECEBIMENTOS_CLIENTES 
+                WHERE STATUS = 'Recebido'
+                """)
+                
+                # Remover da tabela principal
+                cursor.execute("DELETE FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Recebido'")
+                conn.commit()
+                
+                print(f"{count} recebimentos arquivados para o histórico!")
+                return True
+            
+            return False
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Erro ao limpar recebimentos: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+                
+    except Exception as e:
+        print(f"Erro ao limpar recebimentos: {e}")
+        return False
+
+
+# Função para executar todas as correções necessárias
+def executar_correcoes():
+    """Executa correções necessárias na tabela de recebimentos"""
+    try:
+        # Verificar se a coluna VALOR_ORIGINAL existe
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Verificar se a coluna existe
+            cursor.execute("""
+            SELECT 1 FROM RDB$RELATION_FIELDS 
+            WHERE RDB$RELATION_NAME = 'RECEBIMENTOS_CLIENTES' 
+            AND RDB$FIELD_NAME = 'VALOR_ORIGINAL'
+            """)
+            
+            if not cursor.fetchone():
+                # A coluna não existe, vamos adicioná-la
+                print("Adicionando coluna VALOR_ORIGINAL...")
+                cursor.execute("ALTER TABLE RECEBIMENTOS_CLIENTES ADD VALOR_ORIGINAL DECIMAL(15,2)")
+                
+                # Inicializar com o valor atual
+                cursor.execute("UPDATE RECEBIMENTOS_CLIENTES SET VALOR_ORIGINAL = VALOR")
+                conn.commit()
+                print("✓ Coluna VALOR_ORIGINAL adicionada e inicializada")
+            else:
+                print("✓ Coluna VALOR_ORIGINAL já existe")
+                
+        except Exception as e:
+            print(f"Erro ao verificar coluna: {e}")
+        finally:
+            cursor.close()
+            conn.close()
+            
+        print("Correções concluídas!")
+        return True
+    except Exception as e:
+        print(f"Erro nas correções: {e}")
+        return False
+
+def dar_baixa_recebimento(id_recebimento, valor_pago, data_pagamento, criar_novo=True):
+    """
+    Dá baixa em um recebimento
+    
+    Args:
+        id_recebimento (int): ID do recebimento
+        valor_pago (float): Valor pago
+        data_pagamento (date): Data do pagamento
+        criar_novo (bool, optional): Se deve criar um novo registro para o pagamento. Defaults to True.
+    """
+    try:
+        # Se deve criar um novo registro para o pagamento
+        if criar_novo:
+            # Gerar ID explícito para o registro de pagamento
+            query_id = "SELECT COALESCE(MAX(ID), 0) + 1 FROM RECEBIMENTOS_CLIENTES"
+            proximo_id = execute_query(query_id)[0][0]
+            
+            # Buscar dados do recebimento original
+            recebimento = buscar_recebimento_por_id(id_recebimento)
+            if not recebimento:
+                raise Exception(f"Recebimento ID {id_recebimento} não encontrado")
+            
+            # Extrair dados
+            codigo = recebimento[1]
+            cliente = recebimento[2]
+            cliente_id = recebimento[3]
+            
+            # Inserir registro de pagamento
+            query = """
+            INSERT INTO RECEBIMENTOS_CLIENTES (
+                ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Recebido')
+            """
+            
+            params = (
+                proximo_id, codigo, cliente, cliente_id, data_pagamento, valor_pago, data_pagamento
+            )
+            
+            execute_query(query, params)
+            
+            # Atualizar status do recebimento original
+            query_update = """
+            UPDATE RECEBIMENTOS_CLIENTES
+            SET STATUS = 'Recebido'
+            WHERE ID = ?
+            """
+            
+            execute_query(query_update, (id_recebimento,))
+        else:
+            # Apenas registrar o pagamento sem criar novo registro
+            # Inserir registro de pagamento
+            query = """
+            INSERT INTO RECEBIMENTOS_CLIENTES (
+                CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            ) 
+            SELECT CODIGO, CLIENTE, CLIENTE_ID, ?, ?, ?, 'Recebido'
+            FROM RECEBIMENTOS_CLIENTES
+            WHERE ID = ?
+            """
+            
+            execute_query(query, (data_pagamento, valor_pago, data_pagamento, id_recebimento))
+            
+        return True
+    except Exception as e:
+        print(f"Erro ao dar baixa no recebimento: {e}")
+        raise Exception(f"Erro ao dar baixa no recebimento: {str(e)}")
+
+
+def atualizar_recebimento(id_recebimento, codigo=None, cliente=None, cliente_id=None, 
+                        vencimento=None, valor=None, status=None):
+    """
+    Atualiza um recebimento existente
+    
+    Args:
+        id_recebimento (int): ID do recebimento a ser atualizado
+        codigo (str, optional): Novo código
+        cliente (str, optional): Novo nome de cliente
+        cliente_id (int, optional): Novo ID de cliente
+        vencimento (date, optional): Nova data de vencimento
+        valor (float, optional): Novo valor
+        status (str, optional): Novo status
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se o recebimento existe
+        recebimento = buscar_recebimento_por_id(id_recebimento)
+        if not recebimento:
+            raise Exception(f"Recebimento com ID {id_recebimento} não encontrado")
+            
+        # Campos para atualização
+        campos = []
+        params = []
+        
+        # Verificar cada campo a ser atualizado
+        if codigo is not None:
+            codigo = str(codigo).strip()[:20]
+            # Verificar se este código já está em uso por outro recebimento
+            if codigo != recebimento[1]:  # Código atual na posição 1
+                outro_recebimento = buscar_recebimento_por_codigo(codigo)
+                if outro_recebimento and outro_recebimento[0] != id_recebimento:
+                    raise Exception(f"Código {codigo} já está em uso por outro recebimento")
+            campos.append("CODIGO = ?")
+            params.append(codigo)
+            
+        if cliente is not None:
+            cliente = str(cliente).strip()[:100]
+            campos.append("CLIENTE = ?")
+            params.append(cliente)
+            
+        if cliente_id is not None:
+            campos.append("CLIENTE_ID = ?")
+            params.append(cliente_id)
+            
+        if vencimento is not None:
+            campos.append("VENCIMENTO = ?")
+            params.append(vencimento)
+            
+        if valor is not None:
+            try:
+                valor_float = float(valor)
+                if valor_float <= 0:
+                    raise Exception("O valor deve ser maior que zero")
+                campos.append("VALOR = ?")
+                params.append(valor_float)
+            except (ValueError, TypeError):
+                raise Exception("Valor inválido")
+                
+        if status is not None:
+            if status not in ('Pendente', 'Recebido'):
+                raise Exception("Status inválido. Use 'Pendente' ou 'Recebido'")
+            campos.append("STATUS = ?")
+            params.append(status)
+            
+        # Se não há campos para atualizar, retorna
+        if not campos:
+            return True
+            
+        # Montar query de atualização
+        query = f"""
+        UPDATE RECEBIMENTOS_CLIENTES SET
+            {', '.join(campos)}
+        WHERE ID = ?
+        """
+        
+        # Adicionar o ID nos parâmetros
+        params.append(id_recebimento)
+        
+        execute_query(query, tuple(params))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar recebimento: {e}")
+        raise Exception(f"Erro ao atualizar recebimento: {str(e)}")
+
+def excluir_recebimento(id_recebimento):
+    """
+    Exclui um recebimento do banco de dados e reorganiza os IDs se necessário
+    
+    Args:
+        id_recebimento (int): ID do recebimento a ser excluído
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se o recebimento existe
+        recebimento = buscar_recebimento_por_id(id_recebimento)
+        if not recebimento:
+            raise Exception(f"Recebimento com ID {id_recebimento} não encontrado")
+            
+        # Excluir recebimento
+        query = """
+        DELETE FROM RECEBIMENTOS_CLIENTES
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (id_recebimento,))
+        
+        # Verificar se é necessário reorganizar os IDs (se houver poucos recebimentos restantes)
+        query_count = """
+        SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES
+        """
+        count_result = execute_query(query_count)
+        
+        # Se tiver menos de 5 recebimentos restantes, reorganizar os IDs
+        if count_result[0][0] < 5:
+            reorganizar_ids_recebimentos()
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir recebimento: {e}")
+        raise Exception(f"Erro ao excluir recebimento: {str(e)}")
+
+def reorganizar_ids_recebimentos():
+    """
+    Reorganiza os IDs da tabela RECEBIMENTOS_CLIENTES, eliminando lacunas
+    e reiniciando a sequência do gerador
+    """
+    try:
+        conn = None
+        cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Desativar as constraints temporariamente 
+            # (isso pode variar dependendo da sua estrutura de banco)
+            cursor.execute("UPDATE RDB$DATABASE SET RDB$CONSTRAINT_STATE = 0")
+            
+            # Criar tabela temporária com IDs sequenciais
+            cursor.execute("""
+            CREATE TABLE TEMP_RECEBIMENTOS AS
+            SELECT ROW_NUMBER() OVER (ORDER BY ID) AS NEW_ID,
+                CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            FROM RECEBIMENTOS_CLIENTES
+            """)
+            
+            # Limpar a tabela original
+            cursor.execute("DELETE FROM RECEBIMENTOS_CLIENTES")
+            
+            # Reinserir com IDs sequenciais
+            cursor.execute("""
+            INSERT INTO RECEBIMENTOS_CLIENTES (
+                ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            )
+            SELECT NEW_ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS
+            FROM TEMP_RECEBIMENTOS
+            """)
+            
+            # Reativar as constraints
+            cursor.execute("UPDATE RDB$DATABASE SET RDB$CONSTRAINT_STATE = 1")
+            
+            # Remover tabela temporária
+            cursor.execute("DROP TABLE TEMP_RECEBIMENTOS")
+            
+            # Resetar o gerador
+            cursor.execute("SET GENERATOR GEN_RECEBIMENTOS_ID TO 0")
+            
+            # Configurar o gerador para o próximo ID
+            cursor.execute("""
+            SELECT COALESCE(MAX(ID), 0) FROM RECEBIMENTOS_CLIENTES
+            """)
+            max_id = cursor.fetchone()[0]
+            cursor.execute(f"SET GENERATOR GEN_RECEBIMENTOS_ID TO {max_id}")
+            
+            conn.commit()
+            print("IDs de recebimentos reorganizados com sucesso!")
+            return True
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Erro ao reorganizar IDs: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    except Exception as e:
+        print(f"Erro ao reorganizar IDs: {e}")
+        return False
+    
+
+def criar_recebimento(codigo, cliente, cliente_id=None, vencimento=None, valor=0, valor_original=None):
+    """
+    Cria um novo recebimento no banco de dados
+    
+    Args:
+        codigo (str): Código do recebimento
+        cliente (str): Nome do cliente
+        cliente_id (int, optional): ID do cliente
+        vencimento (date, optional): Data de vencimento
+        valor (float): Valor do recebimento
+        valor_original (float, optional): Valor original antes de pagamento parcial
+    
+    Returns:
+        int: ID do recebimento criado
+    """
+    try:
+        # Gerar ID explícito
+        query_id = "SELECT COALESCE(MAX(ID), 0) + 1 FROM RECEBIMENTOS_CLIENTES"
+        proximo_id = execute_query(query_id)[0][0]
+        
+        # Sanitizar e converter dados
+        codigo = str(codigo).strip()[:20]
+        cliente = str(cliente).strip()[:100]
+        
+        # Converter valor para float
+        try:
+            valor_float = float(valor)
+        except (ValueError, TypeError):
+            valor_float = 0
+        
+        # Se valor_original não foi fornecido, usar o valor atual
+        if valor_original is None:
+            valor_original = valor_float
+        
+        # Converter data para formato do banco (se for string)
+        if isinstance(vencimento, str):
+            try:
+                from datetime import datetime
+                partes = vencimento.split('/')
+                if len(partes) == 3:
+                    vencimento = datetime(int(partes[2]), int(partes[1]), int(partes[0]))
+            except Exception as e:
+                print(f"Erro ao converter data: {e}")
+                vencimento = None
+        
+        # Inserir o recebimento com ID explícito
+        query = """
+        INSERT INTO RECEBIMENTOS_CLIENTES (
+            ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, STATUS, VALOR_ORIGINAL
+        ) VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?)
+        """
+        
+        params = (
+            proximo_id, codigo, cliente, cliente_id, vencimento, valor_float, valor_original
+        )
+        
+        execute_query(query, params)
+        
+        return proximo_id
+    except Exception as e:
+        print(f"Erro ao criar recebimento: {e}")
+        raise Exception(f"Erro ao criar recebimento: {str(e)}")
+
+def atualizar_valor_original(recebimento_id, valor_original):
+    """
+    Atualiza o valor original de um recebimento existente
+    
+    Args:
+        recebimento_id (int): ID do recebimento a ser atualizado
+        valor_original (float): Valor original a ser salvo
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Garantir que o valor_original é do tipo correto
+        try:
+            valor_original = float(valor_original) if valor_original is not None else 0
+        except (ValueError, TypeError):
+            raise Exception(f"Valor original inválido: {valor_original}")
+        
+        # Atualizar o valor original
+        query = """
+        UPDATE RECEBIMENTOS_CLIENTES
+        SET VALOR_ORIGINAL = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (valor_original, recebimento_id))
+        
+        print(f"Valor original atualizado com sucesso: ID={recebimento_id}, Valor Original={valor_original}")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar valor original: {e}")
+        raise Exception(f"Erro ao atualizar valor original: {str(e)}")
+
+def buscar_recebimento_por_codigo_com_status(codigo):
+    """
+    Busca um recebimento pelo código e retorna também o status
+    
+    Args:
+        codigo (str): Código do recebimento
+        
+    Returns:
+        tuple: (ID, Código, Cliente, Status) ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, CLIENTE, STATUS FROM RECEBIMENTOS_CLIENTES
+        WHERE CODIGO = ?
+        """
+        result = execute_query(query, (codigo,))
+        if result and len(result) > 0:
+            return result[0]
+        
+        # Try with partial code match if exact match fails
+        if not result or len(result) == 0:
+            codigo_base = codigo.split('-')[0] if '-' in codigo else codigo
+            query = """
+            SELECT ID, CODIGO, CLIENTE, STATUS FROM RECEBIMENTOS_CLIENTES
+            WHERE CODIGO LIKE ?
+            """
+            result = execute_query(query, (f"{codigo_base}%",))
+            if result and len(result) > 0:
+                return result[0]
+                
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar recebimento por código: {e}")
+        return None
+    
+def listar_clientes():
+    """
+    Lista todos os clientes cadastrados na tabela PESSOAS
+    
+    Returns:
+        list: Lista de tuplas com (ID, NOME) dos clientes
+    """
+    try:
+        query = """
+        SELECT ID, NOME 
+        FROM PESSOAS
+        WHERE TIPO_PESSOA = 'Física' OR TIPO_PESSOA = 'Jurídica'
+        ORDER BY NOME
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar clientes: {e}")
+        # Tentar tabela alternativa se existir
+        try:
+            query = """
+            SELECT ID, NOME_EMPRESA as NOME
+            FROM EMPRESAS
+            ORDER BY NOME_EMPRESA
+            """
+            return execute_query(query)
+        except Exception as e2:
+            print(f"Erro ao listar empresas: {e2}")
+            return []
+def buscar_recebimento_por_codigo(codigo):
+    """Busca um recebimento pelo código"""
+    try:
+        # Construir a consulta SQL para busca exata
+        query = """
+        SELECT * FROM RECEBIMENTOS_CLIENTES
+        WHERE CODIGO = ?
+        """
+        
+        # Executar a consulta usando a função execute_query existente
+        resultado = execute_query(query, (codigo,))
+        
+        # Se não encontrou e o código contém hífen (formato com parcelas)
+        if (not resultado or len(resultado) == 0) and '-' in codigo:
+            # Tentar buscar com o código base (antes do hífen)
+            codigo_base = codigo.split('-')[0]
+            query = """
+            SELECT * FROM RECEBIMENTOS_CLIENTES
+            WHERE CODIGO LIKE ?
+            """
+            resultado = execute_query(query, (f"{codigo_base}%",))
+        
+        # Retornar o primeiro resultado, se houver
+        if resultado and len(resultado) > 0:
+            return resultado[0]
+        
+        # Tente buscar pelo código parcial (para casos onde pode haver variações no formato)
+        query = """
+        SELECT * FROM RECEBIMENTOS_CLIENTES
+        WHERE CODIGO LIKE ?
+        """
+        resultado = execute_query(query, (f"%{codigo}%",))
+        
+        if resultado and len(resultado) > 0:
+            return resultado[0]
+            
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar recebimento por código: {e}")
+        return None
+def excluir(self):
+    """Ação do botão excluir"""
+    selected_items = self.tabela.selectedItems()
+    if not selected_items:
+        self.mostrar_mensagem("Atenção", "Selecione um recebimento para excluir!")
+        return
+    
+    # Obter a linha selecionada
+    row = self.tabela.currentRow()
+    codigo = self.tabela.item(row, 0).text()
+    cliente = self.tabela.item(row, 1).text()
+    
+    # Mostrar mensagem de confirmação
+    msgBox = QMessageBox()
+    msgBox.setIcon(QMessageBox.Question)
+    msgBox.setWindowTitle("Confirmação")
+    msgBox.setText(f"Deseja realmente excluir o recebimento do cliente {cliente}?")
+    msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    msgBox.setStyleSheet("""
+        QMessageBox { 
+            background-color: white;
+        }
+        QLabel { 
+            color: black;
+            background-color: white;
+        }
+        QPushButton {
+            background-color: #003b57;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 2px;
+        }
+    """)
+    resposta = msgBox.exec_()
+    
+    if resposta == QMessageBox.Yes:
+        try:
+            # Primeiro, precisamos buscar todos os registros com este código base
+            from base.banco import execute_query
+            
+            # Buscar registros pelo código (incluindo parcelas)
+            query = """
+            SELECT ID FROM RECEBIMENTOS_CLIENTES
+            WHERE CODIGO LIKE ?
+            """
+            
+            # Se o código tem formato com parcelas (ex: 2-1/2), pegamos apenas a parte base
+            codigo_base = codigo
+            if '-' in codigo:
+                codigo_base = codigo.split('-')[0]
+                
+            # Buscar com wildcards para pegar todas as parcelas
+            resultado = execute_query(query, (f"{codigo_base}%",))
+            
+            if resultado and len(resultado) > 0:
+                # Para cada ID encontrado, excluir o registro
+                for reg in resultado:
+                    id_recebimento = reg[0]
+                    from base.banco import excluir_recebimento
+                    excluir_recebimento(id_recebimento)
+                
+                # Remover da tabela visual
+                self.tabela.removeRow(row)
+                self.mostrar_mensagem("Sucesso", "Recebimento excluído com sucesso!")
+                print(f"Recebimento excluído: Código {codigo}, Cliente {cliente}")
+            else:
+                self.mostrar_mensagem("Erro", f"Não foi possível encontrar o recebimento com código {codigo}")
+                
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao excluir recebimento: {str(e)}")
+def resetar_id_recebimentos():
+    """
+    Reseta a sequência de ID da tabela RECEBIMENTOS_CLIENTES para começar do 1
+    
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Criar backup da tabela
+        query_backup = """
+        CREATE TABLE RECEBIMENTOS_CLIENTES_BACKUP AS 
+        SELECT * FROM RECEBIMENTOS_CLIENTES
+        """
+        execute_query(query_backup)
+        
+        # Zerar o gerador
+        query_reset = """
+        SET GENERATOR GEN_RECEBIMENTOS_ID TO 0
+        """
+        execute_query(query_reset)
+        
+        print("Reset do ID de recebimentos concluído com sucesso!")
+        return True
+    except Exception as e:
+        print(f"Erro ao resetar ID: {e}")
+        raise Exception(f"Erro ao resetar ID: {str(e)}")
+    
+def verificar_e_corrigir_tabela_recebimentos():
+    """Verifica e corrige a estrutura da tabela RECEBIMENTOS_CLIENTES, adicionando a coluna VALOR_ORIGINAL se necessário"""
+    try:
+        conn = None
+        cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Verificar se a coluna VALOR_ORIGINAL existe
+            try:
+                # Usar uma consulta compatível com Firebird para verificar se a coluna existe
+                cursor.execute("""
+                SELECT 1 FROM RDB$RELATION_FIELDS 
+                WHERE RDB$RELATION_NAME = 'RECEBIMENTOS_CLIENTES' 
+                AND RDB$FIELD_NAME = 'VALOR_ORIGINAL'
+                """)
+                
+                resultado = cursor.fetchone()
+                if resultado:
+                    print("Coluna VALOR_ORIGINAL já existe.")
+                else:
+                    print("Adicionando coluna VALOR_ORIGINAL à tabela RECEBIMENTOS_CLIENTES...")
+                    cursor.execute("ALTER TABLE RECEBIMENTOS_CLIENTES ADD VALOR_ORIGINAL DECIMAL(15,2)")
+                    
+                    # Preencher com o mesmo valor dos registros existentes
+                    cursor.execute("UPDATE RECEBIMENTOS_CLIENTES SET VALOR_ORIGINAL = VALOR WHERE VALOR_ORIGINAL IS NULL")
+                    conn.commit()
+                    print("Coluna VALOR_ORIGINAL adicionada e inicializada com sucesso.")
+            except Exception as e:
+                print(f"Erro ao verificar coluna: {e}")
+                
+                try:
+                    # Tentar adicionar a coluna de qualquer forma
+                    cursor.execute("ALTER TABLE RECEBIMENTOS_CLIENTES ADD VALOR_ORIGINAL DECIMAL(15,2)")
+                    
+                    # Preencher com o mesmo valor dos registros existentes
+                    cursor.execute("UPDATE RECEBIMENTOS_CLIENTES SET VALOR_ORIGINAL = VALOR")
+                    conn.commit()
+                    print("Coluna VALOR_ORIGINAL adicionada e inicializada com sucesso.")
+                except Exception as e2:
+                    print(f"Erro ao adicionar coluna: {e2}")
+            
+            return True
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Erro ao verificar/corrigir tabela: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+                
+    except Exception as e:
+        print(f"Erro ao verificar/corrigir tabela: {e}")
+        return False
+    
+def diagnosticar_recebimentos():
+    """
+    Função de diagnóstico para verificar o estado da tabela de recebimentos
+    
+    Returns:
+        dict: Informações de diagnóstico
+    """
+    try:
+        # Verificar total de registros
+        query_count = """
+        SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES
+        """
+        total_count = execute_query(query_count)[0][0]
+        
+        # Contar por status
+        query_status = """
+        SELECT STATUS, COUNT(*) FROM RECEBIMENTOS_CLIENTES
+        GROUP BY STATUS
+        """
+        status_counts = execute_query(query_status)
+        
+        # Obter alguns registros para análise
+        query_sample = """
+        SELECT ID, CODIGO, CLIENTE, STATUS, VALOR 
+        FROM RECEBIMENTOS_CLIENTES
+        ORDER BY ID
+        LIMIT 5
+        """
+        sample_records = execute_query(query_sample)
+        
+        # Montar resultado
+        diagnostico = {
+            "total_registros": total_count,
+            "contagem_por_status": {status: count for status, count in status_counts},
+            "registros_exemplo": sample_records
+        }
+        
+        # Imprimir diagnóstico
+        print("\n--- DIAGNÓSTICO DA TABELA RECEBIMENTOS_CLIENTES ---")
+        print(f"Total de registros: {total_count}")
+        print("Contagem por status:")
+        for status, count in status_counts:
+            print(f"  {status}: {count}")
+        print("Registros exemplo:")
+        for rec in sample_records:
+            print(f"  ID={rec[0]}, Código={rec[1]}, Cliente={rec[2]}, Status={rec[3]}, Valor={rec[4]}")
+        
+        return diagnostico
+    except Exception as e:
+        print(f"Erro ao diagnosticar recebimentos: {e}")
+        return {"erro": str(e)} 
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
     try:
@@ -3684,7 +5126,10 @@ if __name__ == "__main__":
         verificar_tabela_grupos()
         verificar_tabela_fornecedores()
         verificar_tabela_tipos_fornecedores()
-        verificar_tabela_pedidos_venda()  # Adicionar esta linha
+        verificar_tabela_pedidos_venda() 
+        verificar_tabela_recebimentos_clientes() 
+        executar_correcoes()
+
         print("Banco de dados inicializado com sucesso!")
         
     except Exception as e:
