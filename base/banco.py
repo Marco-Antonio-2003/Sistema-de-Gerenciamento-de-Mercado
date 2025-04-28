@@ -142,16 +142,24 @@ def validar_login(usuario, senha, empresa):
     """
     try:
         query = """
-        SELECT COUNT(*) FROM USUARIOS 
+        SELECT ID, USUARIO, EMPRESA FROM USUARIOS 
         WHERE USUARIO = ? AND SENHA = ? AND EMPRESA = ?
         """
         result = execute_query(query, (usuario, senha, empresa))
         
         # Se encontrou pelo menos um usuário com essas credenciais
-        return result[0][0] > 0
+        if result and len(result) > 0:
+            # Armazenar informações do usuário logado
+            global usuario_logado
+            usuario_logado["id"] = result[0][0]
+            usuario_logado["nome"] = result[0][1]
+            usuario_logado["empresa"] = result[0][2]
+            return True
+        return False
     except Exception as e:
         print(f"Erro na validação de login: {e}")
         raise Exception(f"Erro ao validar login: {str(e)}")
+
 
 def criar_usuario(usuario, senha, empresa):
     """
@@ -5113,6 +5121,617 @@ def diagnosticar_recebimentos():
     except Exception as e:
         print(f"Erro ao diagnosticar recebimentos: {e}")
         return {"erro": str(e)} 
+
+# Variável global para armazenar o usuário logado
+usuario_logado = {
+    "id": None,
+    "nome": None,
+    "empresa": None
+}
+
+def get_usuario_logado():
+    """
+    Retorna as informações do usuário logado
+    
+    Returns:
+        dict: Dicionário com id, nome e empresa do usuário logado
+    """
+    global usuario_logado
+    return usuario_logado
+
+# Funções para o sistema de caixa
+
+def verificar_tabelas_caixa():
+    """
+    Verifica se as tabelas do sistema de caixa existem e as cria se não existirem
+    
+    Returns:
+        bool: True se as tabelas existem ou foram criadas com sucesso
+    """
+    try:
+        # Verificar se a tabela CAIXA_CONTROLE existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'CAIXA_CONTROLE'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, criar as tabelas
+        if result[0][0] == 0:
+            print("Tabelas do sistema de caixa não encontradas. Criando...")
+            
+            # Criar tabela CAIXA_CONTROLE
+            query_create_controle = """
+            CREATE TABLE CAIXA_CONTROLE (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(10) NOT NULL,
+                DATA_ABERTURA DATE NOT NULL,
+                HORA_ABERTURA TIME NOT NULL,
+                DATA_FECHAMENTO DATE,
+                HORA_FECHAMENTO TIME,
+                VALOR_ABERTURA DECIMAL(15,2) DEFAULT 0 NOT NULL,
+                VALOR_FECHAMENTO DECIMAL(15,2),
+                ESTACAO VARCHAR(20) NOT NULL,
+                ID_USUARIO INTEGER NOT NULL,
+                USUARIO VARCHAR(50) NOT NULL,
+                STATUS CHAR(1) DEFAULT 'A' NOT NULL,
+                OBSERVACAO_ABERTURA VARCHAR(200),
+                OBSERVACAO_FECHAMENTO VARCHAR(200)
+            )
+            """
+            execute_query(query_create_controle)
+            print("Tabela CAIXA_CONTROLE criada com sucesso.")
+            
+            # Criar gerador de IDs para CAIXA_CONTROLE
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CAIXA_CONTROLE_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs para CAIXA_CONTROLE criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                pass
+            
+            # Criar trigger para CAIXA_CONTROLE
+            try:
+                query_trigger = """
+                CREATE TRIGGER CAIXA_CONTROLE_BI FOR CAIXA_CONTROLE
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_CAIXA_CONTROLE_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger para CAIXA_CONTROLE criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                pass
+            
+            # Criar tabela CAIXA_MOVIMENTOS
+            query_create_movimentos = """
+            CREATE TABLE CAIXA_MOVIMENTOS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                ID_CAIXA INTEGER NOT NULL,
+                TIPO CHAR(1) NOT NULL,
+                DATA DATE NOT NULL,
+                HORA TIME NOT NULL,
+                VALOR DECIMAL(15,2) NOT NULL,
+                MOTIVO VARCHAR(50) NOT NULL,
+                ID_USUARIO INTEGER NOT NULL,
+                USUARIO VARCHAR(50) NOT NULL,
+                OBSERVACAO VARCHAR(200)
+            )
+            """
+            execute_query(query_create_movimentos)
+            print("Tabela CAIXA_MOVIMENTOS criada com sucesso.")
+            
+            # Criar gerador de IDs para CAIXA_MOVIMENTOS
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CAIXA_MOVIMENTOS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs para CAIXA_MOVIMENTOS criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                pass
+            
+            # Criar trigger para CAIXA_MOVIMENTOS
+            try:
+                query_trigger = """
+                CREATE TRIGGER CAIXA_MOVIMENTOS_BI FOR CAIXA_MOVIMENTOS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_CAIXA_MOVIMENTOS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger para CAIXA_MOVIMENTOS criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                pass
+            
+            # Criar chave estrangeira para relacionar CAIXA_MOVIMENTOS com CAIXA_CONTROLE
+            try:
+                query_fk = """
+                ALTER TABLE CAIXA_MOVIMENTOS
+                ADD CONSTRAINT FK_CAIXA_MOVIMENTOS_CAIXA_CONTROLE
+                FOREIGN KEY (ID_CAIXA) REFERENCES CAIXA_CONTROLE(ID)
+                ON DELETE CASCADE
+                """
+                execute_query(query_fk)
+                print("Chave estrangeira para CAIXA_MOVIMENTOS criada com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Chave estrangeira pode já existir: {e}")
+                pass
+            
+            # Criar índices para melhorar a performance
+            try:
+                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_CODIGO ON CAIXA_CONTROLE (CODIGO)")
+                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_DATA_ABERTURA ON CAIXA_CONTROLE (DATA_ABERTURA)")
+                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_STATUS ON CAIXA_CONTROLE (STATUS)")
+                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_ID_CAIXA ON CAIXA_MOVIMENTOS (ID_CAIXA)")
+                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_DATA ON CAIXA_MOVIMENTOS (DATA)")
+                print("Índices criados com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Alguns índices podem já existir: {e}")
+                pass
+            
+            return True
+        else:
+            print("Tabelas do sistema de caixa já existem.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabelas de caixa: {e}")
+        raise Exception(f"Erro ao verificar/criar tabelas de caixa: {str(e)}")
+
+def abrir_caixa(codigo, data_abertura, hora_abertura, valor_abertura, estacao, observacao=None):
+    """
+    Registra a abertura de um caixa
+    
+    Args:
+        codigo (str): Código do caixa
+        data_abertura (str): Data de abertura no formato DD/MM/YYYY
+        hora_abertura (str): Hora de abertura no formato HH:MM
+        valor_abertura (float): Valor inicial do caixa
+        estacao (str): Nome da estação/terminal
+        observacao (str, optional): Observação opcional
+        
+    Returns:
+        int: ID do caixa aberto
+    """
+    try:
+        # Verificar se o usuário está logado
+        if not usuario_logado["id"]:
+            raise Exception("Nenhum usuário logado. Faça login antes de abrir o caixa.")
+        
+        # Verificar se já existe um caixa aberto com o mesmo código
+        query_check = """
+        SELECT ID FROM CAIXA_CONTROLE 
+        WHERE CODIGO = ? AND STATUS = 'A'
+        """
+        result = execute_query(query_check, (codigo,))
+        
+        if result and len(result) > 0:
+            raise Exception(f"Já existe um caixa aberto com o código {codigo}.")
+        
+        # Converter data para o formato do banco (YYYY-MM-DD)
+        data_parts = data_abertura.split('/')
+        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+        
+        # Inserir registro de abertura de caixa
+        query_insert = """
+        INSERT INTO CAIXA_CONTROLE (
+            CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+            ESTACAO, ID_USUARIO, USUARIO, STATUS, OBSERVACAO_ABERTURA
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A', ?)
+        """
+        execute_query(query_insert, (
+            codigo, data_iso, hora_abertura, valor_abertura,
+            estacao, usuario_logado["id"], usuario_logado["nome"], observacao
+        ))
+        
+        # Obter o ID do caixa recém-aberto
+        query_id = """
+        SELECT MAX(ID) FROM CAIXA_CONTROLE 
+        WHERE CODIGO = ? AND STATUS = 'A'
+        """
+        result = execute_query(query_id, (codigo,))
+        
+        if result and len(result) > 0 and result[0][0]:
+            caixa_id = result[0][0]
+            
+            # Registrar a entrada inicial como movimento
+            if valor_abertura > 0:
+                registrar_movimento(
+                    id_caixa=caixa_id,
+                    tipo='E',  # Entrada
+                    data=data_abertura,
+                    hora=hora_abertura,
+                    valor=valor_abertura,
+                    motivo="Abertura de Caixa",
+                    observacao=observacao
+                )
+            
+            return caixa_id
+        else:
+            raise Exception("Erro ao obter o ID do caixa aberto.")
+    except Exception as e:
+        print(f"Erro ao abrir caixa: {e}")
+        raise Exception(f"Erro ao abrir caixa: {str(e)}")
+
+def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, observacao=None):
+    """
+    Registra o fechamento de um caixa
+    
+    Args:
+        id_caixa (int): ID do caixa a ser fechado
+        data_fechamento (str): Data de fechamento no formato DD/MM/YYYY
+        hora_fechamento (str): Hora de fechamento no formato HH:MM
+        valor_fechamento (float): Valor final do caixa
+        observacao (str, optional): Observação opcional
+        
+    Returns:
+        bool: True se o caixa foi fechado com sucesso
+    """
+    try:
+        # Verificar se o usuário está logado
+        if not usuario_logado["id"]:
+            raise Exception("Nenhum usuário logado. Faça login antes de fechar o caixa.")
+        
+        # Verificar se o caixa existe e está aberto
+        query_check = """
+        SELECT ID, CODIGO, VALOR_ABERTURA FROM CAIXA_CONTROLE 
+        WHERE ID = ? AND STATUS = 'A'
+        """
+        result = execute_query(query_check, (id_caixa,))
+        
+        if not result or len(result) == 0:
+            raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
+        
+        codigo_caixa = result[0][1]
+        valor_abertura = float(result[0][2])  # Convertendo para float
+        
+        # Converter data para o formato do banco (YYYY-MM-DD)
+        data_parts = data_fechamento.split('/')
+        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+        
+        # Atualizar registro para fechar o caixa
+        query_update = """
+        UPDATE CAIXA_CONTROLE SET
+            DATA_FECHAMENTO = ?,
+            HORA_FECHAMENTO = ?,
+            VALOR_FECHAMENTO = ?,
+            STATUS = 'F',
+            OBSERVACAO_FECHAMENTO = ?
+        WHERE ID = ?
+        """
+        execute_query(query_update, (
+            data_iso, hora_fechamento, valor_fechamento,
+            observacao, id_caixa
+        ))
+        
+        # Registrar o fechamento como movimento (se houver diferença)
+        diferenca = valor_fechamento - valor_abertura
+        
+        if diferenca != 0:
+            tipo = 'E' if diferenca > 0 else 'S'  # Entrada ou Saída
+            valor_movimento = abs(diferenca)
+            motivo = "Fechamento de Caixa"
+            
+            registrar_movimento(
+                id_caixa=id_caixa,
+                tipo=tipo,
+                data=data_fechamento,
+                hora=hora_fechamento,
+                valor=valor_movimento,
+                motivo=motivo,
+                observacao=observacao
+            )
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao fechar caixa: {e}")
+        raise Exception(f"Erro ao fechar caixa: {str(e)}")
+
+
+def registrar_movimento(id_caixa, tipo, data, hora, valor, motivo, observacao=None):
+    """
+    Registra um movimento de entrada ou saída no caixa
+    
+    Args:
+        id_caixa (int): ID do caixa
+        tipo (str): Tipo de movimento (E=Entrada, S=Saída)
+        data (str): Data do movimento no formato DD/MM/YYYY
+        hora (str): Hora do movimento no formato HH:MM
+        valor (float): Valor do movimento
+        motivo (str): Motivo do movimento
+        observacao (str, optional): Observação opcional
+        
+    Returns:
+        int: ID do movimento registrado
+    """
+    try:
+        # Verificar se o usuário está logado
+        if not usuario_logado["id"]:
+            raise Exception("Nenhum usuário logado. Faça login antes de registrar movimentos.")
+        
+        # Verificar se o caixa existe e está aberto
+        query_check = """
+        SELECT ID FROM CAIXA_CONTROLE 
+        WHERE ID = ? AND STATUS = 'A'
+        """
+        result = execute_query(query_check, (id_caixa,))
+        
+        if not result or len(result) == 0:
+            raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
+        
+        # Converter data para o formato do banco (YYYY-MM-DD)
+        data_parts = data.split('/')
+        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+        
+        # Inserir registro de movimento
+        query_insert = """
+        INSERT INTO CAIXA_MOVIMENTOS (
+            ID_CAIXA, TIPO, DATA, HORA, VALOR, 
+            MOTIVO, ID_USUARIO, USUARIO, OBSERVACAO
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        execute_query(query_insert, (
+            id_caixa, tipo, data_iso, hora, valor,
+            motivo, usuario_logado["id"], usuario_logado["nome"], observacao
+        ))
+        
+        # Obter o ID do movimento recém-registrado
+        query_id = """
+        SELECT MAX(ID) FROM CAIXA_MOVIMENTOS 
+        WHERE ID_CAIXA = ?
+        """
+        result = execute_query(query_id, (id_caixa,))
+        
+        if result and len(result) > 0 and result[0][0]:
+            return result[0][0]
+        else:
+            raise Exception("Erro ao obter o ID do movimento registrado.")
+    except Exception as e:
+        print(f"Erro ao registrar movimento: {e}")
+        raise Exception(f"Erro ao registrar movimento: {str(e)}")
+
+def listar_caixas(data_inicial=None, data_final=None, status=None, codigo=None, estacao=None, usuario=None):
+    """
+    Lista os caixas registrados com base nos filtros informados
+    
+    Args:
+        data_inicial (str, optional): Data inicial no formato DD/MM/YYYY
+        data_final (str, optional): Data final no formato DD/MM/YYYY
+        status (str, optional): Status do caixa (A=Aberto, F=Fechado)
+        codigo (str, optional): Código do caixa
+        estacao (str, optional): Nome da estação
+        usuario (str, optional): Nome do usuário
+        
+    Returns:
+        list: Lista de caixas encontrados
+    """
+    try:
+        # Construir a query base
+        query = """
+        SELECT 
+            ID, CODIGO, 
+            DATA_ABERTURA, HORA_ABERTURA, 
+            DATA_FECHAMENTO, HORA_FECHAMENTO, 
+            VALOR_ABERTURA, VALOR_FECHAMENTO, 
+            ESTACAO, USUARIO, STATUS
+        FROM CAIXA_CONTROLE
+        WHERE 1=1
+        """
+        params = []
+        
+        # Adicionar filtros se informados
+        if data_inicial:
+            data_parts = data_inicial.split('/')
+            data_inicial_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+            query += " AND DATA_ABERTURA >= ?"
+            params.append(data_inicial_iso)
+        
+        if data_final:
+            data_parts = data_final.split('/')
+            data_final_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+            query += " AND DATA_ABERTURA <= ?"
+            params.append(data_final_iso)
+        
+        if status:
+            query += " AND STATUS = ?"
+            params.append(status)
+        
+        if codigo:
+            query += " AND CODIGO = ?"
+            params.append(codigo)
+        
+        if estacao:
+            query += " AND ESTACAO LIKE ?"
+            params.append(f"%{estacao}%")
+        
+        if usuario:
+            query += " AND USUARIO LIKE ?"
+            params.append(f"%{usuario}%")
+        
+        # Ordenar por data de abertura decrescente
+        query += " ORDER BY DATA_ABERTURA DESC, HORA_ABERTURA DESC"
+        
+        # Executar a query
+        result = execute_query(query, tuple(params) if params else None)
+        
+        # Formatar as datas para o formato DD/MM/YYYY
+        formatted_result = []
+        for row in result:
+            # Converter datas para o formato brasileiro
+            data_abertura = row[2]
+            if data_abertura:
+                data_abertura = f"{data_abertura.day:02d}/{data_abertura.month:02d}/{data_abertura.year}"
+            
+            data_fechamento = row[4]
+            if data_fechamento:
+                data_fechamento = f"{data_fechamento.day:02d}/{data_fechamento.month:02d}/{data_fechamento.year}"
+            
+            # Criar nova tupla com os dados formatados
+            formatted_row = (
+                row[0],  # ID
+                row[1],  # CODIGO
+                data_abertura,  # DATA_ABERTURA formatada
+                row[3],  # HORA_ABERTURA
+                data_fechamento,  # DATA_FECHAMENTO formatada
+                row[5],  # HORA_FECHAMENTO
+                row[6],  # VALOR_ABERTURA
+                row[7],  # VALOR_FECHAMENTO
+                row[8],  # ESTACAO
+                row[9],  # USUARIO
+                row[10]  # STATUS
+            )
+            formatted_result.append(formatted_row)
+        
+        return formatted_result
+    except Exception as e:
+        print(f"Erro ao listar caixas: {e}")
+        raise Exception(f"Erro ao listar caixas: {str(e)}")
+
+def obter_caixa_por_id(id_caixa):
+    """
+    Obtém os dados de um caixa específico pelo ID
+    
+    Args:
+        id_caixa (int): ID do caixa
+        
+    Returns:
+        tuple: Dados do caixa ou None se não encontrado
+    """
+    try:
+        query = """
+        SELECT 
+            ID, CODIGO, 
+            DATA_ABERTURA, HORA_ABERTURA, 
+            DATA_FECHAMENTO, HORA_FECHAMENTO, 
+            VALOR_ABERTURA, VALOR_FECHAMENTO, 
+            ESTACAO, USUARIO, STATUS,
+            OBSERVACAO_ABERTURA, OBSERVACAO_FECHAMENTO
+        FROM CAIXA_CONTROLE
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_caixa,))
+        
+        if result and len(result) > 0:
+            row = result[0]
+            
+            # Converter datas para o formato brasileiro
+            data_abertura = row[2]
+            if data_abertura:
+                data_abertura = f"{data_abertura.day:02d}/{data_abertura.month:02d}/{data_abertura.year}"
+            
+            data_fechamento = row[4]
+            if data_fechamento:
+                data_fechamento = f"{data_fechamento.day:02d}/{data_fechamento.month:02d}/{data_fechamento.year}"
+            
+            # Criar nova tupla com os dados formatados
+            formatted_row = (
+                row[0],  # ID
+                row[1],  # CODIGO
+                data_abertura,  # DATA_ABERTURA formatada
+                row[3],  # HORA_ABERTURA
+                data_fechamento,  # DATA_FECHAMENTO formatada
+                row[5],  # HORA_FECHAMENTO
+                row[6],  # VALOR_ABERTURA
+                row[7],  # VALOR_FECHAMENTO
+                row[8],  # ESTACAO
+                row[9],  # USUARIO
+                row[10],  # STATUS
+                row[11],  # OBSERVACAO_ABERTURA
+                row[12]   # OBSERVACAO_FECHAMENTO
+            )
+            
+            return formatted_row
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao obter caixa: {e}")
+        raise Exception(f"Erro ao obter caixa: {str(e)}")
+
+def listar_movimentos_caixa(id_caixa):
+    """
+    Lista os movimentos de um caixa específico
+    
+    Args:
+        id_caixa (int): ID do caixa
+        
+    Returns:
+        list: Lista de movimentos do caixa
+    """
+    try:
+        query = """
+        SELECT 
+            ID, TIPO, DATA, HORA, VALOR, 
+            MOTIVO, USUARIO, OBSERVACAO
+        FROM CAIXA_MOVIMENTOS
+        WHERE ID_CAIXA = ?
+        ORDER BY DATA, HORA
+        """
+        result = execute_query(query, (id_caixa,))
+        
+        # Formatar as datas para o formato DD/MM/YYYY
+        formatted_result = []
+        for row in result:
+            # Converter data para o formato brasileiro
+            data = row[2]
+            if data:
+                data = f"{data.day:02d}/{data.month:02d}/{data.year}"
+            
+            # Criar nova tupla com os dados formatados
+            formatted_row = (
+                row[0],  # ID
+                row[1],  # TIPO
+                data,    # DATA formatada
+                row[3],  # HORA
+                row[4],  # VALOR
+                row[5],  # MOTIVO
+                row[6],  # USUARIO
+                row[7]   # OBSERVACAO
+            )
+            formatted_result.append(formatted_row)
+        
+        return formatted_result
+    except Exception as e:
+        print(f"Erro ao listar movimentos: {e}")
+        raise Exception(f"Erro ao listar movimentos: {str(e)}")
+
+def obter_proximo_codigo_caixa():
+    """
+    Obtém o próximo código disponível para um novo caixa
+    
+    Returns:
+        str: Próximo código de caixa disponível (formato: 001, 002, etc.)
+    """
+    try:
+        query = """
+        SELECT MAX(CAST(CODIGO AS INTEGER)) FROM CAIXA_CONTROLE
+        """
+        result = execute_query(query)
+        
+        if result and len(result) > 0 and result[0][0] is not None:
+            proximo_codigo = int(result[0][0]) + 1
+        else:
+            proximo_codigo = 1
+        
+        # Formatar com zeros à esquerda (001, 002, etc.)
+        return f"{proximo_codigo:03d}"
+    except Exception as e:
+        print(f"Erro ao obter próximo código: {e}")
+        # Em caso de erro, retorna um código padrão
+        return "001"
+
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
     try:

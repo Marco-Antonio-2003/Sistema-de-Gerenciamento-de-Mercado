@@ -3,36 +3,20 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
                              QMessageBox, QStyle, QComboBox, QDateEdit, QDialog,
-                             QRadioButton, QButtonGroup)
+                             QRadioButton, QButtonGroup, QDoubleSpinBox, QTimeEdit)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtCore import Qt, QDate, QTime
 import os
 import importlib.util
+import datetime
 
-# Função para importar a classe AbrirCaixa de forma dinâmica
-def importar_abrir_caixa():
-    try:
-        # Tente importar normalmente
-        from abrir_caixa import AbrirCaixa
-        return AbrirCaixa
-    except ImportError:
-        try:
-            # Se falhar, importe dinamicamente do arquivo no mesmo diretório
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            module_path = os.path.join(current_dir, 'abrir_caixa.py')
-            
-            if not os.path.exists(module_path):
-                print(f"Arquivo 'abrir_caixa.py' não encontrado em: {current_dir}")
-                return None
-                
-            spec = importlib.util.spec_from_file_location("abrir_caixa", module_path)
-            abrir_caixa_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(abrir_caixa_module)
-            
-            return abrir_caixa_module.AbrirCaixa
-        except Exception as e:
-            print(f"Erro ao importar 'abrir_caixa.py': {e}")
-            return None
+# Importar funções do banco de dados
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "base"))
+try:
+    import base.banco
+except ImportError:
+    print("Erro ao importar o módulo banco.py")
+    sys.exit(1)
 
 class DialogoEscolhaOperacao(QDialog):
     """Diálogo para escolher entre entrada e saída"""
@@ -129,10 +113,501 @@ class DialogoEscolhaOperacao(QDialog):
             self.tipo_operacao = "Saída"
         self.accept()
 
+class AbrirCaixa(QDialog):
+    def __init__(self, codigo=None, tipo_operacao=None, parent=None):
+        super().__init__(parent)
+        self.codigo = codigo
+        self.tipo_operacao = tipo_operacao
+        self.initUI()
+        
+    def initUI(self):
+        # Configuração da janela
+        self.setWindowTitle(f"Operação de {self.tipo_operacao} - Caixa {self.codigo}")
+        self.setMinimumWidth(500)
+        self.setStyleSheet("background-color: #003353; color: white;")
+        
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+        
+        # Título
+        titulo = QLabel(f"Operação de {self.tipo_operacao}")
+        titulo.setFont(QFont("Arial", 18, QFont.Bold))
+        titulo.setStyleSheet("color: white; margin-bottom: 10px;")
+        titulo.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(titulo)
+        
+        # Informações do caixa
+        info_layout = QHBoxLayout()
+        
+        codigo_label = QLabel(f"Código do Caixa: {self.codigo}")
+        codigo_label.setFont(QFont("Arial", 12))
+        codigo_label.setStyleSheet("color: white;")
+        info_layout.addWidget(codigo_label)
+        
+        # Mostrar o usuário logado
+        usuario = base.banco.get_usuario_logado()
+        if usuario and usuario["nome"]:
+            usuario_label = QLabel(f"Usuário: {usuario['nome']}")
+            usuario_label.setFont(QFont("Arial", 12))
+            usuario_label.setStyleSheet("color: white;")
+            info_layout.addWidget(usuario_label)
+        
+        info_layout.addStretch(1)
+        
+        main_layout.addLayout(info_layout)
+        
+        # Linha separadora
+        separator = QLabel()
+        separator.setStyleSheet("background-color: #004465; min-height: 2px; margin: 10px 0px;")
+        main_layout.addWidget(separator)
+        
+        # Formulário
+        form_layout = QFormLayout()
+        form_layout.setVerticalSpacing(15)
+        form_layout.setHorizontalSpacing(20)
+        form_layout.setContentsMargins(10, 10, 10, 10)
+        form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        
+        # Estilo para labels
+        label_style = "color: white; font-size: 14px;"
+        
+        # Estilo para inputs
+        input_style = """
+            background-color: #fffff0;
+            border: 1px solid #cccccc;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 14px;
+            min-height: 25px;
+            color: black;
+        """
+        combo_style = input_style + """
+            QComboBox::drop-down {
+                border: 0px;
+            }
+            QComboBox::down-arrow {
+                image: url(dropdown.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+            }
+        """
+        
+        # Data e Hora
+        data_label = QLabel("Data:")
+        data_label.setStyleSheet(label_style)
+        self.data_edit = QDateEdit(QDate.currentDate())
+        self.data_edit.setCalendarPopup(True)
+        self.data_edit.setStyleSheet(input_style)
+        form_layout.addRow(data_label, self.data_edit)
+        
+        hora_label = QLabel("Hora:")
+        hora_label.setStyleSheet(label_style)
+        self.hora_edit = QTimeEdit(QTime.currentTime())
+        self.hora_edit.setStyleSheet(input_style)
+        form_layout.addRow(hora_label, self.hora_edit)
+        
+        # Estação/Terminal
+        estacao_label = QLabel("Estação:")
+        estacao_label.setStyleSheet(label_style)
+        self.estacao_combo = QComboBox()
+        self.estacao_combo.addItems([f"Caixa {i:02d}" for i in range(1, 11)])
+        self.estacao_combo.setStyleSheet(combo_style)
+        form_layout.addRow(estacao_label, self.estacao_combo)
+        
+        # Campos específicos para Entrada ou Saída
+        if self.tipo_operacao == "Entrada":
+            # Campos específicos para entrada
+            valor_label = QLabel("Valor de Entrada:")
+            valor_label.setStyleSheet(label_style)
+            self.valor_spin = QDoubleSpinBox()
+            self.valor_spin.setRange(0.00, 9999999.99)
+            self.valor_spin.setDecimals(2)
+            self.valor_spin.setSingleStep(10.00)
+            self.valor_spin.setPrefix("R$ ")
+            self.valor_spin.setValue(0.00)
+            self.valor_spin.setStyleSheet(input_style)
+            form_layout.addRow(valor_label, self.valor_spin)
+            
+            motivo_label = QLabel("Motivo da Entrada:")
+            motivo_label.setStyleSheet(label_style)
+            self.motivo_combo = QComboBox()
+            self.motivo_combo.addItems(["Abertura de Caixa", "Reforço", "Correção", "Outros"])
+            self.motivo_combo.setStyleSheet(combo_style)
+            form_layout.addRow(motivo_label, self.motivo_combo)
+            
+        else:  # Saída
+            # Campos específicos para saída
+            valor_label = QLabel("Valor de Saída:")
+            valor_label.setStyleSheet(label_style)
+            self.valor_spin = QDoubleSpinBox()
+            self.valor_spin.setRange(0.00, 9999999.99)
+            self.valor_spin.setDecimals(2)
+            self.valor_spin.setSingleStep(10.00)
+            self.valor_spin.setPrefix("R$ ")
+            self.valor_spin.setValue(0.00)
+            self.valor_spin.setStyleSheet(input_style)
+            form_layout.addRow(valor_label, self.valor_spin)
+            
+            motivo_label = QLabel("Motivo da Saída:")
+            motivo_label.setStyleSheet(label_style)
+            self.motivo_combo = QComboBox()
+            self.motivo_combo.addItems(["Sangria", "Fechamento", "Devolução", "Cancelamento", "Outros"])
+            self.motivo_combo.setStyleSheet(combo_style)
+            form_layout.addRow(motivo_label, self.motivo_combo)
+        
+        # Campo de observação (comum para ambos)
+        obs_label = QLabel("Observação:")
+        obs_label.setStyleSheet(label_style)
+        self.obs_edit = QLineEdit()
+        self.obs_edit.setStyleSheet(input_style)
+        self.obs_edit.setPlaceholderText("Digite uma observação (opcional)")
+        form_layout.addRow(obs_label, self.obs_edit)
+        
+        # Adicionar o formulário ao layout principal
+        main_layout.addLayout(form_layout)
+        
+        # Botões
+        btns_layout = QHBoxLayout()
+        
+        self.btn_cancelar = QPushButton("Cancelar")
+        self.btn_cancelar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                padding: 8px 15px;
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+            QPushButton:pressed {
+                background-color: #cccccc;
+            }
+        """)
+        self.btn_cancelar.clicked.connect(self.reject)
+        
+        self.btn_confirmar = QPushButton("Confirmar")
+        self.btn_confirmar.setStyleSheet("""
+            QPushButton {
+                background-color: #004465;
+                color: white;
+                padding: 8px 15px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #00354f;
+            }
+            QPushButton:pressed {
+                background-color: #0078d7;
+            }
+        """)
+        self.btn_confirmar.clicked.connect(self.confirmar_operacao)
+        
+        btns_layout.addStretch(1)
+        btns_layout.addWidget(self.btn_cancelar)
+        btns_layout.addWidget(self.btn_confirmar)
+        
+        main_layout.addLayout(btns_layout)
+    
+    def confirmar_operacao(self):
+        """Confirma a operação e salva os dados"""
+        try:
+            # Verificar se o usuário está logado
+            usuario = base.banco.get_usuario_logado()
+            if not usuario["id"]:
+                QMessageBox.warning(self, "Atenção", "Você precisa estar logado para abrir um caixa.")
+                return
+                
+            # Validação básica
+            if self.valor_spin.value() < 0:
+                QMessageBox.warning(self, "Atenção", "O valor não pode ser negativo!")
+                return
+            
+            # Obter os dados do formulário
+            data = self.data_edit.date().toString("dd/MM/yyyy")
+            hora = self.hora_edit.time().toString("hh:mm")
+            valor = self.valor_spin.value()
+            motivo = self.motivo_combo.currentText()
+            observacao = self.obs_edit.text()
+            estacao = self.estacao_combo.currentText()
+            
+            # Abrir o caixa no banco de dados
+            if self.tipo_operacao == "Entrada":
+                # Abrir o caixa
+                id_caixa = base.banco.abrir_caixa(
+                    codigo=self.codigo,
+                    data_abertura=data,
+                    hora_abertura=hora,
+                    valor_abertura=valor,
+                    estacao=estacao,
+                    observacao=observacao
+                )
+                
+                # Exibir mensagem de sucesso
+                QMessageBox.information(
+                    self,
+                    "Sucesso",
+                    f"Caixa {self.codigo} aberto com sucesso!\n"
+                    f"Data: {data} {hora}\n"
+                    f"Valor inicial: R$ {valor:.2f}"
+                )
+            else:
+                # Registrar movimento de saída (implementação futura)
+                QMessageBox.information(
+                    self,
+                    "Sucesso",
+                    f"Operação de {self.tipo_operacao} registrada com sucesso!\n"
+                    f"Data: {data} {hora}\n"
+                    f"Valor: R$ {valor:.2f}\n"
+                    f"Motivo: {motivo}"
+                )
+            
+            # Fechar o diálogo retornando Accepted
+            self.accept()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao processar operação: {str(e)}")
+
+class FecharCaixa(QDialog):
+    def __init__(self, id_caixa, codigo, parent=None):
+        super().__init__(parent)
+        self.id_caixa = id_caixa
+        self.codigo = codigo
+        self.dados_caixa = None
+        self.carregar_dados_caixa()
+        self.initUI()
+        
+    def carregar_dados_caixa(self):
+        """Carrega os dados do caixa a ser fechado"""
+        try:
+            self.dados_caixa = base.banco.obter_caixa_por_id(self.id_caixa)
+            if not self.dados_caixa:
+                raise Exception(f"Caixa com ID {self.id_caixa} não encontrado.")
+                
+            # Verificar se o caixa já está fechado
+            if self.dados_caixa[4]:  # data_fechamento
+                raise Exception(f"Caixa {self.codigo} já está fechado.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar dados do caixa: {str(e)}")
+            self.reject()
+        
+    def initUI(self):
+        # Configuração da janela
+        self.setWindowTitle(f"Fechamento de Caixa - Caixa {self.codigo}")
+        self.setMinimumWidth(500)
+        self.setStyleSheet("background-color: #003353; color: white;")
+        
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+        
+        # Título
+        titulo = QLabel("Fechamento de Caixa")
+        titulo.setFont(QFont("Arial", 18, QFont.Bold))
+        titulo.setStyleSheet("color: white; margin-bottom: 10px;")
+        titulo.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(titulo)
+        
+        # Informações do caixa
+        info_layout = QHBoxLayout()
+        
+        codigo_label = QLabel(f"Código do Caixa: {self.codigo}")
+        codigo_label.setFont(QFont("Arial", 12))
+        codigo_label.setStyleSheet("color: white;")
+        info_layout.addWidget(codigo_label)
+        
+        info_layout.addStretch(1)
+        
+        main_layout.addLayout(info_layout)
+        
+        # Linha separadora
+        separator = QLabel()
+        separator.setStyleSheet("background-color: #004465; min-height: 2px; margin: 10px 0px;")
+        main_layout.addWidget(separator)
+        
+        # Formulário
+        form_layout = QFormLayout()
+        form_layout.setVerticalSpacing(15)
+        form_layout.setHorizontalSpacing(20)
+        form_layout.setContentsMargins(10, 10, 10, 10)
+        form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        
+        # Estilo para labels
+        label_style = "color: white; font-size: 14px;"
+        
+        # Estilo para inputs
+        input_style = """
+            background-color: #fffff0;
+            border: 1px solid #cccccc;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 14px;
+            min-height: 25px;
+            color: black;
+        """
+        
+        # Informações da abertura (somente leitura)
+        if self.dados_caixa:
+            abertura_label = QLabel("Abertura:")
+            abertura_label.setStyleSheet(label_style)
+            abertura_valor = QLabel(f"{self.dados_caixa[2]} {self.dados_caixa[3]}")
+            abertura_valor.setStyleSheet("color: #fffff0; font-size: 14px;")
+            form_layout.addRow(abertura_label, abertura_valor)
+            
+            valor_abertura_label = QLabel("Valor de Abertura:")
+            valor_abertura_label.setStyleSheet(label_style)
+            valor_abertura_valor = QLabel(f"R$ {self.dados_caixa[6]:.2f}")
+            valor_abertura_valor.setStyleSheet("color: #fffff0; font-size: 14px;")
+            form_layout.addRow(valor_abertura_label, valor_abertura_valor)
+        
+        # Data e Hora de Fechamento
+        data_label = QLabel("Data de Fechamento:")
+        data_label.setStyleSheet(label_style)
+        self.data_edit = QDateEdit(QDate.currentDate())
+        self.data_edit.setCalendarPopup(True)
+        self.data_edit.setStyleSheet(input_style)
+        form_layout.addRow(data_label, self.data_edit)
+        
+        hora_label = QLabel("Hora de Fechamento:")
+        hora_label.setStyleSheet(label_style)
+        self.hora_edit = QTimeEdit(QTime.currentTime())
+        self.hora_edit.setStyleSheet(input_style)
+        form_layout.addRow(hora_label, self.hora_edit)
+        
+        # Valor de Fechamento
+        valor_label = QLabel("Valor de Fechamento:")
+        valor_label.setStyleSheet(label_style)
+        self.valor_spin = QDoubleSpinBox()
+        self.valor_spin.setRange(0.00, 9999999.99)
+        self.valor_spin.setDecimals(2)
+        self.valor_spin.setSingleStep(10.00)
+        self.valor_spin.setPrefix("R$ ")
+        
+        # Definir o valor inicial como o valor de abertura (se disponível)
+        if self.dados_caixa and self.dados_caixa[6]:
+            self.valor_spin.setValue(float(self.dados_caixa[6]))
+        else:
+            self.valor_spin.setValue(0.00)
+            
+        self.valor_spin.setStyleSheet(input_style)
+        form_layout.addRow(valor_label, self.valor_spin)
+        
+        # Campo de observação
+        obs_label = QLabel("Observação:")
+        obs_label.setStyleSheet(label_style)
+        self.obs_edit = QLineEdit()
+        self.obs_edit.setStyleSheet(input_style)
+        self.obs_edit.setPlaceholderText("Digite uma observação (opcional)")
+        form_layout.addRow(obs_label, self.obs_edit)
+        
+        # Adicionar o formulário ao layout principal
+        main_layout.addLayout(form_layout)
+        
+        # Botões
+        btns_layout = QHBoxLayout()
+        
+        self.btn_cancelar = QPushButton("Cancelar")
+        self.btn_cancelar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                padding: 8px 15px;
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+            QPushButton:pressed {
+                background-color: #cccccc;
+            }
+        """)
+        self.btn_cancelar.clicked.connect(self.reject)
+        
+        self.btn_confirmar = QPushButton("Confirmar")
+        self.btn_confirmar.setStyleSheet("""
+            QPushButton {
+                background-color: #004465;
+                color: white;
+                padding: 8px 15px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #00354f;
+            }
+            QPushButton:pressed {
+                background-color: #0078d7;
+            }
+        """)
+        self.btn_confirmar.clicked.connect(self.confirmar_fechamento)
+        
+        btns_layout.addStretch(1)
+        btns_layout.addWidget(self.btn_cancelar)
+        btns_layout.addWidget(self.btn_confirmar)
+        
+        main_layout.addLayout(btns_layout)
+    
+    def confirmar_fechamento(self):
+        """Confirma o fechamento do caixa e salva os dados"""
+        try:
+            # Validação básica
+            if self.valor_spin.value() < 0:
+                QMessageBox.warning(self, "Atenção", "O valor não pode ser negativo!")
+                return
+            
+            # Obter os dados do formulário
+            data = self.data_edit.date().toString("dd/MM/yyyy")
+            hora = self.hora_edit.time().toString("hh:mm")
+            valor = self.valor_spin.value()
+            observacao = self.obs_edit.text()
+            
+            # Fechar o caixa no banco de dados
+            base.banco.fechar_caixa(
+                id_caixa=self.id_caixa,
+                data_fechamento=data,
+                hora_fechamento=hora,
+                valor_fechamento=valor,
+                observacao=observacao
+            )
+            
+            # Exibir mensagem de sucesso
+            QMessageBox.information(
+                self,
+                "Sucesso",
+                f"Caixa {self.codigo} fechado com sucesso!\n"
+                f"Data: {data} {hora}\n"
+                f"Valor: R$ {valor:.2f}"
+            )
+            
+            # Fechar o diálogo retornando Accepted
+            self.accept()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao fechar caixa: {str(e)}")
+
 class ControleCaixaWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
+        self.carregar_dados_reais()
         
     def initUI(self):
         # Layout principal
@@ -142,28 +617,6 @@ class ControleCaixaWindow(QWidget):
         
         # Cabeçalho com botão voltar e título
         header_layout = QHBoxLayout()
-        
-        # # Botão Voltar com texto
-        # self.btn_voltar = QPushButton("Voltar")
-        # self.btn_voltar.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #004465;
-        #         color: white;
-        #         padding: 8px 15px;
-        #         border: none;
-        #         border-radius: 5px;
-        #         font-size: 14px;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #00354f;
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #0078d7;
-        #     }
-        # """)
-        # self.btn_voltar.setMinimumWidth(90)
-        # self.btn_voltar.clicked.connect(self.voltar)
-        # header_layout.addWidget(self.btn_voltar)
         
         # Título
         title_label = QLabel("Controle de Caixa")
@@ -392,6 +845,10 @@ class ControleCaixaWindow(QWidget):
         
         main_layout.addWidget(self.table)
         
+        # Layout para botões
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch(1)
+        
         # Botão Abrir
         self.btn_abrir = QPushButton("Abrir")
         self.btn_abrir.setStyleSheet("""
@@ -413,264 +870,188 @@ class ControleCaixaWindow(QWidget):
             }
         """)
         self.btn_abrir.clicked.connect(self.abrir_caixa)
-        
-        # Layout do botão centralizado
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch(1)
         btn_layout.addWidget(self.btn_abrir)
+        
+        # Botão Fechar
+        self.btn_fechar = QPushButton("Fechar")
+        self.btn_fechar.setStyleSheet("""
+            QPushButton {
+                background-color: #fffff0;
+                color: black;
+                padding: 10px 15px;
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+            }
+            QPushButton:pressed {
+                background-color: #0078d7;
+                color: white;
+            }
+        """)
+        self.btn_fechar.clicked.connect(self.fechar_caixa)
+        self.btn_fechar.setEnabled(False)  # Inicialmente desabilitado
+        btn_layout.addWidget(self.btn_fechar)
+
+        
         btn_layout.addStretch(1)
         
         main_layout.addLayout(btn_layout)
         
-        # Carregar dados de teste
-        self.carregar_dados_teste()
-        
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #003353; }")
         
-    def carregar_dados_teste(self):
-        # Dados de exemplo para demonstração
-        dados = [
-            ("001", "03/04/2025 08:15", "03/04/2025 18:30", "Caixa 01", "João Silva"),
-            ("002", "04/04/2025 09:00", "04/04/2025 17:45", "Caixa 02", "Maria Souza"),
-            ("003", "05/04/2025 08:30", "05/04/2025 18:00", "Caixa 01", "Carlos Santos"),
-            ("004", "06/04/2025 09:15", "06/04/2025 17:30", "Caixa 03", "Ana Oliveira"),
-            ("005", "07/04/2025 08:00", "", "Caixa 02", "Pedro Almeida")
-        ]
+        # Inicializar variáveis de controle
+        self.caixa_selecionado = None
         
-        self.table.setRowCount(len(dados))
-        
-        for row, (codigo, abertura, fechamento, estacao, usuario) in enumerate(dados):
-            self.table.setItem(row, 0, QTableWidgetItem(codigo))
-            self.table.setItem(row, 1, QTableWidgetItem(abertura))
-            self.table.setItem(row, 2, QTableWidgetItem(fechamento))
-            self.table.setItem(row, 3, QTableWidgetItem(estacao))
-            self.table.setItem(row, 4, QTableWidgetItem(usuario))
+    def carregar_dados_reais(self):
+        """Carrega dados reais do banco de dados"""
+        try:
+            # Verificar se as tabelas existem
+            base.banco.verificar_tabelas_caixa()
+            
+            # Obter a data atual formatada
+            data_atual = QDate.currentDate().toString("dd/MM/yyyy")
+            
+            # Carregar caixas do banco de dados
+            caixas = base.banco.listar_caixas()
+            
+            # Limpar a tabela
+            self.table.setRowCount(0)
+            
+            # Preencher a tabela com os dados
+            for row, caixa in enumerate(caixas):
+                self.table.insertRow(row)
+                
+                # Extrair dados do caixa
+                id_caixa = caixa[0]
+                codigo = caixa[1]
+                data_abertura = caixa[2]
+                hora_abertura = caixa[3]
+                data_fechamento = caixa[4]
+                hora_fechamento = caixa[5]
+                estacao = caixa[8]
+                usuario = caixa[9]
+                
+                # Formatar datas e horas
+                abertura = f"{data_abertura} {hora_abertura}" if data_abertura else ""
+                fechamento = f"{data_fechamento} {hora_fechamento}" if data_fechamento else ""
+                
+                # Adicionar dados à tabela
+                self.table.setItem(row, 0, QTableWidgetItem(codigo))
+                self.table.setItem(row, 1, QTableWidgetItem(abertura))
+                self.table.setItem(row, 2, QTableWidgetItem(fechamento))
+                self.table.setItem(row, 3, QTableWidgetItem(estacao))
+                self.table.setItem(row, 4, QTableWidgetItem(usuario))
+                
+                # Armazenar o ID do caixa como dado oculto
+                self.table.item(row, 0).setData(Qt.UserRole, id_caixa)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar dados: {str(e)}")
+    
+    def filtrar_por_ordem(self):
+        """Filtra os dados da tabela conforme a ordem selecionada"""
+        # Implementação futura: ordenar os dados conforme selecionado
+        pass
     
     def selecionar_linha(self, item):
-        # Aqui você pode implementar ações quando uma linha é selecionada
+        """Armazena o caixa selecionado quando uma linha é clicada"""
         row = item.row()
-        codigo = self.table.item(row, 0).text()
-        # Adicionar mais ações conforme necessário
+        self.caixa_selecionado = {
+            'id': self.table.item(row, 0).data(Qt.UserRole),
+            'codigo': self.table.item(row, 0).text(),
+            'abertura': self.table.item(row, 1).text(),
+            'fechamento': self.table.item(row, 2).text(),
+            'estacao': self.table.item(row, 3).text(),
+            'usuario': self.table.item(row, 4).text()
+        }
         
-    def voltar(self):
-        """Fecha a tela atual quando o botão voltar for clicado"""
-        # Obtém a janela principal e a fecha
-        self.window().close()
+        # Habilitar o botão Fechar apenas se o caixa estiver aberto (sem data de fechamento)
+        fechamento_texto = self.table.item(row, 2).text().strip()
+        self.btn_fechar.setEnabled(fechamento_texto == "")
+        
+        print(f"Caixa selecionado: {self.caixa_selecionado}")
+        print(f"Texto de fechamento: '{fechamento_texto}'")
+        print(f"Botão fechar habilitado: {self.btn_fechar.isEnabled()}")
+
     
     def abrir_caixa(self):
-        """Abre a janela de diálogo para escolher entre entrada e saída"""
-        row = self.table.currentRow()
-        if row >= 0:
-            codigo = self.table.item(row, 0).text()
+        """Abre um novo caixa"""
+        try:
+            # Verificar se o usuário está logado
+            usuario = base.banco.get_usuario_logado()
+            if not usuario["id"]:
+                QMessageBox.warning(self, "Atenção", "Você precisa estar logado para abrir um caixa.")
+                return
             
-            # Criar e exibir o diálogo para escolher a operação
-            dialogo = DialogoEscolhaOperacao(self)
+            # Obter o próximo código de caixa disponível
+            codigo = base.banco.obter_proximo_codigo_caixa()
             
+            # Criar e exibir o diálogo de abertura de caixa
+            dialogo = AbrirCaixa(codigo=codigo, tipo_operacao="Entrada", parent=self)
             if dialogo.exec_() == QDialog.Accepted:
-                tipo_operacao = dialogo.tipo_operacao
-                
-                # Dependendo da escolha, abrir a tela apropriada
-                try:
-                    # Importar a classe AbrirCaixa dinamicamente
-                    AbrirCaixa = importar_abrir_caixa()
-                    
-                    if AbrirCaixa is None:
-                        # Se não conseguir importar, exibe mensagem de erro
-                        msg_box = QMessageBox(
-                            QMessageBox.Warning,
-                            "Arquivo não encontrado",
-                            f"O arquivo 'abrir_caixa.py' não foi encontrado. Operação: {tipo_operacao}, Código: {codigo}",
-                            QMessageBox.Ok,
-                            self
-                        )
-                        
-                        # Aplicar estilo com texto branco
-                        msg_box.setStyleSheet("""
-                            QMessageBox QLabel {
-                                color: white;
-                                font-weight: bold;
-                            }
-                        """)
-                        
-                        # Obter o botão OK e aplicar estilo diretamente nele
-                        ok_button = msg_box.button(QMessageBox.Ok)
-                        if ok_button:
-                            ok_button.setStyleSheet("""
-                                QPushButton {
-                                    color: white;
-                                    background-color: #004465;
-                                    border: none;
-                                    border-radius: 3px;
-                                    min-width: 80px;
-                                    min-height: 25px;
-                                    font-weight: bold;
-                                }
-                                QPushButton:hover {
-                                    background-color: #00354f;
-                                }
-                                QPushButton:pressed {
-                                    background-color: #0078d7;
-                                }
-                            """)
-                        
-                        msg_box.exec_()
-                        return
-                    
-                    # Cria uma instância da classe AbrirCaixa
-                    tela_caixa = AbrirCaixa(codigo=codigo, 
-                                          tipo_operacao=tipo_operacao,
-                                          parent=self)
-                    
-                    # Aqui você pode lidar com o retorno da tela
-                    if tela_caixa.exec_() == QDialog.Accepted:
-                        # Exibe mensagem de sucesso com texto branco
-                        msg_box = QMessageBox(
-                            QMessageBox.Information,
-                            "Sucesso", 
-                            f"Operação de {tipo_operacao} no caixa {codigo} realizada com sucesso!",
-                            QMessageBox.Ok,
-                            self
-                        )
-                        
-                        # Aplicar estilo com texto branco
-                        msg_box.setStyleSheet("""
-                            QMessageBox QLabel {
-                                color: white;
-                                font-weight: bold;
-                            }
-                        """)
-                        
-                        # Obter o botão OK e aplicar estilo diretamente nele
-                        ok_button = msg_box.button(QMessageBox.Ok)
-                        if ok_button:
-                            ok_button.setStyleSheet("""
-                                QPushButton {
-                                    color: white;
-                                    background-color: #004465;
-                                    border: none;
-                                    border-radius: 3px;
-                                    min-width: 80px;
-                                    min-height: 25px;
-                                    font-weight: bold;
-                                }
-                                QPushButton:hover {
-                                    background-color: #00354f;
-                                }
-                                QPushButton:pressed {
-                                    background-color: #0078d7;
-                                }
-                            """)
-                        
-                        msg_box.exec_()
-                
-                except Exception as e:
-                    # Se ocorrer qualquer erro, exibe uma mensagem
-                    msg_box = QMessageBox(
-                        QMessageBox.Warning,
-                        "Erro",
-                        f"Ocorreu um erro ao abrir o caixa: {str(e)}",
-                        QMessageBox.Ok,
-                        self
-                    )
-                    
-                    # Aplicar estilo com texto branco
-                    msg_box.setStyleSheet("""
-                        QMessageBox QLabel {
-                            color: white;
-                            font-weight: bold;
-                        }
-                    """)
-                    
-                    # Obter o botão OK e aplicar estilo diretamente nele
-                    ok_button = msg_box.button(QMessageBox.Ok)
-                    if ok_button:
-                        ok_button.setStyleSheet("""
-                            QPushButton {
-                                color: white;
-                                background-color: #004465;
-                                border: none;
-                                border-radius: 3px;
-                                min-width: 80px;
-                                min-height: 25px;
-                                font-weight: bold;
-                            }
-                            QPushButton:hover {
-                                background-color: #00354f;
-                            }
-                            QPushButton:pressed {
-                                background-color: #0078d7;
-                            }
-                        """)
-                    
-                    msg_box.exec_()
-        else:
-            # Se nenhuma linha estiver selecionada, exibe uma mensagem
-            msg_box = QMessageBox(
-                QMessageBox.Warning,
-                "Seleção necessária", 
-                "Por favor, selecione um caixa para abrir",
-                QMessageBox.Ok,
-                self
-            )
+                # Recarregar os dados após a abertura
+                self.carregar_dados_reais()
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao abrir caixa: {str(e)}")
+    
+    def fechar_caixa(self):
+        """Fecha o caixa selecionado"""
+        try:
+            # Verificar se há um caixa selecionado
+            if not self.caixa_selecionado:
+                QMessageBox.warning(self, "Atenção", "Selecione um caixa para fechar.")
+                return
             
-            # Aplicar estilo com texto branco
-            msg_box.setStyleSheet("""
-                QMessageBox QLabel {
-                    color: white;
-                    font-weight: bold;
-                }
-            """)
+            # Verificar se o caixa já está fechado
+            if self.caixa_selecionado['fechamento']:
+                QMessageBox.warning(self, "Atenção", "Este caixa já está fechado.")
+                return
             
-            # Obter o botão OK e aplicar estilo diretamente nele
-            ok_button = msg_box.button(QMessageBox.Ok)
-            if ok_button:
-                ok_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 80px;
-                        min-height: 25px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
+            # Verificar se o usuário está logado
+            usuario = base.banco.get_usuario_logado()
+            if not usuario["id"]:
+                QMessageBox.warning(self, "Atenção", "Você precisa estar logado para fechar um caixa.")
+                return
             
-            msg_box.exec_()
+            # Obter dados do caixa selecionado
+            id_caixa = self.caixa_selecionado['id']
+            codigo = self.caixa_selecionado['codigo']
+            
+            # Criar e exibir o diálogo de fechamento de caixa
+            dialogo = FecharCaixa(id_caixa=id_caixa, codigo=codigo, parent=self)
+            if dialogo.exec_() == QDialog.Accepted:
+                # Recarregar os dados após o fechamento
+                self.carregar_dados_reais()
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao fechar caixa: {str(e)}")
 
-    def filtrar_por_ordem(self):
-        """Filtra os dados da tabela com base na seleção de ordem"""
-        criterio = self.codigo_combo.currentText()
-        # Aqui você implementaria a lógica real de ordenação/filtro
-        # Exemplo simples para demonstração:
-        if criterio == "Código":
-            self.table.sortItems(0)  # Ordena pela coluna 0 (Código)
-        elif criterio == "Data de Abertura":
-            self.table.sortItems(1)  # Ordena pela coluna 1 (Abertura)
-        elif criterio == "Data de Fechamento":
-            self.table.sortItems(2)  # Ordena pela coluna 2 (Fechamento)
-        elif criterio == "Estação":
-            self.table.sortItems(3)  # Ordena pela coluna 3 (Estação)
-        elif criterio == "Usuário (A-Z)":
-            self.table.sortItems(4)  # Ordena pela coluna 4 (Usuário)
-
-# Para testar a tela individualmente
+# Para teste individual
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Controle de Caixa")
-    window.setGeometry(100, 100, 1000, 650)
-    window.setStyleSheet("QMainWindow, QWidget { background-color: #003353; }")
+    app.setStyle('Fusion')  # Estilo mais moderno
     
-    controle_caixa = ControleCaixaWindow()
-    window.setCentralWidget(controle_caixa)
+    # Simular login para teste
+    base.banco.usuario_logado = {
+        "id": 1,
+        "nome": "Usuário de Teste",
+        "empresa": "Empresa Teste"
+    }
+    
+    # Criar e exibir a janela
+    window = QMainWindow()
+    window.setWindowTitle("Controle de caixa (PDV)")
+    window.setGeometry(100, 100, 800, 600)
+    
+    caixa_widget = ControleCaixaWindow(window)
+    window.setCentralWidget(caixa_widget)
     
     window.show()
+    
     sys.exit(app.exec_())
