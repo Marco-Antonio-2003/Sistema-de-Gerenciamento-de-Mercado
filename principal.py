@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox)
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl
+from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer
 from PyQt5.QtGui import QDesktopServices
 
 
@@ -63,7 +63,13 @@ class MainWindow(QMainWindow):
         self.usuario = usuario if usuario else "Usuário"
         self.empresa = empresa if empresa else "Empresa"
         self.opened_windows = []
+        self.contadores_labels = {}  # Armazenar referências aos labels de contagem
         self.initUI()
+        
+        # Configurar timer para atualizar contadores a cada 30 segundos
+        self.timer_atualizacao = QTimer(self)
+        self.timer_atualizacao.timeout.connect(self.atualizar_contadores)
+        self.timer_atualizacao.start(30000)  # 30 segundos
         
         # Definir janela para maximizada (não tela cheia)
         self.showMaximized()
@@ -374,7 +380,56 @@ class MainWindow(QMainWindow):
         box_layout.addWidget(label_contagem)
         
         layout_pai.addWidget(box_frame)
+        
+        # Armazenar referência ao label para atualização posterior
+        self.contadores_labels[titulo] = label_contagem
+        
         return label_contagem
+
+    def forcar_atualizacao_contadores(self):
+        """Força a atualização imediata dos contadores na tela principal"""
+        # Chamar a função de atualização de contadores
+        self.atualizar_contadores()
+
+    def atualizar_contadores(self):
+        """Atualiza os contadores de todas as caixas de informação"""
+        try:
+            # Atualizar contador de clientes
+            if "Clientes" in self.contadores_labels:
+                novo_valor = self.obter_contagem_pessoas()
+                self.atualizar_contador_com_animacao(self.contadores_labels["Clientes"], novo_valor)
+                
+            # Atualizar contador de produtos
+            if "Produtos" in self.contadores_labels:
+                novo_valor = self.obter_contagem_produtos()
+                self.atualizar_contador_com_animacao(self.contadores_labels["Produtos"], novo_valor)
+                
+            # Atualizar contador de vendas
+            if "Vendas" in self.contadores_labels:
+                novo_valor = self.obter_contagem_vendas()
+                self.atualizar_contador_com_animacao(self.contadores_labels["Vendas"], novo_valor)
+                
+            print("Contadores atualizados com sucesso!")
+        except Exception as e:
+            print(f"Erro ao atualizar contadores: {e}")
+
+    def atualizar_contador_com_animacao(self, label, novo_valor):
+        """Atualiza um contador com uma animação de destaque"""
+        # Verificar se o valor mudou
+        valor_atual = int(label.text()) if label.text().isdigit() else 0
+        
+        if valor_atual != novo_valor:
+            # Salvar o estilo original
+            estilo_original = label.styleSheet()
+            
+            # Aplicar estilo de destaque
+            label.setStyleSheet("color: #00E676; font-weight: bold;")
+            
+            # Atualizar o valor
+            label.setText(str(novo_valor))
+            
+            # Criar timer para restaurar o estilo original após 1 segundo
+            QTimer.singleShot(1000, lambda: label.setStyleSheet(estilo_original))
 
     def animar_botao(self, botao, fator_escala):
         """Anima o botão para aumentar/diminuir de tamanho"""
@@ -532,16 +587,48 @@ class MainWindow(QMainWindow):
                     
                     # Criar e exibir a janela
                     win = WindowClass()
+                    # Adicionar referência à janela principal
+                    if hasattr(win, 'set_janela_principal'):
+                        win.set_janela_principal(self)
                     win.setWindowTitle(action_title)
                     win.resize(900, 600)  # Definir tamanho da janela
                     win.show()
+                    
+                    # Conectar o sinal closeEvent para atualizar contadores quando a janela for fechada
+                    original_close_event = win.closeEvent
+                    
+                    def novo_close_event(event):
+                        # Chamar o closeEvent original
+                        if original_close_event:
+                            original_close_event(event)
+                        # Atualizar contadores
+                        self.atualizar_contadores()
+                    
+                    win.closeEvent = novo_close_event
+                    
                     self.opened_windows.append(win)
                     return
                 
                 # Criar e exibir a janela
                 win = WindowClass()
+                # Adicionar referência à janela principal
+                if hasattr(win, 'set_janela_principal'):
+                    win.set_janela_principal(self)
                 win.setWindowTitle(action_title)
                 win.show()
+                
+                # Conectar o sinal closeEvent para atualizar contadores quando a janela for fechada
+                original_close_event = win.closeEvent
+                
+                def novo_close_event(event):
+                    # Chamar o closeEvent original
+                    if original_close_event:
+                        original_close_event(event)
+                    # Atualizar contadores
+                    self.atualizar_contadores()
+                
+                win.closeEvent = novo_close_event
+                
                 self.opened_windows.append(win)
                 return
                 
@@ -600,8 +687,24 @@ class MainWindow(QMainWindow):
                 
             # Criar e exibir a janela
             win = WindowClass()
+            # Adicionar referência à janela principal
+            if hasattr(win, 'set_janela_principal'):
+                win.set_janela_principal(self)
             win.setWindowTitle(action_title)
             win.show()
+            
+            # Conectar o sinal closeEvent para atualizar contadores quando a janela for fechada
+            original_close_event = win.closeEvent
+            
+            def novo_close_event(event):
+                # Chamar o closeEvent original
+                if original_close_event:
+                    original_close_event(event)
+                # Atualizar contadores
+                self.atualizar_contadores()
+            
+            win.closeEvent = novo_close_event
+            
             self.opened_windows.append(win)
             
         except Exception as e:

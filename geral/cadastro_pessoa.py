@@ -1445,7 +1445,7 @@ class FormularioPessoa(QWidget):
                                 "Por favor, selecione uma pessoa para excluir", 
                                 QMessageBox.Warning)
             return
-            
+                
         # Confirmar exclusão
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Question)
@@ -1463,11 +1463,8 @@ class FormularioPessoa(QWidget):
             # Excluir a pessoa do banco
             excluir_pessoa(int(codigo))
             
-            # Limpar os campos
+            # Limpar apenas o campo código que existe nesta classe
             self.codigo_input.clear()
-            self.nome_input.clear()
-            self.documento_input.clear()
-            self.cidade_input.clear()
             
             # Recarregar a tabela
             self.carregar_pessoas()

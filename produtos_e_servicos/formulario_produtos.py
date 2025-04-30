@@ -492,6 +492,18 @@ class FormularioProdutos(QWidget):
         
         main_layout.addLayout(linha4)
         
+        #unidade_layout
+        unidade_layout = QHBoxLayout()
+        unidade_label = QLabel("Unidade de Medida:")
+        unidade_label.setStyleSheet(label_style)
+        unidade_layout.addWidget(unidade_label)
+        self.unidade_combo = QComboBox()
+        self.unidade_combo.setStyleSheet(combobox_style)
+        self.unidade_combo.addItems(["Selecione uma unidade", "Un", "Kg", "g", "L", "ml", "m", "cm", "Pç"])
+        unidade_layout.addWidget(self.unidade_combo)
+
+        linha4.addLayout(unidade_layout)
+
         # Botão Incluir
         self.btn_incluir = QPushButton("Incluir")
         self.btn_incluir.setStyleSheet("""
@@ -689,7 +701,7 @@ class FormularioProdutos(QWidget):
         codigo = self.codigo_input.text().strip()
         nome = self.nome_input.text().strip()
         grupo = self.grupo_combo.currentText() if self.grupo_combo.currentIndex() > 0 else ""
-        unidade = self.unidade_combo.currentText() if self.unidade_combo.currentIndex() > 0 else ""
+        # Remova a linha que causa o primeiro erro (unidade_combo)
         preco_venda = self.preco_venda_input.text().strip()
         barras = self.barras_input.text().strip()
         marca = self.marca_combo.currentText() if self.marca_combo.currentIndex() > 0 else ""
@@ -710,7 +722,7 @@ class FormularioProdutos(QWidget):
         except ValueError:
             self.mostrar_mensagem("Erro", "Formato de preço de venda inválido. Use apenas números e vírgula.")
             return
-            
+                
         preco_compra_float = 0.0
         try:
             preco_compra_float = float(preco_compra.replace(',', '.')) if preco_compra else 0.0
@@ -736,8 +748,9 @@ class FormularioProdutos(QWidget):
                         self.mostrar_mensagem("Sucesso", "Produto alterado com sucesso!")
                         
                         # Atualizar a tabela na tela principal
-                        if hasattr(self.parent_widget, 'carregar_produtos'):
-                            self.parent_widget.carregar_produtos()
+                        # Modificado para usar self.parent em vez de self.parent_widget
+                        if hasattr(self.parent, 'carregar_produtos'):
+                            self.parent.carregar_produtos()
                         
                         # Voltar para a tela anterior
                         self.voltar()
@@ -747,9 +760,6 @@ class FormularioProdutos(QWidget):
                     self.mostrar_mensagem("Erro", "Produto original não encontrado para atualização.")
             else:
                 # Modo de inclusão - criar novo produto no banco de dados
-                
-                # Não precisamos verificar se o código existe, pois agora é gerado automaticamente
-                # e é somente leitura, garantindo que será único
                 
                 # Inserir no banco de dados
                 resultado = criar_produto(
@@ -762,8 +772,9 @@ class FormularioProdutos(QWidget):
                     self.mostrar_mensagem("Sucesso", "Produto cadastrado com sucesso!")
                     
                     # Atualizar a tabela na tela principal
-                    if hasattr(self.parent_widget, 'carregar_produtos'):
-                        self.parent_widget.carregar_produtos()
+                    # Modificado para usar self.parent em vez de self.parent_widget
+                    if hasattr(self.parent, 'carregar_produtos'):
+                        self.parent.carregar_produtos()
                     
                     # Limpar os campos para novo cadastro
                     self.nome_input.clear()
@@ -772,7 +783,6 @@ class FormularioProdutos(QWidget):
                     self.preco_venda_input.clear()
                     self.preco_compra_input.clear()
                     self.grupo_combo.setCurrentIndex(0)
-                    self.unidade_combo.setCurrentIndex(0)
                     self.estoque_input.setValue(0)  # Limpar campo de estoque
                     
                     # Atualizar o código para o próximo disponível
