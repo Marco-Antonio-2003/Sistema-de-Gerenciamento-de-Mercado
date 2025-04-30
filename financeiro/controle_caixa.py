@@ -3,8 +3,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
                              QMessageBox, QStyle, QComboBox, QDateEdit, QDialog,
-                             QRadioButton, QButtonGroup, QDoubleSpinBox, QTimeEdit)
-from PyQt5.QtGui import QFont, QIcon, QPixmap
+                             QRadioButton, QButtonGroup, QDoubleSpinBox, QTimeEdit,
+                             QCalendarWidget) # Adicionar QCalendarWidget
+from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPalette # Adicionar QColor, QPalette
 from PyQt5.QtCore import Qt, QDate, QTime
 import os
 import importlib.util
@@ -188,12 +189,13 @@ class AbrirCaixa(QDialog):
                 border: 0px;
             }
             QComboBox::down-arrow {
-                image: url(dropdown.png);
+                image: url(ico-img/dropdown.png); /* Ícone padrão se houver */
                 width: 12px;
                 height: 12px;
             }
             QComboBox QAbstractItemView {
                 background-color: white;
+                color: black;
             }
         """
         
@@ -429,6 +431,14 @@ class FecharCaixa(QDialog):
         codigo_label.setStyleSheet("color: white;")
         info_layout.addWidget(codigo_label)
         
+        # Mostrar o usuário logado
+        usuario = base.banco.get_usuario_logado()
+        if usuario and usuario["nome"]:
+            usuario_label = QLabel(f"Usuário: {usuario['nome']}")
+            usuario_label.setFont(QFont("Arial", 12))
+            usuario_label.setStyleSheet("color: white;")
+            info_layout.addWidget(usuario_label)
+        
         info_layout.addStretch(1)
         
         main_layout.addLayout(info_layout)
@@ -662,30 +672,29 @@ class ControleCaixaWindow(QWidget):
                 font-size: 14px;
                 min-width: 150px;
                 min-height: 30px;
+                color: black; /* Cor do texto */
             }
             QComboBox::drop-down {
                 border: 0px;
             }
             QComboBox::down-arrow {
-                image: url(dropdown.png);
+                image: url(ico-img/dropdown.png); /* Ícone padrão */
                 width: 12px;
                 height: 12px;
             }
-            QComboBox QAbstractItemView {
+            QComboBox QAbstractItemView { /* Estilo da lista dropdown */
                 background-color: white;
+                color: black;
+                selection-background-color: #0078d7;
             }
             QComboBox QAbstractItemView::item {
                 min-height: 25px;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #0078d7;
-                color: white;
             }
             QComboBox:focus {
                 border: 2px solid #0078d7;
             }
         """)
-        self.codigo_combo.currentIndexChanged.connect(self.filtrar_por_ordem)
+        self.codigo_combo.currentIndexChanged.connect(self.filtrar_e_ordenar)
         ordem_layout.addWidget(self.codigo_combo)
         
         # Adicionar o layout da ordem ao layout de filtros
@@ -694,15 +703,14 @@ class ControleCaixaWindow(QWidget):
         # Espaçamento entre ordem e conta
         filtros_layout.addSpacing(20)
         
-        # Label Conta
-        conta_label = QLabel("Conta:")
-        conta_label.setFont(QFont("Arial", 14))
-        conta_label.setStyleSheet("color: white;")
-        filtros_layout.addWidget(conta_label)
+        usuario_label = QLabel("Usuario:")
+        usuario_label.setFont(QFont("Arial", 14))
+        usuario_label.setStyleSheet("color: white;")
+        filtros_layout.addWidget(usuario_label)
         
-        # Campo de texto para Conta
-        self.conta_input = QLineEdit()
-        self.conta_input.setStyleSheet("""
+        # Campo de texto para Usuario (antigo Conta)
+        self.usuario_input = QLineEdit()  # Renomeando a variável para consistência
+        self.usuario_input.setStyleSheet("""
             QLineEdit {
                 background-color: #fffff0;
                 border: 1px solid #cccccc;
@@ -710,13 +718,15 @@ class ControleCaixaWindow(QWidget):
                 padding: 5px;
                 font-size: 14px;
                 min-height: 30px;
+                color: black;
             }
             QLineEdit:focus {
                 border: 2px solid #0078d7;
             }
         """)
-        self.conta_input.setMinimumWidth(400)
-        filtros_layout.addWidget(self.conta_input, 1)  # 1 = stretch factor
+        self.usuario_input.setMinimumWidth(400)
+        self.usuario_input.textChanged.connect(self.filtrar_e_ordenar)  # Conectar o sinal de mudança de texto
+        filtros_layout.addWidget(self.usuario_input, 1)  # 1 = stretch factor
         
         # Adicionar layout de filtros ao layout principal
         main_layout.addLayout(filtros_layout)
@@ -732,10 +742,8 @@ class ControleCaixaWindow(QWidget):
         periodo_label.setAlignment(Qt.AlignCenter)
         periodo_layout.addWidget(periodo_label)
         
-        # DataEdit para data inicial
-        self.data_inicial = QDateEdit(QDate.currentDate())
-        self.data_inicial.setCalendarPopup(True)
-        self.data_inicial.setStyleSheet("""
+        # Correção do ícone no DateEdit para período de abertura
+        date_edit_style = """
             QDateEdit {
                 background-color: #fffff0;
                 border: 1px solid #cccccc;
@@ -744,18 +752,76 @@ class ControleCaixaWindow(QWidget):
                 font-size: 14px;
                 min-height: 30px;
                 min-width: 200px;
+                color: black;
             }
             QDateEdit::drop-down {
-                border: 0px;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: darkgray;
+                border-left-style: solid;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
             }
             QDateEdit::down-arrow {
-                width: 12px;
-                height: 12px;
+                /* Usar caractere unicode para o ícone do calendário */
+                image: none;
+                width: 16px;
+                height: 16px;
+                color: black;
+                font: 16px;
+                text-align: center;
             }
             QDateEdit:focus {
                 border: 2px solid #0078d7;
             }
-        """)
+            /* Estilo para o Calendário Popup */
+            QDateEdit QCalendarWidget QWidget#qt_calendar_navigationbar { 
+                background-color: #e0e0e0; 
+            }
+            QDateEdit QCalendarWidget QToolButton { 
+                color: black; 
+                background-color: #f0f0f0; 
+                border: none; 
+                margin: 5px; 
+                padding: 5px; 
+            }
+            QDateEdit QCalendarWidget QToolButton:hover { 
+                background-color: #d0d0d0; 
+            }
+            QDateEdit QCalendarWidget QMenu { 
+                background-color: white; 
+                color: black; 
+            }
+            QDateEdit QCalendarWidget QSpinBox { 
+                color: black; 
+                background-color: white; 
+                border: 1px solid #cccccc; 
+            }
+            QDateEdit QCalendarWidget QTableView { 
+                background-color: white; 
+                color: black; 
+                selection-background-color: #0078d7; 
+                selection-color: white; 
+            }
+            QDateEdit QCalendarWidget QWidget#qt_calendar_calendarview { 
+                background-color: white; 
+                alternate-background-color: #f9f9f9; 
+            }
+            QDateEdit QCalendarWidget QAbstractItemView:enabled { 
+                color: black; 
+            }
+            QDateEdit QCalendarWidget QAbstractItemView:disabled { 
+                color: #a0a0a0; 
+            }
+        """
+        
+        # DataEdit para data inicial
+        self.data_inicial = QDateEdit(QDate.currentDate())
+        self.data_inicial.setCalendarPopup(True)
+        self.data_inicial.setStyleSheet(date_edit_style)
+        self.data_inicial.dateChanged.connect(self.filtrar_e_ordenar)
         periodo_layout.addWidget(self.data_inicial)
         
         # Label Até
@@ -768,27 +834,8 @@ class ControleCaixaWindow(QWidget):
         # DataEdit para data final
         self.data_final = QDateEdit(QDate.currentDate())
         self.data_final.setCalendarPopup(True)
-        self.data_final.setStyleSheet("""
-            QDateEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 14px;
-                min-height: 30px;
-                min-width: 200px;
-            }
-            QDateEdit::drop-down {
-                border: 0px;
-            }
-            QDateEdit::down-arrow {
-                width: 12px;
-                height: 12px;
-            }
-            QDateEdit:focus {
-                border: 2px solid #0078d7;
-            }
-        """)
+        self.data_final.setStyleSheet(date_edit_style)
+        self.data_final.dateChanged.connect(self.filtrar_e_ordenar)
         periodo_layout.addWidget(self.data_final)
         
         # Espaço para alinhar com o campo de conta
@@ -808,6 +855,7 @@ class ControleCaixaWindow(QWidget):
                 font-size: 14px;
                 font-weight: bold;
                 border: 1px solid #cccccc;
+                color: black; /* Cor do texto do cabeçalho */
             }
         """)
         self.table.setStyleSheet("""
@@ -817,6 +865,7 @@ class ControleCaixaWindow(QWidget):
                 border: 1px solid #cccccc;
                 border-radius: 5px;
                 font-size: 14px;
+                color: black; /* Cor do texto da tabela */
             }
             QTableWidget::item {
                 padding: 6px;
@@ -906,6 +955,7 @@ class ControleCaixaWindow(QWidget):
         
         # Inicializar variáveis de controle
         self.caixa_selecionado = None
+        self.dados_originais = []  # Armazenar dados originais para filtragem
         
     def carregar_dados_reais(self):
         """Carrega dados reais do banco de dados"""
@@ -913,19 +963,12 @@ class ControleCaixaWindow(QWidget):
             # Verificar se as tabelas existem
             base.banco.verificar_tabelas_caixa()
             
-            # Obter a data atual formatada
-            data_atual = QDate.currentDate().toString("dd/MM/yyyy")
-            
             # Carregar caixas do banco de dados
             caixas = base.banco.listar_caixas()
             
-            # Limpar a tabela
-            self.table.setRowCount(0)
-            
-            # Preencher a tabela com os dados
-            for row, caixa in enumerate(caixas):
-                self.table.insertRow(row)
-                
+            # Armazenar dados originais para filtragem
+            self.dados_originais = []
+            for caixa in caixas:
                 # Extrair dados do caixa
                 id_caixa = caixa[0]
                 codigo = caixa[1]
@@ -940,43 +983,175 @@ class ControleCaixaWindow(QWidget):
                 abertura = f"{data_abertura} {hora_abertura}" if data_abertura else ""
                 fechamento = f"{data_fechamento} {hora_fechamento}" if data_fechamento else ""
                 
-                # Adicionar dados à tabela
-                self.table.setItem(row, 0, QTableWidgetItem(codigo))
-                self.table.setItem(row, 1, QTableWidgetItem(abertura))
-                self.table.setItem(row, 2, QTableWidgetItem(fechamento))
-                self.table.setItem(row, 3, QTableWidgetItem(estacao))
-                self.table.setItem(row, 4, QTableWidgetItem(usuario))
-                
-                # Armazenar o ID do caixa como dado oculto
-                self.table.item(row, 0).setData(Qt.UserRole, id_caixa)
+                # Armazenar dados originais para filtragem
+                self.dados_originais.append({
+                    'id': id_caixa,
+                    'codigo': codigo,
+                    'abertura': abertura,
+                    'data_abertura': data_abertura,
+                    'hora_abertura': hora_abertura,
+                    'fechamento': fechamento,
+                    'data_fechamento': data_fechamento,
+                    'hora_fechamento': hora_fechamento,
+                    'estacao': estacao,
+                    'usuario': usuario
+                })
+            
+            # Aplicar filtro e ordenação iniciais
+            self.filtrar_e_ordenar()
             
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar dados: {str(e)}")
     
-    def filtrar_por_ordem(self):
-        """Filtra os dados da tabela conforme a ordem selecionada"""
-        # Implementação futura: ordenar os dados conforme selecionado
-        pass
+    def filtrar_e_ordenar(self):
+        """Filtra os dados pelo período de data, termo de pesquisa e ordena conforme a seleção"""
+        try:
+            # --- Filtragem por Data --- 
+            data_inicial_str = self.data_inicial.date().toString("dd/MM/yyyy")
+            data_final_str = self.data_final.date().toString("dd/MM/yyyy")
+            
+            # Converter para objetos date para comparação (sem hora)
+            data_inicial_dt = datetime.datetime.strptime(data_inicial_str, "%d/%m/%Y").date()
+            data_final_dt = datetime.datetime.strptime(data_final_str, "%d/%m/%Y").date()
+            
+            # --- Filtragem por Usuário ---
+            termo_pesquisa = self.usuario_input.text().lower().strip()
+            
+            dados_filtrados = []
+            for item in self.dados_originais:
+                # Verificar se está dentro do período de data
+                if item['data_abertura']:
+                    try:
+                        data_abertura_dt = datetime.datetime.strptime(item['data_abertura'], "%d/%m/%Y").date()
+                        # Se não estiver no período, pular para o próximo item
+                        if not (data_inicial_dt <= data_abertura_dt <= data_final_dt):
+                            continue
+                    except ValueError:
+                        print(f"Aviso: Data de abertura inválida encontrada: {item['data_abertura']}")
+                        continue
+                else:
+                    # Se não tiver data de abertura, pular
+                    continue
+                
+                # Verificar se corresponde à pesquisa de usuário
+                if termo_pesquisa:
+                    # Verificar se o termo de pesquisa está presente no código, estação ou usuário
+                    if (termo_pesquisa in item['codigo'].lower() or 
+                        termo_pesquisa in item['usuario'].lower() or 
+                        termo_pesquisa in item['estacao'].lower()):
+                        dados_filtrados.append(item)
+                else:
+                    # Se não houver termo de pesquisa, incluir todos os itens que passaram no filtro de data
+                    dados_filtrados.append(item)
+            
+            # --- Ordenação --- 
+            ordem_selecionada = self.codigo_combo.currentText()
+            
+            # Função auxiliar para converter data/hora para ordenação
+            def converter_datetime_safe(data_str, hora_str, default_value):
+                if not data_str:
+                    return default_value
+                try:
+                    data_parts = data_str.split('/')
+                    hora_parts = hora_str.split(':') if hora_str else ['0', '0']
+                    # Garantir que as partes têm o tamanho esperado
+                    if len(data_parts) == 3 and len(hora_parts) >= 2:
+                        return datetime.datetime(
+                            int(data_parts[2]), int(data_parts[1]), int(data_parts[0]),
+                            int(hora_parts[0]), int(hora_parts[1])
+                        )
+                    else:
+                        # Tentar apenas com a data se a hora for inválida
+                        return datetime.datetime(
+                            int(data_parts[2]), int(data_parts[1]), int(data_parts[0])
+                        )
+                except (ValueError, IndexError, TypeError):
+                    print(f"Aviso: Falha ao converter data/hora: {data_str} {hora_str}")
+                    return default_value
+
+            # Ordenar conforme a seleção
+            if ordem_selecionada == "Código":
+                # Ordenar numericamente se possível, senão alfabeticamente
+                dados_filtrados.sort(key=lambda x: int(x['codigo']) if x['codigo'].isdigit() else float('inf'))
+            elif ordem_selecionada == "Data de Abertura":
+                dados_filtrados.sort(key=lambda x: converter_datetime_safe(x['data_abertura'], x['hora_abertura'], datetime.datetime.min))
+            elif ordem_selecionada == "Data de Fechamento":
+                # Coloca os não fechados por último (datetime.max)
+                dados_filtrados.sort(key=lambda x: converter_datetime_safe(x['data_fechamento'], x['hora_fechamento'], datetime.datetime.max))
+            elif ordem_selecionada == "Estação":
+                dados_filtrados.sort(key=lambda x: x['estacao'].lower() if x['estacao'] else '')
+            elif ordem_selecionada == "Usuário (A-Z)":
+                dados_filtrados.sort(key=lambda x: x['usuario'].lower() if x['usuario'] else '')
+            
+            # Atualizar a tabela com os dados filtrados e ordenados
+            self.atualizar_tabela_com_dados(dados_filtrados)
+            
+        except Exception as e:
+            print(f"Erro ao filtrar e ordenar: {e}")
+            import traceback
+            traceback.print_exc() # Imprimir traceback detalhado
+    
+    def atualizar_tabela_com_dados(self, dados):
+        """Atualiza a tabela com os dados fornecidos"""
+        # Desconectar temporariamente o sinal para evitar chamadas recursivas
+        try:
+            self.table.itemClicked.disconnect(self.selecionar_linha)
+        except TypeError:
+            pass # Já estava desconectado
+            
+        self.table.setRowCount(0) # Limpar tabela
+        self.table.clearContents()
+        
+        # Preencher a tabela com os dados filtrados/ordenados
+        for row, item in enumerate(dados):
+            self.table.insertRow(row)
+            
+            # Adicionar dados à tabela
+            self.table.setItem(row, 0, QTableWidgetItem(item['codigo']))
+            self.table.setItem(row, 1, QTableWidgetItem(item['abertura']))
+            self.table.setItem(row, 2, QTableWidgetItem(item['fechamento']))
+            self.table.setItem(row, 3, QTableWidgetItem(item['estacao']))
+            self.table.setItem(row, 4, QTableWidgetItem(item['usuario']))
+            
+            # Armazenar o ID do caixa como dado oculto
+            self.table.item(row, 0).setData(Qt.UserRole, item['id'])
+            
+        # Reconectar o sinal
+        self.table.itemClicked.connect(self.selecionar_linha)
+        # Limpar seleção e desabilitar botão fechar após recarregar
+        self.table.clearSelection()
+        self.caixa_selecionado = None
+        self.btn_fechar.setEnabled(False)
     
     def selecionar_linha(self, item):
         """Armazena o caixa selecionado quando uma linha é clicada"""
         row = item.row()
-        self.caixa_selecionado = {
-            'id': self.table.item(row, 0).data(Qt.UserRole),
-            'codigo': self.table.item(row, 0).text(),
-            'abertura': self.table.item(row, 1).text(),
-            'fechamento': self.table.item(row, 2).text(),
-            'estacao': self.table.item(row, 3).text(),
-            'usuario': self.table.item(row, 4).text()
-        }
-        
-        # Habilitar o botão Fechar apenas se o caixa estiver aberto (sem data de fechamento)
-        fechamento_texto = self.table.item(row, 2).text().strip()
-        self.btn_fechar.setEnabled(fechamento_texto == "")
-        
-        print(f"Caixa selecionado: {self.caixa_selecionado}")
-        print(f"Texto de fechamento: '{fechamento_texto}'")
-        print(f"Botão fechar habilitado: {self.btn_fechar.isEnabled()}")
+        # Certificar que a linha clicada ainda existe (após filtro/ordenação)
+        if row < self.table.rowCount():
+            try:
+                self.caixa_selecionado = {
+                    'id': self.table.item(row, 0).data(Qt.UserRole),
+                    'codigo': self.table.item(row, 0).text(),
+                    'abertura': self.table.item(row, 1).text(),
+                    'fechamento': self.table.item(row, 2).text(),
+                    'estacao': self.table.item(row, 3).text(),
+                    'usuario': self.table.item(row, 4).text()
+                }
+                
+                # Habilitar o botão Fechar apenas se o caixa estiver aberto (sem data de fechamento)
+                fechamento_texto = self.table.item(row, 2).text().strip()
+                self.btn_fechar.setEnabled(fechamento_texto == "")
+                
+                # print(f"Caixa selecionado: {self.caixa_selecionado}") # Debug
+                # print(f"Botão fechar habilitado: {self.btn_fechar.isEnabled()}") # Debug
+            except AttributeError:
+                 # Pode ocorrer se a linha for removida enquanto o clique é processado
+                 print("Aviso: Falha ao selecionar linha, item pode não existir mais.")
+                 self.caixa_selecionado = None
+                 self.btn_fechar.setEnabled(False)
+        else:
+            self.caixa_selecionado = None
+            self.btn_fechar.setEnabled(False)
 
     
     def abrir_caixa(self):
@@ -1038,16 +1213,25 @@ if __name__ == "__main__":
     app.setStyle('Fusion')  # Estilo mais moderno
     
     # Simular login para teste
-    base.banco.usuario_logado = {
-        "id": 1,
-        "nome": "Usuário de Teste",
-        "empresa": "Empresa Teste"
-    }
+    # Certifique-se que base.banco está acessível e configurado
+    try:
+        base.banco.usuario_logado = {
+            "id": 1,
+            "nome": "Usuário de Teste",
+            "empresa": "Empresa Teste"
+        }
+        # Tentar verificar tabelas para garantir que o banco está acessível
+        base.banco.verificar_tabelas_caixa()
+    except Exception as e_db:
+        print(f"Erro ao inicializar banco para teste: {e_db}")
+        # Você pode querer mostrar uma mensagem de erro aqui ou sair
+        # QMessageBox.critical(None, "Erro de Banco", f"Não foi possível conectar ou inicializar o banco: {e_db}")
+        # sys.exit(1)
     
     # Criar e exibir a janela
     window = QMainWindow()
-    window.setWindowTitle("Controle de caixa (PDV)")
-    window.setGeometry(100, 100, 800, 600)
+    window.setWindowTitle("Controle de caixa (PDV) - Corrigido")
+    window.setGeometry(100, 100, 900, 700) # Aumentar tamanho para melhor visualização
     
     caixa_widget = ControleCaixaWindow(window)
     window.setCentralWidget(caixa_widget)

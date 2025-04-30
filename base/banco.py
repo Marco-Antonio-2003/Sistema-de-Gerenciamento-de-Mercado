@@ -5731,6 +5731,317 @@ def obter_proximo_codigo_caixa():
         print(f"Erro ao obter próximo código: {e}")
         # Em caso de erro, retorna um código padrão
         return "001"
+    
+#Baco de relatorio de vendas
+# Funções para o sistema de relatório de vendas de produtos
+
+def verificar_tabela_vendas_produtos():
+    """
+    Verifica se as tabelas do sistema de vendas de produtos existem e as cria se não existirem
+    
+    Returns:
+        bool: True se as tabelas existem ou foram criadas com sucesso
+    """
+    try:
+        # Verificar se a tabela VENDAS_PRODUTOS existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'VENDAS_PRODUTOS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, criar as tabelas
+        if result[0][0] == 0:
+            print("Tabelas do sistema de vendas de produtos não encontradas. Criando...")
+            
+            # Criar tabela VENDAS_PRODUTOS
+            query_create = """
+            CREATE TABLE VENDAS_PRODUTOS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                DATA DATE NOT NULL,
+                CODIGO_PRODUTO VARCHAR(20) NOT NULL,
+                PRODUTO VARCHAR(100) NOT NULL,
+                CATEGORIA VARCHAR(50),
+                QUANTIDADE DECIMAL(15,3) NOT NULL,
+                VALOR_UNITARIO DECIMAL(15,2) NOT NULL,
+                VALOR_TOTAL DECIMAL(15,2) NOT NULL,
+                CLIENTE VARCHAR(100),
+                VENDEDOR VARCHAR(100)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela VENDAS_PRODUTOS criada com sucesso.")
+            
+            # Criar gerador de IDs para VENDAS_PRODUTOS
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_VENDAS_PRODUTOS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs para VENDAS_PRODUTOS criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                pass
+            
+            # Criar trigger para VENDAS_PRODUTOS
+            try:
+                query_trigger = """
+                CREATE TRIGGER VENDAS_PRODUTOS_BI FOR VENDAS_PRODUTOS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_VENDAS_PRODUTOS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger para VENDAS_PRODUTOS criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                pass
+            
+            # Criar índices para melhorar a performance
+            try:
+                execute_query("CREATE INDEX IDX_VENDAS_PRODUTOS_DATA ON VENDAS_PRODUTOS (DATA)")
+                execute_query("CREATE INDEX IDX_VENDAS_PRODUTOS_PRODUTO ON VENDAS_PRODUTOS (CODIGO_PRODUTO)")
+                execute_query("CREATE INDEX IDX_VENDAS_PRODUTOS_CATEGORIA ON VENDAS_PRODUTOS (CATEGORIA)")
+                print("Índices criados com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Alguns índices podem já existir: {e}")
+                pass
+            
+            # Inserir dados de exemplo
+            inserir_dados_exemplo_vendas()
+            
+            return True
+        else:
+            print("Tabelas do sistema de vendas de produtos já existem.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabelas de vendas de produtos: {e}")
+        raise Exception(f"Erro ao verificar/criar tabelas de vendas de produtos: {str(e)}")
+
+def inserir_dados_exemplo_vendas():
+    """
+    Insere dados de exemplo para o relatório de vendas de produtos
+    """
+    try:
+        # Verificar se já existem dados na tabela
+        query_check = "SELECT COUNT(*) FROM VENDAS_PRODUTOS"
+        result = execute_query(query_check)
+        
+        if result[0][0] > 0:
+            print("Tabela VENDAS_PRODUTOS já possui dados. Pulando inserção de exemplos.")
+            return
+        
+        # Buscar produtos existentes no banco
+        produtos = listar_produtos()
+        
+        if not produtos or len(produtos) == 0:
+            print("Nenhum produto encontrado para criar vendas exemplo.")
+            return
+        
+        # Gerar datas para os últimos 30 dias
+        import datetime
+        hoje = datetime.datetime.now().date()
+        datas = [(hoje - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(30)]
+        
+        # Inserir vendas aleatórias para os últimos 30 dias
+        import random
+        
+        for _ in range(50):  # Inserir 50 vendas aleatórias
+            # Escolher um produto aleatório
+            produto = random.choice(produtos)
+            codigo_produto = produto[1]  # Índice 1 é o código do produto
+            nome_produto = produto[2]    # Índice 2 é o nome do produto
+            grupo = produto[5] if len(produto) > 5 and produto[5] else 'Sem Categoria'
+            
+            # Escolher uma data aleatória
+            data = random.choice(datas)
+            
+            # Dados aleatórios de venda
+            quantidade = random.randint(1, 10)
+            valor_unitario = float(produto[7]) if len(produto) > 7 and produto[7] else random.uniform(10.0, 100.0)
+            valor_total = quantidade * valor_unitario
+            
+            # Clientes e vendedores fictícios
+            clientes = ["João Silva", "Maria Souza", "Pedro Oliveira", "Ana Santos", "Carla Lima"]
+            vendedores = ["Vendedor 1", "Vendedor 2", "Vendedor 3"]
+            
+            cliente = random.choice(clientes)
+            vendedor = random.choice(vendedores)
+            
+            # Inserir a venda
+            query_insert = """
+            INSERT INTO VENDAS_PRODUTOS (
+                DATA, CODIGO_PRODUTO, PRODUTO, CATEGORIA, QUANTIDADE,
+                VALOR_UNITARIO, VALOR_TOTAL, CLIENTE, VENDEDOR
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            execute_query(query_insert, (
+                data, codigo_produto, nome_produto, grupo, quantidade,
+                valor_unitario, valor_total, cliente, vendedor
+            ))
+        
+        print(f"Inseridos {50} registros de vendas de exemplo.")
+        return True
+        
+    except Exception as e:
+        print(f"Erro ao inserir dados de exemplo de vendas: {e}")
+        return False
+
+def registrar_venda_produto(data, codigo_produto, produto, categoria, quantidade, 
+                           valor_unitario, valor_total, cliente=None, vendedor=None):
+    """
+    Registra uma venda de produto
+    
+    Args:
+        data (str): Data da venda no formato YYYY-MM-DD
+        codigo_produto (str): Código do produto
+        produto (str): Nome do produto
+        categoria (str): Categoria/grupo do produto
+        quantidade (float): Quantidade vendida
+        valor_unitario (float): Valor unitário
+        valor_total (float): Valor total
+        cliente (str, optional): Nome do cliente
+        vendedor (str, optional): Nome do vendedor
+        
+    Returns:
+        int: ID da venda registrada
+    """
+    try:
+        # Inserir a venda
+        query = """
+        INSERT INTO VENDAS_PRODUTOS (
+            DATA, CODIGO_PRODUTO, PRODUTO, CATEGORIA, QUANTIDADE,
+            VALOR_UNITARIO, VALOR_TOTAL, CLIENTE, VENDEDOR
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        execute_query(query, (
+            data, codigo_produto, produto, categoria, quantidade,
+            valor_unitario, valor_total, cliente, vendedor
+        ))
+        
+        # Obter o ID da venda recém-registrada
+        query_id = "SELECT MAX(ID) FROM VENDAS_PRODUTOS"
+        result = execute_query(query_id)
+        
+        if result and len(result) > 0 and result[0][0]:
+            return result[0][0]
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao registrar venda: {e}")
+        raise Exception(f"Erro ao registrar venda: {str(e)}")
+
+def obter_vendas_por_periodo(data_inicial, data_final, categoria=None):
+    """
+    Obtém as vendas de produtos em um período
+    
+    Args:
+        data_inicial (str): Data inicial no formato YYYY-MM-DD
+        data_final (str): Data final no formato YYYY-MM-DD
+        categoria (str, optional): Categoria para filtrar
+        
+    Returns:
+        list: Lista de dicionários com os dados das vendas
+    """
+    try:
+        # Construir a query
+        query = """
+        SELECT 
+            PRODUTO, CATEGORIA, DATA, QUANTIDADE, VALOR_TOTAL
+        FROM VENDAS_PRODUTOS
+        WHERE DATA BETWEEN ? AND ?
+        """
+        
+        params = [data_inicial, data_final]
+        
+        # Adicionar filtro de categoria se fornecido
+        if categoria:
+            query += " AND CATEGORIA = ?"
+            params.append(categoria)
+        
+        # Ordenar por data e produto
+        query += " ORDER BY DATA, PRODUTO"
+        
+        # Executar a query
+        result = execute_query(query, tuple(params))
+        
+        # Converter para lista de dicionários
+        vendas = []
+        for row in result:
+            vendas.append({
+                "produto": row[0],
+                "categoria": row[1],
+                "data": row[2],
+                "quantidade": row[3],
+                "valor_total": row[4]
+            })
+        
+        return vendas
+    except Exception as e:
+        print(f"Erro ao obter vendas por período: {e}")
+        raise Exception(f"Erro ao obter vendas por período: {str(e)}")
+
+def obter_resumo_vendas_por_periodo(data_inicial, data_final, categoria=None):
+    """
+    Obtém um resumo das vendas agregadas por produto
+    
+    Args:
+        data_inicial (str): Data inicial no formato YYYY-MM-DD
+        data_final (str): Data final no formato YYYY-MM-DD
+        categoria (str, optional): Categoria para filtrar
+        
+    Returns:
+        list: Lista de dicionários com o resumo das vendas
+    """
+    try:
+        # Construir a query
+        query = """
+        SELECT 
+            PRODUTO, CATEGORIA, 
+            SUM(QUANTIDADE) as QUANTIDADE_TOTAL, 
+            SUM(VALOR_TOTAL) as VALOR_TOTAL,
+            COUNT(*) as NUM_VENDAS
+        FROM VENDAS_PRODUTOS
+        WHERE DATA BETWEEN ? AND ?
+        """
+        
+        params = [data_inicial, data_final]
+        
+        # Adicionar filtro de categoria se fornecido
+        if categoria:
+            query += " AND CATEGORIA = ?"
+            params.append(categoria)
+        
+        # Agrupar por produto e categoria
+        query += " GROUP BY PRODUTO, CATEGORIA"
+        
+        # Ordenar por quantidade total (decrescente)
+        query += " ORDER BY QUANTIDADE_TOTAL DESC"
+        
+        # Executar a query
+        result = execute_query(query, tuple(params))
+        
+        # Converter para lista de dicionários
+        resumo = []
+        for row in result:
+            resumo.append({
+                "produto": row[0],
+                "categoria": row[1],
+                "quantidade_total": row[2],
+                "valor_total": row[3],
+                "num_vendas": row[4]
+            })
+        
+        return resumo
+    except Exception as e:
+        print(f"Erro ao obter resumo de vendas: {e}")
+        raise Exception(f"Erro ao obter resumo de vendas: {str(e)}")
 
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
@@ -5746,7 +6057,8 @@ if __name__ == "__main__":
         verificar_tabela_fornecedores()
         verificar_tabela_tipos_fornecedores()
         verificar_tabela_pedidos_venda() 
-        verificar_tabela_recebimentos_clientes() 
+        verificar_tabela_recebimentos_clientes()
+        verificar_tabela_vendas_produtos()  # Adicione esta linha
         executar_correcoes()
 
         print("Banco de dados inicializado com sucesso!")
