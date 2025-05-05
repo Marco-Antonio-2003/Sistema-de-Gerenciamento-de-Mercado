@@ -1,5 +1,6 @@
-#configuração de impressora
 import sys
+import socket
+from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QMessageBox)
@@ -7,11 +8,15 @@ from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtPrintSupport import QPrinterInfo, QPrintDialog, QPrinter
 
+# Importar funções do banco de dados
+from base.banco import execute_query, get_usuario_logado
+
 
 class ConfiguracaoImpressoraWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
+        self.carregar_dados_do_banco()  # Carregar dados do banco ao iniciar
         
     def create_palette(self):
         """Cria uma paleta com cor de fundo azul escuro"""
@@ -174,6 +179,26 @@ class ConfiguracaoImpressoraWindow(QWidget):
         # Categoria atual
         self.categoria_atual = "Padrão"
     
+    def carregar_dados_do_banco(self):
+        """Carrega as configurações de impressoras do banco de dados"""
+        try:
+            # Para cada categoria, buscar a impressora configurada
+            for categoria in self.categorias:
+                query = """
+                SELECT IMPRESSORA FROM CONFIGURACAO_IMPRESSORAS
+                WHERE CATEGORIA = ?
+                """
+                result = execute_query(query, (categoria,))
+                
+                if result and len(result) > 0:
+                    self.impressoras[categoria] = result[0][0]
+            
+            # Atualizar o campo com a impressora da categoria atual
+            self.impressora_input.setText(self.impressoras[self.categoria_atual])
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao carregar dados do banco: {str(e)}")
+    
     def mudar_categoria(self):
         """Muda a categoria selecionada e carrega a configuração correspondente"""
         sender = self.sender()
@@ -237,12 +262,123 @@ class ConfiguracaoImpressoraWindow(QWidget):
             """)
             msg_box.exec_()
             return
+        
+        try:
+            # Salvar no banco de dados
+            impressora = self.impressora_input.text()
+            estacao = self.obter_estacao_atual()
             
-        # Exibir mensagem de sucesso
+            self.salvar_configuracao_impressora(self.categoria_atual, impressora, estacao)
+            
+            # Exibir mensagem de sucesso
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setWindowTitle("Configuração Salva")
+            msg_box.setText(f"Impressora para {self.categoria_atual} configurada com sucesso!")
+            msg_box.setStyleSheet("""
+                QMessageBox { 
+                    background-color: white;
+                }
+                QLabel { 
+                    color: black;
+                    background-color: white;
+                }
+                QPushButton {
+                    background-color: #043b57;
+                    color: white;
+                    border: none;
+                    padding: 5px 15px;
+                    border-radius: 2px;
+                }
+            """)
+            msg_box.exec_()
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao salvar configuração: {str(e)}")
+    
+    def salvar_configuracao_impressora(self, categoria, impressora, estacao=None):
+        """Salva a configuração de impressora no banco de dados"""
+        try:
+            # Verificar se já existe uma configuração para esta categoria
+            query_check = """
+            SELECT ID FROM CONFIGURACAO_IMPRESSORAS 
+            WHERE CATEGORIA = ?
+            """
+            result = execute_query(query_check, (categoria,))
+            
+            # Obter dados do usuário logado
+            data_atual = datetime.now().date()
+            id_usuario = None
+            nome_usuario = None
+            
+            # Se houver um usuário logado, usar seus dados
+            try:
+                usuario_logado = get_usuario_logado()
+                if usuario_logado and usuario_logado["id"]:
+                    id_usuario = usuario_logado["id"]
+                    nome_usuario = usuario_logado["nome"]
+            except:
+                pass
+            
+            # Se já existe, atualiza
+            if result and len(result) > 0:
+                id_config = result[0][0]
+                
+                query_update = """
+                UPDATE CONFIGURACAO_IMPRESSORAS
+                SET IMPRESSORA = ?, ESTACAO = ?, DATA_CONFIGURACAO = ?, ID_USUARIO = ?, USUARIO = ?
+                WHERE ID = ?
+                """
+                
+                execute_query(query_update, (
+                    impressora, estacao, data_atual, id_usuario, nome_usuario, id_config
+                ))
+            else:
+                # Gerar próximo ID manualmente
+                query_nextid = """
+                SELECT COALESCE(MAX(ID), 0) + 1 FROM CONFIGURACAO_IMPRESSORAS
+                """
+                next_id = execute_query(query_nextid)[0][0]
+                
+                # Se não existe, insere com ID explícito
+                query_insert = """
+                INSERT INTO CONFIGURACAO_IMPRESSORAS (
+                    ID, CATEGORIA, IMPRESSORA, ESTACAO, DATA_CONFIGURACAO, ID_USUARIO, USUARIO
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """
+                
+                execute_query(query_insert, (
+                    next_id, categoria, impressora, estacao, data_atual, id_usuario, nome_usuario
+                ))
+            
+            # Atualizar o dicionário local
+            self.impressoras[categoria] = impressora
+            
+            print(f"Configuração de impressora para {categoria} salva com sucesso!")
+            return True
+        except Exception as e:
+            print(f"Erro ao salvar configuração de impressora: {e}")
+            raise Exception(f"Erro ao salvar configuração de impressora: {str(e)}")
+    
+    def obter_estacao_atual(self):
+        """Obtém o nome da estação atual (computador)"""
+        try:
+            return socket.gethostname()
+        except Exception as e:
+            print(f"Erro ao obter nome da estação: {e}")
+            return "Estação Desconhecida"
+    
+    def mostrar_mensagem(self, titulo, texto):
+        """Exibe uma caixa de mensagem"""
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.setWindowTitle("Configuração Salva")
-        msg_box.setText(f"Impressora para {self.categoria_atual} configurada com sucesso!")
+        if "Atenção" in titulo:
+            msg_box.setIcon(QMessageBox.Warning)
+        elif "Erro" in titulo:
+            msg_box.setIcon(QMessageBox.Critical)
+        else:
+            msg_box.setIcon(QMessageBox.Information)
+        
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(texto)
         msg_box.setStyleSheet("""
             QMessageBox { 
                 background-color: white;
@@ -260,20 +396,87 @@ class ConfiguracaoImpressoraWindow(QWidget):
             }
         """)
         msg_box.exec_()
+
+
+# Função para verificar e criar a tabela no banco de dados
+def verificar_tabela_configuracao_impressoras():
+    """Verifica se a tabela CONFIGURACAO_IMPRESSORAS existe e a cria se não existir"""
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'CONFIGURACAO_IMPRESSORAS'
+        """
+        result = execute_query(query_check)
         
-        # Aqui você salvaria a configuração no banco de dados/arquivo
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela CONFIGURACAO_IMPRESSORAS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE CONFIGURACAO_IMPRESSORAS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CATEGORIA VARCHAR(50) NOT NULL,
+                IMPRESSORA VARCHAR(100) NOT NULL,
+                ESTACAO VARCHAR(50),
+                DATA_CONFIGURACAO DATE,
+                ID_USUARIO INTEGER,
+                USUARIO VARCHAR(50)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela CONFIGURACAO_IMPRESSORAS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CONFIG_IMPRESSORAS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+            
+            # Não vamos criar o trigger, vamos gerar o ID manualmente no código
+            
+            return True
+        else:
+            print("Tabela CONFIGURACAO_IMPRESSORAS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de configuração de impressoras: {str(e)}")
 
 
 # Para testar a aplicação
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Configuração de Impressoras")
-    window.setGeometry(100, 100, 800, 500)
-    window.setStyleSheet("background-color: #043b57;")
-    
-    configuracao_widget = ConfiguracaoImpressoraWindow()
-    window.setCentralWidget(configuracao_widget)
-    
-    window.show()
-    sys.exit(app.exec_())
+    try:
+        # Verificar e criar a tabela de impressoras se necessário
+        verificar_tabela_configuracao_impressoras()
+        
+        app = QApplication(sys.argv)
+        window = QMainWindow()
+        window.setWindowTitle("Configuração de Impressoras")
+        window.setGeometry(100, 100, 800, 500)
+        window.setStyleSheet("background-color: #043b57;")
+        
+        configuracao_widget = ConfiguracaoImpressoraWindow()
+        window.setCentralWidget(configuracao_widget)
+        
+        window.show()
+        sys.exit(app.exec_())
+    except Exception as e:
+        print(f"Erro ao iniciar aplicação: {e}")
+        
+        # Mostrar mensagem de erro em uma caixa de diálogo
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
+        
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText(f"Erro ao iniciar aplicação: {str(e)}")
+        msg.setWindowTitle("Erro")
+        msg.exec_()
+        
+        sys.exit(1)

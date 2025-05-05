@@ -16,8 +16,74 @@ import numpy as np
 
 # Importar funções do banco de dados
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from base.banco import (get_connection, execute_query, verificar_tabela_vendas_produtos,
-                        listar_produtos, listar_grupos, obter_vendas_por_periodo)
+from base.banco import (get_connection, execute_query, listar_produtos, listar_grupos)
+
+
+# Função para verificar e criar a tabela de vendas produtos se necessário
+def verificar_tabela_vendas_produtos():
+    """
+    Esta função foi removida, já que vamos usar diretamente a tabela VENDAS do PDV
+    """
+    pass
+
+
+# Função para obter vendas diretamente da tabela VENDAS do PDV
+def obter_vendas_por_periodo(data_inicial, data_final, categoria=None):
+    """
+    Obtém as vendas da tabela VENDAS do PDV pelo período selecionado
+    
+    Args:
+        data_inicial (str): Data inicial no formato yyyy-MM-dd
+        data_final (str): Data final no formato yyyy-MM-dd
+        categoria (str, optional): Filtrar por categoria. Default None (todas)
+        
+    Returns:
+        list: Lista de dicionários com os dados das vendas
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Construir a consulta SQL para buscar da tabela VENDAS
+        query = """
+        SELECT p.nome AS produto, g.nome AS categoria, v.data, 
+               vi.quantidade, (vi.quantidade * vi.valor_unitario) AS valor_total
+        FROM VENDAS v
+        JOIN venda_itens vi ON v.id = vi.venda_id
+        JOIN produtos p ON vi.produto_id = p.id
+        JOIN grupos g ON p.grupo_id = g.id
+        WHERE v.data BETWEEN ? AND ?
+        """
+        
+        params = [data_inicial, data_final]
+        
+        # Adicionar filtro por categoria se especificado
+        if categoria:
+            query += " AND g.nome = ?"
+            params.append(categoria)
+            
+        # Ordenar por data
+        query += " ORDER BY v.data DESC"
+        
+        cursor.execute(query, params)
+        
+        vendas = []
+        for row in cursor.fetchall():
+            venda = {
+                "produto": row[0],
+                "categoria": row[1],
+                "data": row[2],
+                "quantidade": row[3],
+                "valor_total": row[4]
+            }
+            vendas.append(venda)
+            
+        conn.close()
+        return vendas
+        
+    except Exception as e:
+        print(f"Erro ao obter vendas: {e}")
+        return []
 
 
 class GraficoVendas(FigureCanvas):
@@ -114,8 +180,8 @@ class RelatorioVendasWindow(QWidget):
         # Para garantir que a janela seja aberta com esse tamanho
         self.resize(900, 600)
         
-        # Verificar e criar a tabela de vendas se necessário
-        verificar_tabela_vendas_produtos()
+        # Não precisamos mais verificar a tabela de vendas_produtos
+        # já que vamos usar diretamente a tabela VENDAS do PDV
         
         self.initUI()
         
@@ -445,7 +511,7 @@ class RelatorioVendasWindow(QWidget):
             if categoria == "Todas as Categorias":
                 categoria = None
                 
-            # Buscar dados no banco
+            # Buscar dados no banco - agora usando a tabela VENDAS do PDV
             self.dados_filtrados = obter_vendas_por_periodo(data_inicial, data_final, categoria)
             
             # Limpar e preencher a tabela
@@ -463,7 +529,7 @@ class RelatorioVendasWindow(QWidget):
                 self.tabela.setItem(i, 0, QTableWidgetItem(venda["produto"]))
                 self.tabela.setItem(i, 1, QTableWidgetItem(venda["categoria"]))
                 
-                # Formatar data - CORREÇÃO AQUI
+                # Formatar data
                 data_formatada = venda["data"]
                 if isinstance(data_formatada, datetime.date):
                     # Converter objeto date para string no formato "dd/mm/yyyy"

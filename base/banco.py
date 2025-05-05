@@ -9,6 +9,16 @@ import fdb  # Módulo para conexão com Firebird
 from PyQt5.QtWidgets import QMessageBox
 
 # Função para encontrar o caminho do banco de dados
+
+# Função adicionada para resolver problemas de caminho no executável
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        # Executando como executable
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # Executando em desenvolvimento
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return base_dir
 def get_db_path():
     """
     Determina o caminho do banco de dados considerando diferentes ambientes
@@ -6043,6 +6053,819 @@ def obter_resumo_vendas_por_periodo(data_inicial, data_final, categoria=None):
         print(f"Erro ao obter resumo de vendas: {e}")
         raise Exception(f"Erro ao obter resumo de vendas: {str(e)}")
 
+#Conta Corrente
+# Add this function to your banco.py file
+
+def verificar_tabela_contas_correntes():
+    """
+    Verifica se a tabela CONTAS_CORRENTES existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'CONTAS_CORRENTES'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela CONTAS_CORRENTES não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE CONTAS_CORRENTES (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20) NOT NULL,
+                DESCRICAO VARCHAR(100) NOT NULL,
+                BANCO VARCHAR(20),
+                BANCO_DESCRICAO VARCHAR(100),
+                CAIXA_PDV CHAR(1) DEFAULT 'N',
+                AGENCIA VARCHAR(20),
+                CONTA VARCHAR(20),
+                SALDO DECIMAL(15,2) DEFAULT 0
+            )
+            """
+            execute_query(query_create)
+            print("Tabela CONTAS_CORRENTES criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CONTAS_CORRENTES_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER CONTAS_CORRENTES_BI FOR CONTAS_CORRENTES
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_CONTAS_CORRENTES_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Dados iniciais
+            dados_iniciais = [
+                ("001", "CARTEIRA", "1", "LOCAL", "S", "", "", 0.00),
+                ("002", "CAIXA", "1", "LOCAL", "S", "", "", 0.00)
+            ]
+            
+            for conta in dados_iniciais:
+                try:
+                    query_insert = """
+                    INSERT INTO CONTAS_CORRENTES 
+                    (CODIGO, DESCRICAO, BANCO, BANCO_DESCRICAO, CAIXA_PDV, AGENCIA, CONTA, SALDO) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """
+                    execute_query(query_insert, conta)
+                    print(f"Conta {conta[0]} - {conta[1]} inserida com sucesso.")
+                except Exception as e:
+                    print(f"Erro ao inserir conta {conta[0]}: {e}")
+            
+            return True
+        else:
+            print("Tabela CONTAS_CORRENTES já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de contas correntes: {str(e)}")
+
+def listar_contas_correntes():
+    """
+    Lista todas as contas correntes cadastradas
+    
+    Returns:
+        list: Lista de tuplas com dados das contas correntes
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, DESCRICAO, BANCO, BANCO_DESCRICAO, CAIXA_PDV
+        FROM CONTAS_CORRENTES
+        ORDER BY CODIGO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar contas correntes: {e}")
+        raise Exception(f"Erro ao listar contas correntes: {str(e)}")
+
+def buscar_conta_corrente_por_id(id_conta):
+    """
+    Busca uma conta corrente pelo ID
+    
+    Args:
+        id_conta (int): ID da conta corrente
+        
+    Returns:
+        tuple: Dados da conta corrente ou None se não encontrada
+    """
+    try:
+        query = """
+        SELECT * FROM CONTAS_CORRENTES
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_conta,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar conta corrente: {e}")
+        raise Exception(f"Erro ao buscar conta corrente: {str(e)}")
+
+def buscar_conta_corrente_por_codigo(codigo):
+    """
+    Busca uma conta corrente pelo código
+    
+    Args:
+        codigo (str): Código da conta corrente
+        
+    Returns:
+        tuple: Dados da conta corrente ou None se não encontrada
+    """
+    try:
+        query = """
+        SELECT * FROM CONTAS_CORRENTES
+        WHERE CODIGO = ?
+        """
+        result = execute_query(query, (codigo,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar conta corrente por código: {e}")
+        raise Exception(f"Erro ao buscar conta corrente por código: {str(e)}")
+
+def criar_conta_corrente(codigo, descricao, banco, banco_descricao, caixa_pdv="N", agencia="", conta="", saldo=0.00):
+    """
+    Cria uma nova conta corrente no banco de dados
+    
+    Args:
+        codigo (str): Código da conta corrente
+        descricao (str): Descrição da conta
+        banco (str): Código do banco
+        banco_descricao (str): Descrição do banco
+        caixa_pdv (str, optional): Se é caixa PDV (S/N)
+        agencia (str, optional): Número da agência
+        conta (str, optional): Número da conta
+        saldo (float, optional): Saldo inicial
+        
+    Returns:
+        int: ID da conta corrente criada
+    """
+    try:
+        # Verificar se já existe uma conta com o mesmo código
+        conta_existente = buscar_conta_corrente_por_codigo(codigo)
+        if conta_existente:
+            raise Exception(f"Já existe uma conta corrente cadastrada com o código {codigo}")
+        
+        # Garantir que todos os parâmetros não são None
+        codigo = str(codigo).strip() if codigo else ""
+        descricao = str(descricao).strip() if descricao else ""
+        banco = str(banco).strip() if banco else ""
+        banco_descricao = str(banco_descricao).strip() if banco_descricao else ""
+        caixa_pdv = "S" if caixa_pdv == True or caixa_pdv == "S" else "N"
+        agencia = str(agencia).strip() if agencia else ""
+        conta = str(conta).strip() if conta else ""
+        
+        # Converter saldo para float
+        try:
+            saldo_float = float(saldo)
+        except (ValueError, TypeError):
+            saldo_float = 0.00
+        
+        # Inserir a conta corrente
+        query = """
+        INSERT INTO CONTAS_CORRENTES (
+            CODIGO, DESCRICAO, BANCO, BANCO_DESCRICAO, CAIXA_PDV, AGENCIA, CONTA, SALDO
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        params = (
+            codigo, descricao, banco, banco_descricao, caixa_pdv, agencia, conta, saldo_float
+        )
+        
+        execute_query(query, params)
+        
+        # Retornar o ID da conta inserida
+        conta_inserida = buscar_conta_corrente_por_codigo(codigo)
+        if conta_inserida:
+            return conta_inserida[0]  # ID é o primeiro item da tupla
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao criar conta corrente: {e}")
+        raise Exception(f"Erro ao criar conta corrente: {str(e)}")
+
+def atualizar_conta_corrente(id_conta, codigo, descricao, banco, banco_descricao, caixa_pdv="N", agencia="", conta="", saldo=None):
+    """
+    Atualiza uma conta corrente existente
+    
+    Args:
+        id_conta (int): ID da conta corrente a ser atualizada
+        codigo (str): Código da conta corrente
+        descricao (str): Descrição da conta
+        banco (str): Código do banco
+        banco_descricao (str): Descrição do banco
+        caixa_pdv (str, optional): Se é caixa PDV (S/N)
+        agencia (str, optional): Número da agência
+        conta (str, optional): Número da conta
+        saldo (float, optional): Saldo da conta (passar None para não alterar)
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se a conta existe
+        conta_existente = buscar_conta_corrente_por_id(id_conta)
+        if not conta_existente:
+            raise Exception(f"Conta corrente com ID {id_conta} não encontrada")
+        
+        # Verificar se o código sendo alterado já está em uso
+        if codigo != conta_existente[1]:  # Comparar com o código atual (índice 1)
+            outra_conta = buscar_conta_corrente_por_codigo(codigo)
+            if outra_conta:
+                raise Exception(f"Já existe outra conta corrente com o código {codigo}")
+        
+        # Garantir que os parâmetros não são None
+        codigo = str(codigo).strip() if codigo else ""
+        descricao = str(descricao).strip() if descricao else ""
+        banco = str(banco).strip() if banco else ""
+        banco_descricao = str(banco_descricao).strip() if banco_descricao else ""
+        caixa_pdv = "S" if caixa_pdv == True or caixa_pdv == "S" else "N"
+        agencia = str(agencia).strip() if agencia else ""
+        conta = str(conta).strip() if conta else ""
+        
+        # Construir a query de atualização
+        campos = [
+            "CODIGO = ?",
+            "DESCRICAO = ?",
+            "BANCO = ?",
+            "BANCO_DESCRICAO = ?",
+            "CAIXA_PDV = ?",
+            "AGENCIA = ?",
+            "CONTA = ?"
+        ]
+        
+        params = [
+            codigo, descricao, banco, banco_descricao, caixa_pdv, agencia, conta
+        ]
+        
+        # Adicionar o saldo se for fornecido
+        if saldo is not None:
+            try:
+                saldo_float = float(saldo)
+                campos.append("SALDO = ?")
+                params.append(saldo_float)
+            except (ValueError, TypeError):
+                pass  # Ignorar se não for possível converter
+        
+        # Montar a query final
+        query = f"""
+        UPDATE CONTAS_CORRENTES SET
+            {", ".join(campos)}
+        WHERE ID = ?
+        """
+        
+        # Adicionar o ID nos parâmetros
+        params.append(id_conta)
+        
+        execute_query(query, tuple(params))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar conta corrente: {e}")
+        raise Exception(f"Erro ao atualizar conta corrente: {str(e)}")
+
+def excluir_conta_corrente(id_conta):
+    """
+    Exclui uma conta corrente do banco de dados
+    
+    Args:
+        id_conta (int): ID da conta corrente a ser excluída
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se a conta existe
+        conta = buscar_conta_corrente_por_id(id_conta)
+        if not conta:
+            raise Exception(f"Conta corrente com ID {id_conta} não encontrada")
+        
+        # Excluir a conta
+        query = """
+        DELETE FROM CONTAS_CORRENTES
+        WHERE ID = ?
+        """
+        execute_query(query, (id_conta,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir conta corrente: {e}")
+        raise Exception(f"Erro ao excluir conta corrente: {str(e)}")
+
+def filtrar_contas_correntes(codigo="", descricao=""):
+    """
+    Filtra as contas correntes com base nos critérios informados
+    
+    Args:
+        codigo (str, optional): Código da conta (filtro parcial)
+        descricao (str, optional): Descrição da conta (filtro parcial)
+        
+    Returns:
+        list: Lista de contas correntes filtradas
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, DESCRICAO, BANCO, BANCO_DESCRICAO, CAIXA_PDV
+        FROM CONTAS_CORRENTES
+        WHERE 1=1
+        """
+        
+        params = []
+        
+        if codigo:
+            query += " AND CODIGO LIKE ?"
+            params.append(f"%{codigo}%")
+        
+        if descricao:
+            query += " AND UPPER(DESCRICAO) LIKE UPPER(?)"
+            params.append(f"%{descricao}%")
+        
+        query += " ORDER BY CODIGO"
+        
+        return execute_query(query, tuple(params) if params else None)
+    except Exception as e:
+        print(f"Erro ao filtrar contas correntes: {e}")
+        raise Exception(f"Erro ao filtrar contas correntes: {str(e)}")
+
+#Classes Financeiras 
+def verificar_tabela_classes_financeiras():
+    """
+    Verifica se a tabela CLASSES_FINANCEIRAS existe e a cria se não existir
+    
+    Returns:
+        bool: True se a tabela existe ou foi criada com sucesso
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'CLASSES_FINANCEIRAS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela CLASSES_FINANCEIRAS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE CLASSES_FINANCEIRAS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CODIGO VARCHAR(20) NOT NULL,
+                DESCRICAO VARCHAR(100) NOT NULL,
+                UNIQUE (CODIGO)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela CLASSES_FINANCEIRAS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CLASSES_FINANCEIRAS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+                # Se o gerador já existir, ignoramos o erro
+                pass
+            
+            # Criar o trigger para autoincrementar o ID
+            try:
+                query_trigger = """
+                CREATE TRIGGER CLASSES_FINANCEIRAS_BI FOR CLASSES_FINANCEIRAS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.ID IS NULL) THEN
+                        NEW.ID = GEN_ID(GEN_CLASSES_FINANCEIRAS_ID, 1);
+                    END
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Trigger pode já existir: {e}")
+                # Se o trigger já existir, ignoramos o erro
+                pass
+            
+            # Inserir dados iniciais
+            dados_iniciais = [
+                ("001", "DESPESAS OPERACIONAIS"),
+                ("002", "DESPESAS ADMINISTRATIVAS"),
+                ("003", "RECEITAS"),
+                ("004", "INVESTIMENTOS")
+            ]
+            
+            for dado in dados_iniciais:
+                try:
+                    query_insert = """
+                    INSERT INTO CLASSES_FINANCEIRAS (CODIGO, DESCRICAO)
+                    VALUES (?, ?)
+                    """
+                    execute_query(query_insert, dado)
+                    print(f"Classe {dado[0]} inserida com sucesso.")
+                except Exception as e:
+                    print(f"Aviso: Erro ao inserir classe {dado[0]}: {e}")
+            
+            return True
+        else:
+            print("Tabela CLASSES_FINANCEIRAS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de classes financeiras: {str(e)}")
+
+def listar_classes_financeiras():
+    """
+    Lista todas as classes financeiras cadastradas
+    
+    Returns:
+        list: Lista de tuplas com dados das classes financeiras (ID, CODIGO, DESCRICAO)
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, DESCRICAO
+        FROM CLASSES_FINANCEIRAS
+        ORDER BY CODIGO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar classes financeiras: {e}")
+        raise Exception(f"Erro ao listar classes financeiras: {str(e)}")
+
+def criar_classe_financeira(codigo, descricao):
+    """
+    Cria uma nova classe financeira no banco de dados
+    
+    Args:
+        codigo (str): Código da classe financeira
+        descricao (str): Descrição da classe financeira
+        
+    Returns:
+        int: ID da classe financeira criada
+    """
+    try:
+        # Verificar se já existe uma classe com o mesmo código
+        query_check = """
+        SELECT ID FROM CLASSES_FINANCEIRAS 
+        WHERE CODIGO = ?
+        """
+        result = execute_query(query_check, (codigo,))
+        
+        if result and len(result) > 0:
+            raise Exception(f"Já existe uma classe financeira com o código {codigo}")
+        
+        # Inserir a classe financeira - o ID será gerado automaticamente pelo trigger
+        query_insert = """
+        INSERT INTO CLASSES_FINANCEIRAS (CODIGO, DESCRICAO)
+        VALUES (?, ?)
+        """
+        
+        execute_query(query_insert, (codigo, descricao))
+        
+        # Obter o ID da classe inserida
+        result = execute_query(query_check, (codigo,))
+        if result and len(result) > 0:
+            return result[0][0]
+        
+        return None
+    except Exception as e:
+        print(f"Erro ao criar classe financeira: {e}")
+        raise Exception(f"Erro ao criar classe financeira: {str(e)}")
+
+def buscar_classe_financeira_por_id(id_classe):
+    """
+    Busca uma classe financeira pelo ID
+    
+    Args:
+        id_classe (int): ID da classe financeira
+        
+    Returns:
+        tuple: Dados da classe financeira ou None se não encontrada
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, DESCRICAO
+        FROM CLASSES_FINANCEIRAS
+        WHERE ID = ?
+        """
+        result = execute_query(query, (id_classe,))
+        if result and len(result) > 0:
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar classe financeira: {e}")
+        raise Exception(f"Erro ao buscar classe financeira: {str(e)}")
+
+def atualizar_classe_financeira(id_classe, codigo, descricao):
+    """
+    Atualiza uma classe financeira existente
+    
+    Args:
+        id_classe (int): ID da classe financeira a ser atualizada
+        codigo (str): Novo código da classe financeira
+        descricao (str): Nova descrição da classe financeira
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Verificar se a classe existe
+        classe = buscar_classe_financeira_por_id(id_classe)
+        if not classe:
+            raise Exception(f"Classe financeira com ID {id_classe} não encontrada")
+        
+        # Verificar se o código sendo alterado já está em uso
+        if codigo != classe[1]:  # Comparar com o código atual (índice 1)
+            query_check = """
+            SELECT ID FROM CLASSES_FINANCEIRAS 
+            WHERE CODIGO = ? AND ID <> ?
+            """
+            result = execute_query(query_check, (codigo, id_classe))
+            
+            if result and len(result) > 0:
+                raise Exception(f"Já existe outra classe financeira com o código {codigo}")
+        
+        # Atualizar a classe financeira
+        query_update = """
+        UPDATE CLASSES_FINANCEIRAS
+        SET CODIGO = ?, DESCRICAO = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query_update, (codigo, descricao, id_classe))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar classe financeira: {e}")
+        raise Exception(f"Erro ao atualizar classe financeira: {str(e)}")
+
+def excluir_classe_financeira(id_classe):
+    """
+    Exclui uma classe financeira do banco de dados
+    
+    Args:
+        id_classe (int): ID da classe financeira a ser excluída
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        # Verificar se a classe existe
+        classe = buscar_classe_financeira_por_id(id_classe)
+        if not classe:
+            raise Exception(f"Classe financeira com ID {id_classe} não encontrada")
+        
+        # Excluir a classe
+        query_delete = """
+        DELETE FROM CLASSES_FINANCEIRAS
+        WHERE ID = ?
+        """
+        execute_query(query_delete, (id_classe,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir classe financeira: {e}")
+        raise Exception(f"Erro ao excluir classe financeira: {str(e)}")
+
+#Impressora 
+def verificar_tabela_configuracao_impressoras():
+    """
+    Verifica se a tabela CONFIGURACAO_IMPRESSORAS existe e a cria se não existir
+    """
+    try:
+        # Verificar se a tabela existe
+        query_check = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'CONFIGURACAO_IMPRESSORAS'
+        """
+        result = execute_query(query_check)
+        
+        # Se a tabela não existe, cria
+        if result[0][0] == 0:
+            print("Tabela CONFIGURACAO_IMPRESSORAS não encontrada. Criando...")
+            query_create = """
+            CREATE TABLE CONFIGURACAO_IMPRESSORAS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                CATEGORIA VARCHAR(50) NOT NULL,
+                IMPRESSORA VARCHAR(100) NOT NULL,
+                ESTACAO VARCHAR(50),
+                DATA_CONFIGURACAO DATE,
+                ID_USUARIO INTEGER,
+                USUARIO VARCHAR(50)
+            )
+            """
+            execute_query(query_create)
+            print("Tabela CONFIGURACAO_IMPRESSORAS criada com sucesso.")
+            
+            # Criar o gerador de IDs (sequence)
+            try:
+                query_generator = """
+                CREATE GENERATOR GEN_CONFIG_IMPRESSORAS_ID
+                """
+                execute_query(query_generator)
+                print("Gerador de IDs criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Gerador pode já existir: {e}")
+            
+            # Criar o trigger com sintaxe mais simples
+            try:
+                query_trigger = """
+                CREATE TRIGGER CONFIGURACAO_IMPRESSORAS_BI FOR CONFIGURACAO_IMPRESSORAS
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                  NEW.ID = GEN_ID(GEN_CONFIG_IMPRESSORAS_ID, 1);
+                END
+                """
+                execute_query(query_trigger)
+                print("Trigger criado com sucesso.")
+            except Exception as e:
+                print(f"Aviso: Não foi possível criar o trigger: {e}")
+            
+            return True
+        else:
+            print("Tabela CONFIGURACAO_IMPRESSORAS já existe.")
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela: {e}")
+        raise Exception(f"Erro ao verificar/criar tabela de configuração de impressoras: {str(e)}")
+
+def salvar_configuracao_impressora(categoria, impressora, estacao=None):
+    """
+    Salva ou atualiza uma configuração de impressora
+    
+    Args:
+        categoria (str): Categoria da impressora (ex: Padrão, Orçamento, etc.)
+        impressora (str): Nome da impressora
+        estacao (str, optional): Nome da estação
+        
+    Returns:
+        bool: True se a operação foi bem-sucedida
+    """
+    try:
+        # Verificar se já existe uma configuração para esta categoria
+        query_check = """
+        SELECT ID FROM CONFIGURACAO_IMPRESSORAS 
+        WHERE CATEGORIA = ?
+        """
+        result = execute_query(query_check, (categoria,))
+        
+        # Obter dados do usuário logado
+        from datetime import date
+        data_atual = date.today()
+        id_usuario = None
+        nome_usuario = None
+        
+        # Se houver um usuário logado, usar seus dados
+        try:
+            usuario_logado = get_usuario_logado()
+            if usuario_logado and usuario_logado["id"]:
+                id_usuario = usuario_logado["id"]
+                nome_usuario = usuario_logado["nome"]
+        except:
+            pass  # Continua mesmo se não conseguir obter usuário logado
+        
+        # Se já existe, atualiza
+        if result and len(result) > 0:
+            id_config = result[0][0]
+            
+            query_update = """
+            UPDATE CONFIGURACAO_IMPRESSORAS
+            SET IMPRESSORA = ?, ESTACAO = ?, DATA_CONFIGURACAO = ?, ID_USUARIO = ?, USUARIO = ?
+            WHERE ID = ?
+            """
+            
+            execute_query(query_update, (
+                impressora, estacao, data_atual, id_usuario, nome_usuario, id_config
+            ))
+        else:
+            # Se não existe, insere
+            query_insert = """
+            INSERT INTO CONFIGURACAO_IMPRESSORAS (
+                CATEGORIA, IMPRESSORA, ESTACAO, DATA_CONFIGURACAO, ID_USUARIO, USUARIO
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """
+            
+            execute_query(query_insert, (
+                categoria, impressora, estacao, data_atual, id_usuario, nome_usuario
+            ))
+        
+        print(f"Configuração de impressora para {categoria} salva com sucesso!")
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar configuração de impressora: {e}")
+        raise Exception(f"Erro ao salvar configuração de impressora: {str(e)}")
+
+def buscar_impressora_por_categoria(categoria):
+    """
+    Busca uma configuração de impressora pela categoria
+    
+    Args:
+        categoria (str): Categoria da impressora
+        
+    Returns:
+        str: Nome da impressora ou None se não encontrada
+    """
+    try:
+        query = """
+        SELECT IMPRESSORA FROM CONFIGURACAO_IMPRESSORAS
+        WHERE CATEGORIA = ?
+        """
+        result = execute_query(query, (categoria,))
+        
+        if result and len(result) > 0:
+            return result[0][0]
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar impressora por categoria: {e}")
+        return None
+
+def listar_configuracoes_impressoras():
+    """
+    Lista todas as configurações de impressoras
+    
+    Returns:
+        list: Lista de tuplas com dados das configurações (ID, CATEGORIA, IMPRESSORA, ESTACAO)
+    """
+    try:
+        query = """
+        SELECT ID, CATEGORIA, IMPRESSORA, ESTACAO
+        FROM CONFIGURACAO_IMPRESSORAS
+        ORDER BY CATEGORIA
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar configurações de impressoras: {e}")
+        raise Exception(f"Erro ao listar configurações de impressoras: {str(e)}")
+
+def excluir_configuracao_impressora(id_config):
+    """
+    Exclui uma configuração de impressora
+    
+    Args:
+        id_config (int): ID da configuração
+        
+    Returns:
+        bool: True se a exclusão foi bem-sucedida
+    """
+    try:
+        query = """
+        DELETE FROM CONFIGURACAO_IMPRESSORAS
+        WHERE ID = ?
+        """
+        execute_query(query, (id_config,))
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir configuração de impressora: {e}")
+        raise Exception(f"Erro ao excluir configuração de impressora: {str(e)}")
+
+def obter_estacao_atual():
+    """
+    Obtém o nome da estação atual (computador)
+    
+    Returns:
+        str: Nome da estação
+    """
+    try:
+        import socket
+        return socket.gethostname()
+    except Exception as e:
+        print(f"Erro ao obter nome da estação: {e}")
+        return "Estação Desconhecida"
+
+
+
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
     try:
@@ -6060,6 +6883,7 @@ if __name__ == "__main__":
         verificar_tabela_recebimentos_clientes()
         verificar_tabela_vendas_produtos()  # Adicione esta linha
         executar_correcoes()
+        verificar_tabela_configuracao_impressoras()
 
         print("Banco de dados inicializado com sucesso!")
         

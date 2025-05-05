@@ -190,6 +190,8 @@ class FormularioEmpresa(QWidget):
         "--hidden-import=idna",
         "--hidden-import=chardet",
         "--hidden-import=certifi",
+        "--hidden-import=PyQt5",
+        "--hidden-import=PyQt5.QtSvg",  # Adicionando o módulo QtSvg explicitamente
         "login.py"
     ])
     
@@ -203,7 +205,8 @@ class FormularioEmpresa(QWidget):
         # Incluir diretórios completos
         data_dirs = [
             "geral", "vendas", "produtos_e_servicos", "compras", 
-            "financeiro", "relatorios", "notas_fiscais", "ferramentas"
+            "financeiro", "relatorios", "notas_fiscais", "ferramentas",
+            "PDV"  
         ]
         
         # Adicionar diretório de ícones e arquivos específicos
@@ -213,6 +216,8 @@ class FormularioEmpresa(QWidget):
         for d in data_dirs:
             if os.path.exists(d):
                 data_str += f"('{d}', '{d}'), "
+            else:
+                print(f"AVISO: Diretório {d} não encontrado!")
         
         # Adicionar diretório de ícones com tratamento especial
         if os.path.exists(ico_img_dir):
@@ -232,11 +237,11 @@ class FormularioEmpresa(QWidget):
         
         spec_content = spec_content.replace("datas=[]", data_str)
     
-    # Garantir que os hiddenimports incluam requests e suas dependências
+    # Garantir que os hiddenimports incluam requests, PyQt5.QtSvg e suas dependências
     if "hiddenimports=[]" in spec_content:
         spec_content = spec_content.replace(
             "hiddenimports=[]",
-            "hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi']"
+            "hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'PyQt5', 'PyQt5.QtSvg']"
         )
     
     with open("MBSistema.spec", "w", encoding="utf-8") as f:
@@ -251,6 +256,14 @@ class FormularioEmpresa(QWidget):
     if os.path.exists(exe_path):
         print("\nCompilação concluída com sucesso!")
         print(f"O executável está disponível em: {exe_path}")
+        
+        # Verificar e copiar diretamente o diretório PDV para garantir
+        pdv_dir = "PDV"
+        dist_pdv = os.path.join("dist", "PDV")
+        if os.path.exists(pdv_dir) and not os.path.exists(dist_pdv):
+            print(f"\nGarantindo que a pasta {pdv_dir} está no diretório dist...")
+            shutil.copytree(pdv_dir, dist_pdv)
+            print(f"Pasta {pdv_dir} copiada com sucesso para o diretório dist.")
         
         # Verificar se a pasta ico-img foi incluída no executável
         dist_ico_img = os.path.join("dist", "ico-img")

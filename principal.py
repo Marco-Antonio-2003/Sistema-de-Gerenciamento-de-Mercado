@@ -119,7 +119,8 @@ class MainWindow(QMainWindow):
             "Conta corrente",
             "Classes financeiras"
         ], self)
-        btn_relatorios.add_menu_actions(["Fiscal NF-e, SAT, NFC-e",  "Relatório de Vendas de Produtos"], self)
+        btn_relatorios.add_menu_actions([#"Fiscal NF-e, SAT, NFC-e",  
+                                         "Relatório de Vendas de Produtos"], self)
         btn_ferramentas.add_menu_actions(["Configuração de estação"], self)
         
         for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas,
@@ -261,6 +262,69 @@ class MainWindow(QMainWindow):
         # Garantir que o botão fique por cima de outros widgets
         self.botao_whatsapp.raise_()
         
+        # Criação do botão de acesso ao PDV no canto superior esquerdo
+        self.pdv_button = QPushButton("Acesso ao\nPDV", self)
+        self.pdv_button.setFixedSize(180, 80)  # Aumentado o tamanho do botão
+        self.pdv_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2E8B57;
+                color: white;
+                border-radius: 10px;
+                font-weight: bold;
+                text-align: center;
+                padding: 5px;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #1D6F42;
+            }
+            QPushButton:pressed {
+                background-color: #125C30;
+            }
+        """)
+        
+        # Adicionar ícone correto ao botão (caixa.png)
+        pdv_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "caixa.png")
+        if os.path.exists(pdv_icon_path):
+            self.pdv_button.setIcon(QIcon(pdv_icon_path))
+            self.pdv_button.setIconSize(QSize(45, 45))  # Ícone maior para o botão maior
+        else:
+            # Caso o ícone não exista, cria um emoji como fallback
+            print(f"AVISO: Ícone de caixa não encontrado em: {pdv_icon_path}")
+            # Usar emoji de cashier/register como ícone alternativo no texto
+            self.pdv_button.setText("🧾\nAcesso ao\nPDV")
+            self.pdv_button.setFont(QFont("Arial", 10, QFont.Bold))
+        
+        # Adicionar sombra ao botão
+        pdv_shadow = QGraphicsDropShadowEffect(self.pdv_button)
+        pdv_shadow.setBlurRadius(15)
+        pdv_shadow.setColor(Qt.black)
+        pdv_shadow.setOffset(0, 0)
+        self.pdv_button.setGraphicsEffect(pdv_shadow)
+        
+        # Conectar ao clique
+        self.pdv_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.pdv_button.clicked.connect(self.abrir_pdv)
+        
+        # Posicionar o botão logo abaixo do menu "GERAL" (ajustado mais para baixo)
+        self.pdv_button.move(30, 90)  # Mantida a mesma posição vertical
+        self.pdv_button.raise_()
+        
+        # Método para reposicionar o botão PDV quando a janela for redimensionada
+        def pdv_resize_event(event):
+            # Chamar o método original de redimensionamento
+            if hasattr(self, '_resize_original_pdv'):
+                self._resize_original_pdv(event)
+            else:
+                novo_resize_event(event)
+            
+            # Manter o botão PDV na posição correta (abaixo do menu GERAL)
+            self.pdv_button.move(30, 90)  # Ajustado para a nova posição
+        
+        # Salvar o método anterior e substituir
+        self._resize_original_pdv = self.resizeEvent
+        self.resizeEvent = pdv_resize_event
+        
         # mapeamentos
         self.action_to_py_file = {
             "Cadastro de empresa": os.path.join("geral", "cadastro_empresa.py"),
@@ -280,7 +344,8 @@ class MainWindow(QMainWindow):
             "Classes financeiras": os.path.join("financeiro", "classes_financeiras.py"),
             "Fiscal NF-e, SAT, NFC-e": os.path.join("relatorios", "relatorio_fiscal.py"),
             "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"),  
-            "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py")
+            "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
+            "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
         }
         # casos especiais de nome de classe
         self.action_to_class = {
@@ -308,8 +373,58 @@ class MainWindow(QMainWindow):
             "Fiscal NF-e, SAT, NFC-e":      "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos":                      "RelatorioVendasWindow",
             # FERRAMENTAS
-            "Configuração de estação":      "ConfiguracaoImpressoraWindow"
+            "Configuração de estação":      "ConfiguracaoImpressoraWindow",
+            # PDV
+            "PDV - Ponto de Venda":         "PDVWindow"
         }
+
+    def abrir_pdv(self):
+        """Abre o módulo do PDV"""
+        try:
+            pdv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PDV", "PDV_principal.py")
+            
+            if not os.path.exists(pdv_path):
+                print(f"ERRO: Arquivo PDV não existe: {pdv_path}")
+                QMessageBox.warning(self, "Erro", f"Módulo PDV não encontrado!")
+                return
+                
+            # Verificar se já está aberto
+            self.opened_windows = [w for w in self.opened_windows if w.isVisible()]
+            for w in self.opened_windows:
+                if w.windowTitle() == "PDV - Ponto de Venda":
+                    w.setWindowState(w.windowState() & ~Qt.WindowMinimized)
+                    w.activateWindow()
+                    return
+                    
+            # Importar e abrir o módulo PDV
+            spec = importlib.util.spec_from_file_location("PDV_principal", pdv_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # Assumindo que a classe se chama PDVWindow
+            WindowClass = getattr(module, "PDVWindow", None)
+            
+            if not WindowClass:
+                print("Classe PDVWindow não encontrada no módulo PDV")
+                QMessageBox.warning(self, "Erro", "Não foi possível iniciar o PDV!")
+                return
+                
+            # Criar e exibir a janela
+            win = WindowClass()
+            # Adicionar referência à janela principal
+            if hasattr(win, 'set_janela_principal'):
+                win.set_janela_principal(self)
+            win.setWindowTitle("PDV - Ponto de Venda")
+            win.show()
+            
+            # Adicionar à lista de janelas abertas
+            self.opened_windows.append(win)
+            
+        except Exception as e:
+            print(f"ERRO ao abrir o PDV: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Erro", f"Não foi possível abrir o PDV: {str(e)}")
 
     def criar_caixa_info(self, layout_pai, titulo, nome_icone, contagem):
         """Cria uma caixa de informação com título, ícone e contagem"""

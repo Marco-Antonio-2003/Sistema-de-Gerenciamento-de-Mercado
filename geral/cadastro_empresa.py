@@ -5,7 +5,7 @@ import importlib.util
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QLineEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout,
-                             QMessageBox, QStyle, QGridLayout, QComboBox)
+                             QMessageBox, QStyle, QGridLayout, QComboBox, QDialog)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt
 from base.banco import listar_empresas, excluir_empresa, verificar_tabela_empresas, buscar_empresa_por_id
@@ -597,11 +597,10 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from data.banco import criar_empresa, atualizar_empresa, buscar_empresa_por_id
 
-class FormularioEmpresa(QWidget):
-    def __init__(self, parent_window, form_window=None):
-        super().__init__()
-        self.parent_window = parent_window
-        self.form_window = form_window
+class FormularioEmpresa(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
         self.initUI()
         
     def initUI(self):

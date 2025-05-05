@@ -7,6 +7,11 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize
 
+# Importe as funções do banco.py
+from base.banco import (verificar_tabela_classes_financeiras, listar_classes_financeiras, 
+                       criar_classe_financeira, buscar_classe_financeira_por_id,
+                       atualizar_classe_financeira, excluir_classe_financeira)
+
 class ClassesFinanceirasWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -18,7 +23,7 @@ class ClassesFinanceirasWindow(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         
-        # Cabeçalho com título centralizado (sem botão voltar)
+        # Cabeçalho com título centralizado
         header_layout = QHBoxLayout()
         
         # Título centralizado
@@ -98,8 +103,8 @@ class ClassesFinanceirasWindow(QWidget):
         
         # Tabela de classes financeiras
         self.table = QTableWidget()
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Código", "Descrição"])
+        self.table.setColumnCount(3)  # Agora incluiremos o ID
+        self.table.setHorizontalHeaderLabels(["ID", "Código", "Descrição"])
         self.table.horizontalHeader().setStyleSheet("""
             QHeaderView::section {
                 background-color: #f0f0f0;
@@ -129,7 +134,8 @@ class ClassesFinanceirasWindow(QWidget):
         
         # Ajustar largura das colunas
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -225,38 +231,43 @@ class ClassesFinanceirasWindow(QWidget):
         
         main_layout.addLayout(btn_control_layout)
         
-        # Carregar dados de teste
-        self.carregar_dados_teste()
-        
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #003353; }")
         
-    def carregar_dados_teste(self):
-        # Dados de exemplo para a tabela
-        dados = [
-            ("001", "DESPESAS OPERACIONAIS"),
-            ("002", "DESPESAS ADMINISTRATIVAS"),
-            ("003", "RECEITAS"),
-            ("004", "INVESTIMENTOS")
-        ]
-        
-        self.table.setRowCount(len(dados))
-        
-        for row, (codigo, descricao) in enumerate(dados):
-            self.table.setItem(row, 0, QTableWidgetItem(codigo))
-            self.table.setItem(row, 1, QTableWidgetItem(descricao))
+        # Inicializar o banco e carregar dados
+        self.inicializar_banco()
+        self.carregar_dados_do_banco()
+    
+    def inicializar_banco(self):
+        """Inicializa o banco de dados e cria a tabela se não existir"""
+        try:
+            verificar_tabela_classes_financeiras()
+        except Exception as e:
+            self.mostrar_erro(f"Erro ao inicializar o banco de dados: {str(e)}")
+    
+    def carregar_dados_do_banco(self):
+        """Carrega os dados do banco para a tabela"""
+        try:
+            classes = listar_classes_financeiras()
+            self.table.setRowCount(len(classes))
+            
+            for row, (id_classe, codigo, descricao) in enumerate(classes):
+                self.table.setItem(row, 0, QTableWidgetItem(str(id_classe)))
+                self.table.setItem(row, 1, QTableWidgetItem(codigo))
+                self.table.setItem(row, 2, QTableWidgetItem(descricao))
+                
+        except Exception as e:
+            self.mostrar_erro(f"Erro ao carregar dados: {str(e)}")
     
     def selecionar_linha(self, item):
-        # Implementar ações quando uma linha é selecionada
+        """Implementar ações quando uma linha é selecionada"""
         row = item.row()
-        codigo = self.table.item(row, 0).text()
-        descricao = self.table.item(row, 1).text()
+        codigo = self.table.item(row, 1).text()
+        descricao = self.table.item(row, 2).text()
         
         # Preencher os campos de filtro com os dados da linha selecionada
         self.codigo_input.setText(codigo)
         self.descricao_input.setText(descricao)
-    
-    # Método voltar foi removido
     
     def cadastrar_classe(self):
         """Abre o formulário para cadastrar nova classe financeira"""
@@ -265,238 +276,286 @@ class ClassesFinanceirasWindow(QWidget):
         
         # Se o diálogo foi aceito (usuário clicou em Incluir/Salvar)
         if result == QDialog.Accepted:
-            # Obter os dados do formulário e adicionar à tabela
-            codigo = dialog.codigo_edit.text().strip()
-            descricao = dialog.descricao_edit.text().strip()
-            
-            # Adicionar nova linha na tabela
-            row_position = self.table.rowCount()
-            self.table.insertRow(row_position)
-            self.table.setItem(row_position, 0, QTableWidgetItem(codigo))
-            self.table.setItem(row_position, 1, QTableWidgetItem(descricao))
+            try:
+                # Obter os dados do formulário
+                codigo = dialog.codigo_edit.text().strip()
+                descricao = dialog.descricao_edit.text().strip()
+                
+                # Salvar no banco de dados
+                id_classe = criar_classe_financeira(codigo, descricao)
+                
+                # Atualizar a tabela
+                self.carregar_dados_do_banco()
+                
+                # Mensagem de sucesso
+                self.mostrar_sucesso(f"Classe financeira {codigo} cadastrada com sucesso!")
+                
+            except Exception as e:
+                self.mostrar_erro(f"Erro ao cadastrar classe: {str(e)}")
     
     def alterar_classe(self):
         """Abre o formulário para alterar classe financeira selecionada"""
         row = self.table.currentRow()
         if row >= 0:
-            codigo = self.table.item(row, 0).text()
-            descricao = self.table.item(row, 1).text()
+            id_classe = int(self.table.item(row, 0).text())
+            codigo = self.table.item(row, 1).text()
+            descricao = self.table.item(row, 2).text()
             
             dialog = FormularioClasseFinanceira(self, codigo=codigo, descricao=descricao, modo_edicao=True)
             result = dialog.exec_()
             
             # Se o diálogo foi aceito (usuário clicou em Salvar)
             if result == QDialog.Accepted:
-                # Obter os dados atualizados do formulário
-                novo_codigo = dialog.codigo_edit.text().strip()
-                nova_descricao = dialog.descricao_edit.text().strip()
-                
-                # Atualizar a linha na tabela
-                self.table.setItem(row, 0, QTableWidgetItem(novo_codigo))
-                self.table.setItem(row, 1, QTableWidgetItem(nova_descricao))
+                try:
+                    # Obter os dados atualizados do formulário
+                    novo_codigo = dialog.codigo_edit.text().strip()
+                    nova_descricao = dialog.descricao_edit.text().strip()
+                    
+                    # Atualizar no banco de dados
+                    atualizar_classe_financeira(id_classe, novo_codigo, nova_descricao)
+                    
+                    # Atualizar a tabela
+                    self.carregar_dados_do_banco()
+                    
+                    # Mensagem de sucesso
+                    self.mostrar_sucesso(f"Classe financeira {novo_codigo} alterada com sucesso!")
+                    
+                except Exception as e:
+                    self.mostrar_erro(f"Erro ao alterar classe: {str(e)}")
         else:
-            msg_box = QMessageBox(
-                QMessageBox.Warning,
-                "Seleção necessária", 
-                "Por favor, selecione uma classe para alterar.",
-                QMessageBox.Ok,
-                self
-            )
-            
-            # Aplicar estilo com texto branco
-            msg_box.setStyleSheet("""
-                QMessageBox {
-                    background-color: #003353;
-                }
-                QMessageBox QLabel {
-                    color: white;
-                    font-weight: bold;
-                }
-            """)
-            
-            # Obter o botão OK e aplicar estilo diretamente nele
-            ok_button = msg_box.button(QMessageBox.Ok)
-            if ok_button:
-                ok_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 70px;
-                        min-height: 20px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
-            
-            msg_box.exec_()
+            self.mostrar_aviso("Seleção necessária", "Por favor, selecione uma classe para alterar.")
     
     def excluir_classe(self):
         """Exclui a classe financeira selecionada após confirmação"""
         row = self.table.currentRow()
         if row >= 0:
-            codigo = self.table.item(row, 0).text()
-            descricao = self.table.item(row, 1).text()
+            id_classe = int(self.table.item(row, 0).text())
+            codigo = self.table.item(row, 1).text()
+            descricao = self.table.item(row, 2).text()
             
-            # Configurar caixa de mensagem de confirmação com estilo
-            msg_box = QMessageBox(
-                QMessageBox.Question,
+            # Pedir confirmação
+            confirmacao = self.pedir_confirmacao(
                 "Confirmar exclusão", 
-                f"Deseja realmente excluir a classe {codigo} - {descricao}?",
-                QMessageBox.Yes | QMessageBox.No,
-                self
+                f"Deseja realmente excluir a classe {codigo} - {descricao}?"
             )
             
-            # Aplicar estilo com texto branco
-            msg_box.setStyleSheet("""
-                QMessageBox {
-                    background-color: #003353;
-                }
-                QMessageBox QLabel {
-                    color: white;
-                    font-weight: bold;
-                }
-            """)
-            
-            # Estilizar botões
-            yes_button = msg_box.button(QMessageBox.Yes)
-            if yes_button:
-                yes_button.setText("Sim")
-                yes_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 70px;
-                        min-height: 20px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
-            
-            no_button = msg_box.button(QMessageBox.No)
-            if no_button:
-                no_button.setText("Não")
-                no_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 70px;
-                        min-height: 20px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
-            
-            confirmacao = msg_box.exec_()
-            
-            if confirmacao == QMessageBox.Yes:
-                self.table.removeRow(row)
-                
-                # Mensagem de sucesso
-                success_box = QMessageBox(
-                    QMessageBox.Information,
-                    "Exclusão concluída", 
-                    f"A classe {codigo} foi excluída com sucesso.",
-                    QMessageBox.Ok,
-                    self
-                )
-                
-                # Aplicar estilo com texto branco
-                success_box.setStyleSheet("""
-                    QMessageBox {
-                        background-color: #003353;
-                    }
-                    QMessageBox QLabel {
-                        color: white;
-                        font-weight: bold;
-                    }
-                """)
-                
-                # Obter o botão OK e aplicar estilo diretamente nele
-                ok_button = success_box.button(QMessageBox.Ok)
-                if ok_button:
-                    ok_button.setStyleSheet("""
-                        QPushButton {
-                            color: white;
-                            background-color: #004465;
-                            border: none;
-                            border-radius: 3px;
-                            min-width: 70px;
-                            min-height: 20px;
-                            font-weight: bold;
-                        }
-                        QPushButton:hover {
-                            background-color: #00354f;
-                        }
-                        QPushButton:pressed {
-                            background-color: #0078d7;
-                        }
-                    """)
-                
-                success_box.exec_()
+            if confirmacao:
+                try:
+                    # Excluir do banco de dados
+                    excluir_classe_financeira(id_classe)
+                    
+                    # Atualizar a tabela
+                    self.carregar_dados_do_banco()
+                    
+                    # Limpar os campos
+                    self.codigo_input.clear()
+                    self.descricao_input.clear()
+                    
+                    # Mensagem de sucesso
+                    self.mostrar_sucesso(f"A classe {codigo} foi excluída com sucesso.")
+                    
+                except Exception as e:
+                    self.mostrar_erro(f"Erro ao excluir classe: {str(e)}")
         else:
-            # Mensagem de aviso quando nenhuma linha está selecionada
-            msg_box = QMessageBox(
-                QMessageBox.Warning,
-                "Seleção necessária", 
-                "Por favor, selecione uma classe para excluir.",
-                QMessageBox.Ok,
-                self
-            )
-            
-            # Aplicar estilo com texto branco
-            msg_box.setStyleSheet("""
-                QMessageBox {
-                    background-color: #003353;
-                }
-                QMessageBox QLabel {
+            self.mostrar_aviso("Seleção necessária", "Por favor, selecione uma classe para excluir.")
+    
+    def mostrar_erro(self, mensagem):
+        """Exibe uma mensagem de erro"""
+        msg_box = QMessageBox(
+            QMessageBox.Critical,
+            "Erro", 
+            mensagem,
+            QMessageBox.Ok,
+            self
+        )
+        
+        # Aplicar estilo com texto branco
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #003353;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-weight: bold;
+            }
+        """)
+        
+        # Obter o botão OK e aplicar estilo diretamente nele
+        ok_button = msg_box.button(QMessageBox.Ok)
+        if ok_button:
+            ok_button.setStyleSheet("""
+                QPushButton {
                     color: white;
+                    background-color: #004465;
+                    border: none;
+                    border-radius: 3px;
+                    min-width: 70px;
+                    min-height: 20px;
                     font-weight: bold;
                 }
+                QPushButton:hover {
+                    background-color: #00354f;
+                }
+                QPushButton:pressed {
+                    background-color: #0078d7;
+                }
             """)
-            
-            # Obter o botão OK e aplicar estilo diretamente nele
-            ok_button = msg_box.button(QMessageBox.Ok)
-            if ok_button:
-                ok_button.setStyleSheet("""
-                    QPushButton {
-                        color: white;
-                        background-color: #004465;
-                        border: none;
-                        border-radius: 3px;
-                        min-width: 70px;
-                        min-height: 20px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #00354f;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0078d7;
-                    }
-                """)
-            
-            msg_box.exec_()
+        
+        msg_box.exec_()
+    
+    def mostrar_aviso(self, titulo, mensagem):
+        """Exibe uma mensagem de aviso"""
+        msg_box = QMessageBox(
+            QMessageBox.Warning,
+            titulo, 
+            mensagem,
+            QMessageBox.Ok,
+            self
+        )
+        
+        # Aplicar estilo com texto branco
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #003353;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-weight: bold;
+            }
+        """)
+        
+        # Obter o botão OK e aplicar estilo diretamente nele
+        ok_button = msg_box.button(QMessageBox.Ok)
+        if ok_button:
+            ok_button.setStyleSheet("""
+                QPushButton {
+                    color: white;
+                    background-color: #004465;
+                    border: none;
+                    border-radius: 3px;
+                    min-width: 70px;
+                    min-height: 20px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #00354f;
+                }
+                QPushButton:pressed {
+                    background-color: #0078d7;
+                }
+            """)
+        
+        msg_box.exec_()
+    
+    def mostrar_sucesso(self, mensagem):
+        """Exibe uma mensagem de sucesso"""
+        msg_box = QMessageBox(
+            QMessageBox.Information,
+            "Sucesso", 
+            mensagem,
+            QMessageBox.Ok,
+            self
+        )
+        
+        # Aplicar estilo com texto branco
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #003353;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-weight: bold;
+            }
+        """)
+        
+        # Obter o botão OK e aplicar estilo diretamente nele
+        ok_button = msg_box.button(QMessageBox.Ok)
+        if ok_button:
+            ok_button.setStyleSheet("""
+                QPushButton {
+                    color: white;
+                    background-color: #004465;
+                    border: none;
+                    border-radius: 3px;
+                    min-width: 70px;
+                    min-height: 20px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #00354f;
+                }
+                QPushButton:pressed {
+                    background-color: #0078d7;
+                }
+            """)
+        
+        msg_box.exec_()
+    
+    def pedir_confirmacao(self, titulo, mensagem):
+        """Exibe uma mensagem de confirmação e retorna True se confirmado"""
+        msg_box = QMessageBox(
+            QMessageBox.Question,
+            titulo, 
+            mensagem,
+            QMessageBox.Yes | QMessageBox.No,
+            self
+        )
+        
+        # Aplicar estilo com texto branco
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #003353;
+            }
+            QMessageBox QLabel {
+                color: white;
+                font-weight: bold;
+            }
+        """)
+        
+        # Estilizar botões
+        yes_button = msg_box.button(QMessageBox.Yes)
+        if yes_button:
+            yes_button.setText("Sim")
+            yes_button.setStyleSheet("""
+                QPushButton {
+                    color: white;
+                    background-color: #004465;
+                    border: none;
+                    border-radius: 3px;
+                    min-width: 70px;
+                    min-height: 20px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #00354f;
+                }
+                QPushButton:pressed {
+                    background-color: #0078d7;
+                }
+            """)
+        
+        no_button = msg_box.button(QMessageBox.No)
+        if no_button:
+            no_button.setText("Não")
+            no_button.setStyleSheet("""
+                QPushButton {
+                    color: white;
+                    background-color: #004465;
+                    border: none;
+                    border-radius: 3px;
+                    min-width: 70px;
+                    min-height: 20px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #00354f;
+                }
+                QPushButton:pressed {
+                    background-color: #0078d7;
+                }
+            """)
+        
+        return msg_box.exec_() == QMessageBox.Yes
 
 
 class FormularioClasseFinanceira(QDialog):
@@ -519,7 +578,7 @@ class FormularioClasseFinanceira(QDialog):
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(10)
         
-        # Título centralizado (sem botão voltar)
+        # Título centralizado
         title_label = QLabel("Cadastro de Classe Financeira")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_label.setStyleSheet("color: white;")
@@ -615,51 +674,7 @@ class FormularioClasseFinanceira(QDialog):
             self.mostrar_erro("A descrição da classe é obrigatória.")
             return
         
-        # Mensagem de sucesso
-        acao = "alterada" if self.modo_edicao else "cadastrada"
-        msg_box = QMessageBox(
-            QMessageBox.Information,
-            "Sucesso",
-            f"Classe financeira {codigo} - {descricao} {acao} com sucesso!",
-            QMessageBox.Ok,
-            self
-        )
-        
-        # Aplicar estilo com texto branco
-        msg_box.setStyleSheet("""
-            QMessageBox {
-                background-color: #003353;
-            }
-            QMessageBox QLabel {
-                color: white;
-                font-weight: bold;
-            }
-        """)
-        
-        # Obter o botão OK e aplicar estilo diretamente nele
-        ok_button = msg_box.button(QMessageBox.Ok)
-        if ok_button:
-            ok_button.setStyleSheet("""
-                QPushButton {
-                    color: white;
-                    background-color: #004465;
-                    border: none;
-                    border-radius: 3px;
-                    min-width: 70px;
-                    min-height: 20px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #00354f;
-                }
-                QPushButton:pressed {
-                    background-color: #0078d7;
-                }
-            """)
-        
-        msg_box.exec_()
-        
-        # Fechar a janela
+        # Os dados serão salvos quando o diálogo for fechado
         self.accept()
         
     def mostrar_erro(self, mensagem):
