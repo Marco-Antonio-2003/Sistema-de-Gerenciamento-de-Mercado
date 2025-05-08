@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2022, PyInstaller Development Team.
+# Copyright (c) 2022-2023, PyInstaller Development Team.
 #
 # Distributed under the terms of the GNU General Public License (version 2
 # or later) with exception for distributing the bootloader.
@@ -63,6 +63,11 @@ def normalize_icon_type(icon_path: str, allowed_types: Tuple[str], convert_type:
         _generated_name = f"generated-{hashlib.sha256(icon_path.encode()).hexdigest()}.{convert_type}"
         generated_icon = os.path.join(workpath, _generated_name)
         with PILImage.open(icon_path) as im:
+            # If an image uses a custom palette + transparency, convert it to RGBA for a better alpha mask depth.
+            if im.mode == "P" and im.info.get("transparency", None) is not None:
+                # The bit depth of the alpha channel will be higher, and the images will look better when eventually
+                # scaled to multiple sizes (16,24,32,..) for the ICO format for example.
+                im = im.convert("RGBA")
             im.save(generated_icon)
         icon_path = generated_icon
     except PIL.UnidentifiedImageError:

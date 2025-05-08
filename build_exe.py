@@ -191,7 +191,12 @@ class FormularioEmpresa(QWidget):
         "--hidden-import=chardet",
         "--hidden-import=certifi",
         "--hidden-import=PyQt5",
-        "--hidden-import=PyQt5.QtSvg",  # Adicionando o módulo QtSvg explicitamente
+        "--hidden-import=PyQt5.QtSvg",
+        "--hidden-import=matplotlib",       
+        "--hidden-import=matplotlib.backends.backend_qt5agg",
+        "--hidden-import=matplotlib.figure",
+        "--hidden-import=numpy",
+        "--hidden-import=datetime",
         "login.py"
     ])
     
@@ -206,7 +211,7 @@ class FormularioEmpresa(QWidget):
         data_dirs = [
             "geral", "vendas", "produtos_e_servicos", "compras", 
             "financeiro", "relatorios", "notas_fiscais", "ferramentas",
-            "PDV"  
+            "PDV", "base"
         ]
         
         # Adicionar diretório de ícones e arquivos específicos

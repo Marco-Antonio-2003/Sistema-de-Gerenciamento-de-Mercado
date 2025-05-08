@@ -6,156 +6,235 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QTableWidget,
                              QTableWidgetItem, QHeaderView, QComboBox, QDateEdit,
                              QGroupBox, QFormLayout, QRadioButton, QButtonGroup,
-                             QMessageBox, QFileDialog)
+                             QMessageBox, QFileDialog, QProgressDialog)
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPalette
-from PyQt5.QtCore import Qt, QDate, QDateTime
+from PyQt5.QtCore import Qt, QDate, QDateTime, QThread, pyqtSignal, QTimer
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
+import functools
 
-# Importar funções do banco de dados
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from base.banco import (get_connection, execute_query, listar_produtos, listar_grupos)
+# Modificação na importação do banco de dados para funcionar tanto em desenvolvimento quanto no executável
+# Determinar se estamos rodando como um executável ou script normal
+if getattr(sys, 'frozen', False):
+    # Estamos executando em um executável PyInstaller
+    application_path = os.path.dirname(sys.executable)
+else:
+    # Estamos executando em um ambiente de desenvolvimento
+    application_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Adicionar o diretório raiz ao PATH
+if application_path not in sys.path:
+    sys.path.insert(0, application_path)
 
-# Função para verificar e criar a tabela de vendas produtos se necessário
-def verificar_tabela_vendas_produtos():
-    """
-    Esta função foi removida, já que vamos usar diretamente a tabela VENDAS do PDV
-    """
+# Debugging: criar um arquivo de log para ajudar a diagnosticar problemas
+try:
+    log_path = os.path.join(application_path, 'debug_relatorio.txt')
+    with open(log_path, 'a') as f:
+        f.write(f"\n--- Iniciando módulo de relatórios em {datetime.datetime.now()} ---\n")
+        f.write(f"Diretório da aplicação: {application_path}\n")
+        f.write(f"Caminhos no sys.path: {sys.path}\n")
+except Exception as e:
+    # Falha no log não deve interromper a aplicação
     pass
 
-
-# Função para obter vendas diretamente da tabela VENDAS do PDV
-def obter_vendas_por_periodo(data_inicial, data_final, categoria=None):
-    """
-    Obtém as vendas da tabela VENDAS do PDV pelo período selecionado
-    
-    Args:
-        data_inicial (str): Data inicial no formato yyyy-MM-dd
-        data_final (str): Data final no formato yyyy-MM-dd
-        categoria (str, optional): Filtrar por categoria. Default None (todas)
-        
-    Returns:
-        list: Lista de dicionários com os dados das vendas
-    """
+# Agora importe as funções do banco de dados
+try:
+    from base.banco import (get_connection, execute_query, listar_produtos, listar_grupos)
+except Exception as e:
+    # Registrar erro de importação no log
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        with open(log_path, 'a') as f:
+            f.write(f"ERRO AO IMPORTAR MÓDULOS DO BANCO: {str(e)}\n")
+    except:
+        pass
+
+
+# Thread para carregamento de dados
+class CarregadorDadosThread(QThread):
+    dados_carregados = pyqtSignal(list)
+    erro_carregamento = pyqtSignal(str)
+    
+    def __init__(self, data_inicial, data_final, categoria=None):
+        super().__init__()
+        self.data_inicial = data_inicial
+        self.data_final = data_final
+        self.categoria = categoria
         
-        # Construir a consulta SQL para buscar da tabela VENDAS
-        query = """
-        SELECT p.nome AS produto, g.nome AS categoria, v.data, 
-               vi.quantidade, (vi.quantidade * vi.valor_unitario) AS valor_total
-        FROM VENDAS v
-        JOIN venda_itens vi ON v.id = vi.venda_id
-        JOIN produtos p ON vi.produto_id = p.id
-        JOIN grupos g ON p.grupo_id = g.id
-        WHERE v.data BETWEEN ? AND ?
+    def run(self):
+        try:
+            vendas = self.obter_vendas_por_periodo(self.data_inicial, self.data_final, self.categoria)
+            self.dados_carregados.emit(vendas)
+        except Exception as e:
+            self.erro_carregamento.emit(str(e))
+    
+    def obter_vendas_por_periodo(self, data_inicial, data_final, categoria=None):
         """
+        Obtém as vendas da tabela VENDAS do PDV pelo período selecionado
         
-        params = [data_inicial, data_final]
-        
-        # Adicionar filtro por categoria se especificado
-        if categoria:
-            query += " AND g.nome = ?"
-            params.append(categoria)
+        Args:
+            data_inicial (str): Data inicial no formato yyyy-MM-dd
+            data_final (str): Data final no formato yyyy-MM-dd
+            categoria (str, optional): Filtrar por categoria. Default None (todas)
             
-        # Ordenar por data
-        query += " ORDER BY v.data DESC"
-        
-        cursor.execute(query, params)
-        
-        vendas = []
-        for row in cursor.fetchall():
-            venda = {
-                "produto": row[0],
-                "categoria": row[1],
-                "data": row[2],
-                "quantidade": row[3],
-                "valor_total": row[4]
-            }
-            vendas.append(venda)
+        Returns:
+            list: Lista de dicionários com os dados das vendas
+        """
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
             
-        conn.close()
-        return vendas
-        
-    except Exception as e:
-        print(f"Erro ao obter vendas: {e}")
-        return []
+            # Construir a consulta SQL otimizada com LIMIT
+            query = """
+            SELECT p.nome AS produto, g.nome AS categoria, v.data, 
+                vi.quantidade, (vi.quantidade * vi.valor_unitario) AS valor_total
+            FROM VENDAS v
+            JOIN venda_itens vi ON v.id = vi.venda_id
+            JOIN produtos p ON vi.produto_id = p.id
+            JOIN grupos g ON p.grupo_id = g.id
+            WHERE v.data BETWEEN ? AND ?
+            """
+            
+            params = [data_inicial, data_final]
+            
+            # Adicionar filtro por categoria se especificado
+            if categoria:
+                query += " AND g.nome = ?"
+                params.append(categoria)
+                
+            # Ordenar por data e limitar a 1000 registros para performance
+            query += " ORDER BY v.data DESC LIMIT 1000"
+            
+            cursor.execute(query, params)
+            
+            vendas = []
+            for row in cursor.fetchall():
+                venda = {
+                    "produto": row[0],
+                    "categoria": row[1],
+                    "data": row[2],
+                    "quantidade": row[3],
+                    "valor_total": row[4]
+                }
+                vendas.append(venda)
+                
+            conn.close()
+            return vendas
+            
+        except Exception as e:
+            # Registrar erro de banco de dados no log
+            try:
+                log_path = os.path.join(application_path, 'debug_relatorio.txt')
+                with open(log_path, 'a') as f:
+                    f.write(f"ERRO AO OBTER VENDAS: {str(e)}\n")
+            except:
+                pass
+            print(f"Erro ao obter vendas: {e}")
+            raise
+
+
+# Thread para carregamento de categorias
+class CarregadorCategoriasThread(QThread):
+    categorias_carregadas = pyqtSignal(list)
+    erro_carregamento = pyqtSignal(str)
+    
+    def run(self):
+        try:
+            grupos = listar_grupos()
+            self.categorias_carregadas.emit(grupos)
+        except Exception as e:
+            self.erro_carregamento.emit(str(e))
 
 
 class GraficoVendas(FigureCanvas):
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(self, parent=None, width=5, height=4, dpi=70):
+        # Reduzir DPI para melhorar performance
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
+        
+        # Configurar estilo do gráfico uma única vez
+        self.setup_style()
+        
+        super(GraficoVendas, self).__init__(self.fig)
+        self.setParent(parent)
+        
+        # Iniciar com um placeholder em vez de gráfico vazio
+        self.mostrar_placeholder("Clique em 'Gerar Relatório' para visualizar dados")
+        
+        # Cache para evitar redesenhar gráficos idênticos
+        self._ultimo_dados = None
+    
+    def setup_style(self):
+        """Configura o estilo do gráfico uma única vez para economizar recursos"""
         self.fig.patch.set_facecolor('#043b57')
         self.axes.set_facecolor('#043b57')
         
         # Configurar estilo do gráfico para fundo escuro
-        self.axes.spines['bottom'].set_color('white')
-        self.axes.spines['top'].set_color('white') 
-        self.axes.spines['right'].set_color('white')
-        self.axes.spines['left'].set_color('white')
+        for spine in self.axes.spines.values():
+            spine.set_color('white')
+            
         self.axes.tick_params(axis='x', colors='white')
         self.axes.tick_params(axis='y', colors='white')
         self.axes.yaxis.label.set_color('white')
         self.axes.xaxis.label.set_color('white')
         self.axes.title.set_color('white')
-        
-        super(GraficoVendas, self).__init__(self.fig)
-        self.setParent(parent)
-        
-        # Dados iniciais
-        self.atualizar_grafico([])
+    
+    def mostrar_placeholder(self, mensagem):
+        """Mostra uma mensagem placeholder em vez de gráfico vazio"""
+        self.axes.clear()
+        self.axes.text(0.5, 0.5, mensagem, 
+                     horizontalalignment='center',
+                     verticalalignment='center',
+                     transform=self.axes.transAxes,
+                     color='white', fontsize=12)
+        self.draw()
     
     def atualizar_grafico(self, dados_venda):
         """
-        Atualiza o gráfico com os dados de venda
-        
-        dados_venda: lista de dicionários no formato:
-        [{'produto': 'Nome do Produto', 'quantidade': 10, 'data': '2025-04-28'}, ...]
+        Atualiza o gráfico com os dados de venda, com cache para evitar redesenho desnecessário
         """
-        self.axes.clear()
+        # Verificar se temos os mesmos dados que antes (usando hash)
+        hash_dados = hash(str(dados_venda))
+        if hash_dados == self._ultimo_dados:
+            return  # Evita redesenhar o mesmo gráfico
+            
+        self._ultimo_dados = hash_dados
         
         # Verificar se há dados
         if not dados_venda:
-            self.axes.text(0.5, 0.5, 'Nenhum dado disponível', 
-                          horizontalalignment='center',
-                          verticalalignment='center',
-                          transform=self.axes.transAxes,
-                          color='white', fontsize=12)
-            self.draw()
+            self.mostrar_placeholder('Nenhum dado disponível')
             return
         
+        self.axes.clear()
+        
         # Processar dados para o gráfico (agrupa por produto)
+        # Usando um método mais eficiente com dicionário
         produtos = {}
         for venda in dados_venda:
             produto = venda['produto']
-            if produto in produtos:
-                produtos[produto] += venda['quantidade']
-            else:
-                produtos[produto] = venda['quantidade']
+            produtos[produto] = produtos.get(produto, 0) + venda['quantidade']
         
         # Criar gráfico de barras
         nomes = list(produtos.keys())
         valores = list(produtos.values())
         
-        # Limitar a 10 produtos para melhor visualização
+        # Limitar a 10 produtos para melhor visualização e performance
         if len(nomes) > 10:
-            indices_ordenados = sorted(range(len(valores)), key=lambda i: valores[i], reverse=True)[:10]
-            nomes = [nomes[i] for i in indices_ordenados]
-            valores = [valores[i] for i in indices_ordenados]
+            # Usar numpy para ordenação mais rápida
+            indices = np.argsort(valores)[-10:][::-1]
+            nomes = [nomes[i] for i in indices]
+            valores = [valores[i] for i in indices]
             self.axes.set_title('Top 10 Produtos Vendidos', color='white')
         else:
             self.axes.set_title('Produtos Vendidos', color='white')
         
-        # Criar barras com cores gradientes
-        barras = self.axes.bar(nomes, valores, color=plt.cm.viridis(np.linspace(0, 1, len(nomes))))
+        # Criar barras com cores gradientes (simplificado)
+        cores = plt.cm.viridis(np.linspace(0, 1, len(nomes)))
+        barras = self.axes.bar(nomes, valores, color=cores)
         
         # Configurar eixos e rótulos
-        self.axes.set_ylabel('Quantidade Vendida', color='white')
+        self.axes.set_ylabel('Quantidade', color='white')  # Texto mais curto
         self.axes.set_xlabel('Produtos', color='white')
         
         # Rotacionar rótulos do eixo X para melhor visualização
@@ -173,35 +252,35 @@ class RelatorioVendasWindow(QWidget):
         super().__init__()
         self.janela_parent = janela_parent
         self.dados_filtrados = []
+        self.thread_dados = None
+        self.thread_categorias = None
         
         # Definir tamanho mínimo da janela
         self.setMinimumSize(900, 600)
-        
-        # Para garantir que a janela seja aberta com esse tamanho
         self.resize(900, 600)
         
-        # Não precisamos mais verificar a tabela de vendas_produtos
-        # já que vamos usar diretamente a tabela VENDAS do PDV
+        # Inicializar UI com carregamento preguiçoso
+        self.setupUI()
         
-        self.initUI()
+        # Carregar categorias em segundo plano
+        self.iniciar_carregamento_categorias()
         
-    def create_palette(self):
-        """Cria uma paleta com cor de fundo azul escuro"""
-        from PyQt5.QtGui import QPalette, QColor
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor("#043b57"))
-        palette.setColor(QPalette.WindowText, Qt.white)
-        return palette
+        # Usar um QTimer para adiar o carregamento inicial de dados
+        QTimer.singleShot(100, self.configurar_eventos)
     
-    def initUI(self):
+    def setupUI(self):
+        """Configuração básica da UI sem carregar dados inicialmente"""
         # Layout principal
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         
-        # Fundo para todo o aplicativo
+        # Aplicar estilo ao widget principal (simplificado)
         self.setAutoFillBackground(True)
-        self.setPalette(self.create_palette())
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor("#043b57"))
+        palette.setColor(QPalette.WindowText, Qt.white)
+        self.setPalette(palette)
         
         # Título
         titulo = QLabel("Relatório de Vendas de Produtos")
@@ -275,16 +354,6 @@ class RelatorioVendasWindow(QWidget):
                 padding: 5px;
                 min-height: 25px;
             }
-            QDateEdit::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left-width: 1px;
-                border-left-color: white;
-                border-left-style: solid;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
         """)
         
         data_inicial_label = QLabel("Data Inicial:")
@@ -303,16 +372,6 @@ class RelatorioVendasWindow(QWidget):
                 padding: 5px;
                 min-height: 25px;
             }
-            QDateEdit::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left-width: 1px;
-                border-left-color: white;
-                border-left-style: solid;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
         """)
         
         data_final_label = QLabel("Data Final:")
@@ -321,9 +380,7 @@ class RelatorioVendasWindow(QWidget):
         
         # Categoria (Grupo)
         self.categoria_combo = QComboBox()
-        categorias = ["Todas as Categorias"]  # Buscar do banco
-        categorias.extend(self.carregar_categorias())
-        self.categoria_combo.addItems(categorias)
+        self.categoria_combo.addItem("Carregando categorias...")  # Placeholder
         self.categoria_combo.setStyleSheet("""
             QComboBox {
                 background-color: white;
@@ -333,29 +390,13 @@ class RelatorioVendasWindow(QWidget):
                 padding: 5px;
                 min-height: 25px;
             }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left-width: 1px;
-                border-left-color: white;
-                border-left-style: solid;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: white;
-                color: #043b57;
-                selection-background-color: #0078d7;
-                selection-color: white;
-            }
         """)
         
         categoria_label = QLabel("Categoria:")
         categoria_label.setStyleSheet(form_label_style)
         filtros_layout.addRow(categoria_label, self.categoria_combo)
         
-        # Botão gerar relatório
+        # Botões
         btn_layout = QHBoxLayout()
         btn_layout.addStretch(1)
         
@@ -374,11 +415,7 @@ class RelatorioVendasWindow(QWidget):
             QPushButton:hover {
                 background-color: #0078d7;
             }
-            QPushButton:pressed {
-                background-color: #005f9e;
-            }
         """)
-        self.btn_gerar.clicked.connect(self.gerar_relatorio)
         btn_layout.addWidget(self.btn_gerar)
         
         self.btn_exportar = QPushButton("Exportar")
@@ -396,11 +433,7 @@ class RelatorioVendasWindow(QWidget):
             QPushButton:hover {
                 background-color: #3d8b40;
             }
-            QPushButton:pressed {
-                background-color: #2d682f;
-            }
         """)
-        self.btn_exportar.clicked.connect(self.exportar_relatorio)
         btn_layout.addWidget(self.btn_exportar)
         
         filtros_layout.addRow("", btn_layout)
@@ -427,25 +460,11 @@ class RelatorioVendasWindow(QWidget):
                 border: none;
                 border-radius: 5px;
             }
-            QTableWidget::item {
-                padding: 5px;
-                border-bottom: 1px solid #eeeeee;
-            }
-            QTableWidget::item:selected {
-                background-color: #0078d7;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: #f0f0f0;
-                padding: 5px;
-                border: 1px solid #cccccc;
-                font-weight: bold;
-            }
         """)
         content_layout.addWidget(self.tabela, 3)  # Proporção 3:2
         
-        # Gráfico de vendas
-        self.grafico = GraficoVendas(self, width=6, height=4, dpi=80)
+        # Gráfico de vendas - com DPI reduzido para melhor performance
+        self.grafico = GraficoVendas(self, width=6, height=4, dpi=70)
         self.grafico.setStyleSheet("background-color: #043b57; border-radius: 5px;")
         self.grafico.setMinimumWidth(400)
         content_layout.addWidget(self.grafico, 2)  # Proporção 3:2
@@ -466,21 +485,25 @@ class RelatorioVendasWindow(QWidget):
         resumo_layout.addWidget(self.total_produtos_label)
         
         main_layout.addLayout(resumo_layout)
-        
-        # Conectar sinais
-        self.grupo_periodo.buttonClicked.connect(self.atualizar_periodo)
-        
-        # Gerar relatório inicial
-        self.gerar_relatorio()
     
-    def carregar_categorias(self):
-        """Carrega as categorias (grupos) do banco de dados"""
-        try:
-            grupos = listar_grupos()
-            return grupos
-        except Exception as e:
-            print(f"Erro ao carregar categorias: {e}")
-            return []
+    def configurar_eventos(self):
+        """Configura os eventos e conexões de sinais após a UI estar pronta"""
+        self.btn_gerar.clicked.connect(self.iniciar_gerar_relatorio)
+        self.btn_exportar.clicked.connect(self.exportar_relatorio)
+        self.grupo_periodo.buttonClicked.connect(self.atualizar_periodo)
+    
+    def iniciar_carregamento_categorias(self):
+        """Inicia o carregamento de categorias em uma thread separada"""
+        self.thread_categorias = CarregadorCategoriasThread()
+        self.thread_categorias.categorias_carregadas.connect(self.atualizar_categorias)
+        self.thread_categorias.erro_carregamento.connect(lambda erro: self.mostrar_mensagem("Erro", f"Erro ao carregar categorias: {erro}"))
+        self.thread_categorias.start()
+    
+    def atualizar_categorias(self, categorias):
+        """Atualiza o combo de categorias com dados carregados"""
+        self.categoria_combo.clear()
+        self.categoria_combo.addItem("Todas as Categorias")
+        self.categoria_combo.addItems(categorias)
     
     def atualizar_periodo(self):
         """Atualiza o período selecionado"""
@@ -499,84 +522,106 @@ class RelatorioVendasWindow(QWidget):
             self.data_inicial.setDate(hoje.addMonths(-1))
             self.data_final.setDate(hoje)
     
-    def gerar_relatorio(self):
-        """Gera o relatório com base nos filtros selecionados"""
-        try:
-            # Obter datas do filtro
-            data_inicial = self.data_inicial.date().toString("yyyy-MM-dd")
-            data_final = self.data_final.date().toString("yyyy-MM-dd")
-            
-            # Obter categoria selecionada
-            categoria = self.categoria_combo.currentText()
-            if categoria == "Todas as Categorias":
-                categoria = None
-                
-            # Buscar dados no banco - agora usando a tabela VENDAS do PDV
-            self.dados_filtrados = obter_vendas_por_periodo(data_inicial, data_final, categoria)
-            
-            # Limpar e preencher a tabela
-            self.tabela.setRowCount(0)
-            
-            # Variáveis para cálculo de totais
-            total_vendas = 0
-            total_produtos = 0
-            
-            # Preencher a tabela com os dados
-            for i, venda in enumerate(self.dados_filtrados):
-                self.tabela.insertRow(i)
-                
-                # Configurar células da tabela
-                self.tabela.setItem(i, 0, QTableWidgetItem(venda["produto"]))
-                self.tabela.setItem(i, 1, QTableWidgetItem(venda["categoria"]))
-                
-                # Formatar data
-                data_formatada = venda["data"]
-                if isinstance(data_formatada, datetime.date):
-                    # Converter objeto date para string no formato "dd/mm/yyyy"
-                    data_formatada = data_formatada.strftime("%d/%m/%Y")
-                elif isinstance(data_formatada, str) and "-" in data_formatada:
-                    # Converter de "yyyy-mm-dd" para "dd/mm/yyyy"
-                    partes = data_formatada.split("-")
-                    if len(partes) == 3:
-                        data_formatada = f"{partes[2]}/{partes[1]}/{partes[0]}"
-                
-                # Garantir que seja string
-                self.tabela.setItem(i, 2, QTableWidgetItem(str(data_formatada)))
-                self.tabela.setItem(i, 3, QTableWidgetItem(str(venda["quantidade"])))
-                
-                # Formatação de valor monetário
-                valor_total = venda["valor_total"]
-                valor_formatado = f"R$ {valor_total:.2f}".replace('.', ',')
-                self.tabela.setItem(i, 4, QTableWidgetItem(valor_formatado))
-                
-                # Acumular totais
-                total_vendas += valor_total
-                total_produtos += venda["quantidade"]
-            
-            # Atualizar rótulos de resumo
-            self.total_vendas_label.setText(f"Total de Vendas: R$ {total_vendas:.2f}".replace('.', ','))
-            self.total_produtos_label.setText(f"Produtos Vendidos: {total_produtos}")
-            
-            # Atualizar gráfico
-            self.grafico.atualizar_grafico(self.dados_filtrados)
-            
-            # Exibir mensagem se não houver dados
-            if not self.dados_filtrados:
-                self.mostrar_mensagem("Sem Dados", 
-                                    "Não foram encontrados dados para o período e categoria selecionados.")
+    def iniciar_gerar_relatorio(self):
+        """Inicia a geração do relatório em uma thread separada"""
+        # Desabilitar botão enquanto carrega
+        self.btn_gerar.setEnabled(False)
+        self.btn_gerar.setText("Carregando...")
         
-        except Exception as e:
-            print(f"Erro ao gerar relatório: {e}")
-            import traceback
-            traceback.print_exc()
-            self.mostrar_mensagem("Erro", f"Ocorreu um erro ao gerar o relatório: {str(e)}")
+        # Criar diálogo de progresso
+        self.progresso = QProgressDialog("Carregando dados...", "Cancelar", 0, 0, self)
+        self.progresso.setWindowTitle("Aguarde")
+        self.progresso.setModal(True)
+        self.progresso.setMinimumDuration(500)  # Só aparece se demorar mais de 500ms
+        self.progresso.show()
+        
+        # Obter datas do filtro
+        data_inicial = self.data_inicial.date().toString("yyyy-MM-dd")
+        data_final = self.data_final.date().toString("yyyy-MM-dd")
+        
+        # Obter categoria selecionada
+        categoria = self.categoria_combo.currentText()
+        if categoria == "Todas as Categorias" or categoria == "Carregando categorias...":
+            categoria = None
+        
+        # Iniciar thread de carregamento
+        self.thread_dados = CarregadorDadosThread(data_inicial, data_final, categoria)
+        self.thread_dados.dados_carregados.connect(self.atualizar_relatorio)
+        self.thread_dados.erro_carregamento.connect(self.tratar_erro_carregamento)
+        self.thread_dados.finished.connect(lambda: self.finalizar_carregamento())
+        self.thread_dados.start()
+    
+    def finalizar_carregamento(self):
+        """Finaliza o processo de carregamento, fechando o diálogo e reativando botões"""
+        self.progresso.close()
+        self.btn_gerar.setEnabled(True)
+        self.btn_gerar.setText("Gerar Relatório")
+    
+    def tratar_erro_carregamento(self, erro):
+        """Trata erros durante o carregamento de dados"""
+        self.mostrar_mensagem("Erro", f"Ocorreu um erro ao gerar o relatório: {erro}")
+        self.dados_filtrados = []
+        self.tabela.setRowCount(0)
+        self.total_vendas_label.setText("Total de Vendas: R$ 0,00")
+        self.total_produtos_label.setText("Produtos Vendidos: 0")
+        self.grafico.mostrar_placeholder("Ocorreu um erro ao carregar os dados")
+    
+    def atualizar_relatorio(self, dados):
+        """Atualiza a UI com os dados carregados"""
+        self.dados_filtrados = dados
+        
+        # Limpamos a tabela antes de preencher
+        self.tabela.setRowCount(0)
+        
+        # Variáveis para cálculo de totais
+        total_vendas = 0
+        total_produtos = 0
+        
+        # Desativar sorting temporariamente para melhorar performance
+        self.tabela.setSortingEnabled(False)
+        
+        # Usar setRowCount para pré-alocar linhas (melhora performance)
+        self.tabela.setRowCount(len(dados))
+        
+        # Preencher a tabela com os dados - por batch para melhorar performance
+        for i, venda in enumerate(self.dados_filtrados):
+            # Configurar células da tabela
+            self.tabela.setItem(i, 0, QTableWidgetItem(venda["produto"]))
+            self.tabela.setItem(i, 1, QTableWidgetItem(venda["categoria"]))
             
-            # Limpar dados
-            self.dados_filtrados = []
-            self.tabela.setRowCount(0)
-            self.total_vendas_label.setText("Total de Vendas: R$ 0,00")
-            self.total_produtos_label.setText("Produtos Vendidos: 0")
-            self.grafico.atualizar_grafico([])
+            # Formatar data
+            data_formatada = venda["data"]
+            if isinstance(data_formatada, datetime.date):
+                # Converter objeto date para string no formato "dd/mm/yyyy"
+                data_formatada = data_formatada.strftime("%d/%m/%Y")
+            elif isinstance(data_formatada, str) and "-" in data_formatada:
+                # Converter de "yyyy-mm-dd" para "dd/mm/yyyy"
+                partes = data_formatada.split("-")
+                if len(partes) == 3:
+                    data_formatada = f"{partes[2]}/{partes[1]}/{partes[0]}"
+            
+            # Garantir que seja string
+            self.tabela.setItem(i, 2, QTableWidgetItem(str(data_formatada)))
+            self.tabela.setItem(i, 3, QTableWidgetItem(str(venda["quantidade"])))
+            
+            # Formatação de valor monetário
+            valor_total = venda["valor_total"]
+            valor_formatado = f"R$ {valor_total:.2f}".replace('.', ',')
+            self.tabela.setItem(i, 4, QTableWidgetItem(valor_formatado))
+            
+            # Acumular totais
+            total_vendas += valor_total
+            total_produtos += venda["quantidade"]
+        
+        # Reativar sorting
+        self.tabela.setSortingEnabled(True)
+        
+        # Atualizar rótulos de resumo
+        self.total_vendas_label.setText(f"Total de Vendas: R$ {total_vendas:.2f}".replace('.', ','))
+        self.total_produtos_label.setText(f"Produtos Vendidos: {total_produtos}")
+        
+        # Atualizar gráfico (com delay para melhorar responsividade)
+        QTimer.singleShot(100, lambda: self.grafico.atualizar_grafico(self.dados_filtrados))
     
     def exportar_relatorio(self):
         """Exporta o relatório para um arquivo CSV"""
@@ -594,12 +639,25 @@ class RelatorioVendasWindow(QWidget):
         
         if nome_arquivo:
             try:
+                # Mostrar progresso durante exportação para arquivos grandes
+                progresso = QProgressDialog("Exportando relatório...", "Cancelar", 0, len(self.dados_filtrados), self)
+                progresso.setWindowTitle("Exportando")
+                progresso.setModal(True)
+                progresso.show()
+                
                 with open(nome_arquivo, 'w', encoding='utf-8') as arquivo:
                     # Cabeçalho
                     arquivo.write("Produto,Categoria,Data,Quantidade,Valor Total\n")
                     
-                    # Dados
-                    for venda in self.dados_filtrados:
+                    # Dados - processados em lotes de 100 para não travar a UI
+                    for i, venda in enumerate(self.dados_filtrados):
+                        if i % 100 == 0:
+                            progresso.setValue(i)
+                            QApplication.processEvents()  # Permite que a UI responda
+                            
+                            if progresso.wasCanceled():
+                                break
+                        
                         # Formatar a data
                         data = venda['data']
                         if isinstance(data, str) and "-" in data:
@@ -610,6 +668,8 @@ class RelatorioVendasWindow(QWidget):
                         linha = f"{venda['produto']},{venda['categoria']},{data},"
                         linha += f"{venda['quantidade']},{venda['valor_total']:.2f}\n"
                         arquivo.write(linha)
+                
+                progresso.close()
                 
                 self.mostrar_mensagem("Exportação Concluída", 
                                     f"Relatório exportado com sucesso para:\n{nome_arquivo}")
@@ -643,9 +703,6 @@ class RelatorioVendasWindow(QWidget):
                 border: none;
                 padding: 5px 15px;
                 border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #0078d7;
             }
         """)
         msg_box.exec_()

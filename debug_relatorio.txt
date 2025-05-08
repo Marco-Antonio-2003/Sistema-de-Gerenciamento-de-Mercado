@@ -1,0 +1,4 @@
+
+--- Iniciando módulo de relatórios em 2025-05-08 10:25:56.184355 ---
+Diretório da aplicação: c:\Users\Marco-Note\Desktop\PythonProject\Sistema
+Caminhos no sys.path: ['c:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema', 'C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\python310.zip', 'C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\DLLs', 'C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib', 'C:\\Users\\Marco-Note\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0', 'C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\.venv', 'C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\.venv\\lib\\site-packages']

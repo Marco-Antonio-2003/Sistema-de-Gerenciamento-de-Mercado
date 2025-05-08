@@ -1,0 +1,8 @@
+
+--- Iniciando módulo de relatórios em 2025-05-08 10:31:18.901750 ---
+Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
+Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI136762\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI136762\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI136762']
+
+--- Iniciando módulo de relatórios em 2025-05-08 10:32:24.134746 ---
+Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
+Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962']
