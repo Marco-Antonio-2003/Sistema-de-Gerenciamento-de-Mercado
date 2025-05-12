@@ -6,3 +6,8 @@ Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\
 --- Iniciando módulo de relatórios em 2025-05-08 10:32:24.134746 ---
 Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
 Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI49962']
+
+--- Iniciando módulo de relatórios em 2025-05-09 10:55:03.585110 ---
+Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
+Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202']
+ERRO AO OBTER VENDAS: ('Error while preparing SQL statement:\n- SQLCODE: -104\n- Dynamic SQL Error\n- SQL error code = -104\n- Token unknown - line 9, column 35\n- LIMIT', -104, 335544569)
