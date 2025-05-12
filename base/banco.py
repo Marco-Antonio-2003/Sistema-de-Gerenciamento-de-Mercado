@@ -5832,6 +5832,127 @@ def verificar_tabela_vendas_produtos():
         print(f"Erro ao verificar/criar tabelas de vendas de produtos: {e}")
         raise Exception(f"Erro ao verificar/criar tabelas de vendas de produtos: {str(e)}")
 
+def atualizar_estoque_apos_venda(codigo_produto, quantidade_vendida):
+    """
+    Atualiza o estoque de um produto após uma venda
+    
+    Args:
+        codigo_produto (str): Código do produto vendido
+        quantidade_vendida (float): Quantidade vendida
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida, False caso contrário
+        dict: Informações sobre o estoque após a atualização, incluindo avisos se necessário
+    """
+    try:
+        # Buscar o produto pelo código
+        produto = buscar_produto_por_codigo(codigo_produto)
+        
+        if not produto:
+            raise Exception(f"Produto com código {codigo_produto} não encontrado")
+        
+        # Obter o estoque atual e calcular o novo estoque
+        id_produto = produto[0]
+        estoque_atual = produto[8] or 0  # Índice 8 é QUANTIDADE_ESTOQUE
+        
+        if estoque_atual < quantidade_vendida:
+            raise Exception(f"Estoque insuficiente. Disponível: {estoque_atual}, Solicitado: {quantidade_vendida}")
+        
+        novo_estoque = estoque_atual - quantidade_vendida
+        
+        # Atualizar o estoque do produto
+        query = """
+        UPDATE PRODUTOS
+        SET QUANTIDADE_ESTOQUE = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (novo_estoque, id_produto))
+        
+        # Verificar se o estoque está baixo
+        resultado = {
+            "sucesso": True,
+            "produto": produto[2],  # Nome do produto
+            "estoque_anterior": estoque_atual,
+            "estoque_atual": novo_estoque,
+            "estoque_baixo": False,
+            "mensagem": "Estoque atualizado com sucesso."
+        }
+        
+        # Definir limites para estoque baixo (pode ajustar conforme necessário)
+        limite_estoque_baixo = 5  # Exemplo: avisar quando estoque for menor que 5
+        
+        if novo_estoque <= limite_estoque_baixo:
+            resultado["estoque_baixo"] = True
+            resultado["mensagem"] = f"ATENÇÃO: Estoque baixo para o produto {produto[2]}. Restam apenas {novo_estoque} unidades. É necessário repor!"
+            
+            # Registrar o alerta de estoque baixo (opcional)
+            registrar_alerta_estoque_baixo(produto[0], produto[2], novo_estoque)
+        
+        return resultado
+    
+    except Exception as e:
+        print(f"Erro ao atualizar estoque: {e}")
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro ao atualizar estoque: {str(e)}"
+        }
+    
+def registrar_alerta_estoque_baixo(id_produto, nome_produto, estoque_atual):
+    """
+    Registra um alerta de estoque baixo (pode ser adaptado para
+    salvar em uma tabela de alertas, enviar e-mail, etc.)
+    
+    Args:
+        id_produto (int): ID do produto
+        nome_produto (str): Nome do produto
+        estoque_atual (float): Quantidade atual em estoque
+    """
+    # Esta é uma implementação simples que apenas imprime o alerta no console
+    # Você pode expandir para salvar em um log ou tabela, enviar e-mail, etc.
+    print(f"[ALERTA] Estoque baixo: Produto {nome_produto} (ID: {id_produto}) - Restam apenas {estoque_atual} unidades.")
+    
+    # Implementação futura: salvar em uma tabela de alertas
+    # Por exemplo:
+    # inserir_alerta_tabela(id_produto, nome_produto, estoque_atual, datetime.now())
+
+def verificar_produtos_estoque_baixo(limite=5):
+    """
+    Verifica todos os produtos com estoque baixo
+    
+    Args:
+        limite (int): Limite para considerar estoque baixo
+        
+    Returns:
+        list: Lista de produtos com estoque baixo
+    """
+    try:
+        query = """
+        SELECT ID, CODIGO, NOME, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE QUANTIDADE_ESTOQUE <= ?
+        ORDER BY QUANTIDADE_ESTOQUE
+        """
+        
+        result = execute_query(query, (limite,))
+        
+        # Formatar os resultados
+        produtos_estoque_baixo = []
+        for produto in result:
+            produtos_estoque_baixo.append({
+                "id": produto[0],
+                "codigo": produto[1],
+                "nome": produto[2],
+                "estoque": produto[3]
+            })
+        
+        return produtos_estoque_baixo
+        
+    except Exception as e:
+        print(f"Erro ao verificar produtos com estoque baixo: {e}")
+        return []
+
+
 def inserir_dados_exemplo_vendas():
     """
     Insere dados de exemplo para o relatório de vendas de produtos
@@ -7095,7 +7216,7 @@ def verificar_tabela_vendas(self):
             # Verificar estrutura
             colunas = execute_query("SELECT RDB$FIELD_NAME FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = 'VENDAS'")
             print("Colunas da tabela VENDAS:")
-            for col in colunas:
+            for col in colunas: 
                 print(f"- {col[0].strip()}")
                 
             # Verificar quantidade de registros

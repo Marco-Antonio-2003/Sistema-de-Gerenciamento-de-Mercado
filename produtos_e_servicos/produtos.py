@@ -21,6 +21,188 @@ except ImportError as e:
     QMessageBox.critical(None, "Erro de importação", 
                         f"Não foi possível importar o módulo banco.py da pasta base: {e}")
 
+# Funções para gerenciamento de estoque
+def atualizar_estoque_apos_venda(codigo_produto, quantidade_vendida):
+    """
+    Atualiza o estoque de um produto após uma venda
+    
+    Args:
+        codigo_produto (str): Código do produto vendido
+        quantidade_vendida (float): Quantidade vendida
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida, False caso contrário
+        dict: Informações sobre o estoque após a atualização, incluindo avisos se necessário
+    """
+    try:
+        from base.banco import buscar_produto_por_codigo, execute_query
+        
+        # Buscar o produto pelo código
+        produto = buscar_produto_por_codigo(codigo_produto)
+        
+        if not produto:
+            raise Exception(f"Produto com código {codigo_produto} não encontrado")
+        
+        # Obter o estoque atual e calcular o novo estoque
+        id_produto = produto[0]
+        estoque_atual = produto[8] or 0  # Índice 8 é QUANTIDADE_ESTOQUE
+        
+        if estoque_atual < quantidade_vendida:
+            raise Exception(f"Estoque insuficiente. Disponível: {estoque_atual}, Solicitado: {quantidade_vendida}")
+        
+        novo_estoque = estoque_atual - quantidade_vendida
+        
+        # Atualizar o estoque do produto
+        query = """
+        UPDATE PRODUTOS
+        SET QUANTIDADE_ESTOQUE = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (novo_estoque, id_produto))
+        
+        # Verificar se o estoque está baixo
+        resultado = {
+            "sucesso": True,
+            "produto": produto[2],  # Nome do produto
+            "estoque_anterior": estoque_atual,
+            "estoque_atual": novo_estoque,
+            "estoque_baixo": False,
+            "mensagem": "Estoque atualizado com sucesso."
+        }
+        
+        # Definir limites para estoque baixo (pode ajustar conforme necessário)
+        limite_estoque_baixo = 5  # Exemplo: avisar quando estoque for menor que 5
+        
+        if novo_estoque <= limite_estoque_baixo:
+            resultado["estoque_baixo"] = True
+            resultado["mensagem"] = f"ATENÇÃO: Estoque baixo para o produto {produto[2]}. Restam apenas {novo_estoque} unidades. É necessário repor!"
+            
+            # Registrar o alerta de estoque baixo
+            registrar_alerta_estoque_baixo(produto[0], produto[2], novo_estoque)
+        
+        return resultado
+    
+    except Exception as e:
+        print(f"Erro ao atualizar estoque: {e}")
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro ao atualizar estoque: {str(e)}"
+        }
+
+def registrar_alerta_estoque_baixo(id_produto, nome_produto, estoque_atual):
+    """
+    Registra um alerta de estoque baixo (pode ser adaptado para
+    salvar em uma tabela de alertas, enviar e-mail, etc.)
+    
+    Args:
+        id_produto (int): ID do produto
+        nome_produto (str): Nome do produto
+        estoque_atual (float): Quantidade atual em estoque
+    """
+    # Esta é uma implementação simples que apenas imprime o alerta no console
+    # Você pode expandir para salvar em um log ou tabela, enviar e-mail, etc.
+    print(f"[ALERTA] Estoque baixo: Produto {nome_produto} (ID: {id_produto}) - Restam apenas {estoque_atual} unidades.")
+
+def verificar_produtos_estoque_baixo(limite=5):
+    """
+    Verifica todos os produtos com estoque baixo
+    
+    Args:
+        limite (int): Limite para considerar estoque baixo
+        
+    Returns:
+        list: Lista de produtos com estoque baixo
+    """
+    try:
+        from base.banco import execute_query
+        
+        query = """
+        SELECT ID, CODIGO, NOME, QUANTIDADE_ESTOQUE
+        FROM PRODUTOS
+        WHERE QUANTIDADE_ESTOQUE <= ?
+        ORDER BY QUANTIDADE_ESTOQUE
+        """
+        
+        result = execute_query(query, (limite,))
+        
+        # Formatar os resultados
+        produtos_estoque_baixo = []
+        for produto in result:
+            produtos_estoque_baixo.append({
+                "id": produto[0],
+                "codigo": produto[1],
+                "nome": produto[2],
+                "estoque": produto[3]
+            })
+        
+        return produtos_estoque_baixo
+        
+    except Exception as e:
+        print(f"Erro ao verificar produtos com estoque baixo: {e}")
+        return []
+
+def registrar_venda_produto(data, codigo_produto, produto, categoria, quantidade, 
+                           valor_unitario, valor_total, cliente=None, vendedor=None):
+    """
+    Registra uma venda de produto e atualiza o estoque
+    
+    Args:
+        data (str): Data da venda no formato YYYY-MM-DD
+        codigo_produto (str): Código do produto
+        produto (str): Nome do produto
+        categoria (str): Categoria/grupo do produto
+        quantidade (float): Quantidade vendida
+        valor_unitario (float): Valor unitário
+        valor_total (float): Valor total
+        cliente (str, optional): Nome do cliente
+        vendedor (str, optional): Nome do vendedor
+        
+    Returns:
+        dict: Resultado da operação incluindo ID da venda e informações de estoque
+    """
+    try:
+        from base.banco import execute_query
+        
+        # Inserir a venda
+        query = """
+        INSERT INTO VENDAS_PRODUTOS (
+            DATA, CODIGO_PRODUTO, PRODUTO, CATEGORIA, QUANTIDADE,
+            VALOR_UNITARIO, VALOR_TOTAL, CLIENTE, VENDEDOR
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        execute_query(query, (
+            data, codigo_produto, produto, categoria, quantidade,
+            valor_unitario, valor_total, cliente, vendedor
+        ))
+        
+        # Obter o ID da venda recém-registrada
+        query_id = "SELECT MAX(ID) FROM VENDAS_PRODUTOS"
+        result = execute_query(query_id)
+        
+        id_venda = None
+        if result and len(result) > 0 and result[0][0]:
+            id_venda = result[0][0]
+        
+        # Atualizar o estoque do produto
+        resultado_estoque = atualizar_estoque_apos_venda(codigo_produto, quantidade)
+        
+        # Retornar um resultado completo
+        return {
+            "id_venda": id_venda,
+            "sucesso": resultado_estoque["sucesso"],
+            "mensagem": resultado_estoque["mensagem"],
+            "estoque_baixo": resultado_estoque.get("estoque_baixo", False)
+        }
+        
+    except Exception as e:
+        print(f"Erro ao registrar venda: {e}")
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro ao registrar venda: {str(e)}"
+        }
+
 # Classe LeitorCodigoBarras - para detectar automaticamente leituras de código de barras
 class LeitorCodigoBarras(QLineEdit):
     """
@@ -164,6 +346,9 @@ class Produtos(QWidget):
             print(f"Erro ao verificar tabela de produtos: {str(e)}")
         
         self.initUI()
+        
+        # Verificar estoque baixo ao iniciar
+        self.verificar_estoque_inicial()
         
     def create_palette(self):
         """Cria uma paleta com cor de fundo azul escuro"""
@@ -457,6 +642,30 @@ class Produtos(QWidget):
         self.btn_cadastrar.setStyleSheet(btn_action_style)
         acoes_layout.addWidget(self.btn_cadastrar)
         
+        # Botão para verificar produtos com estoque baixo
+        self.btn_estoque_baixo = QPushButton("Verificar Estoque Baixo")
+        try:
+            self.btn_estoque_baixo.setIcon(self.style().standardIcon(QStyle.SP_MessageBoxWarning))
+        except:
+            pass
+        self.btn_estoque_baixo.setStyleSheet("""
+            QPushButton {
+                background-color: #FFA500;
+                color: white;
+                border: 1px solid #E69500;
+                padding: 5px 10px;
+                font-size: 13px;
+                border-radius: 4px;
+                text-align: center;
+                min-height: 25px;
+                max-height: 25px;
+            }
+            QPushButton:hover {
+                background-color: #E69500;
+            }
+        """)
+        acoes_layout.addWidget(self.btn_estoque_baixo)
+        
         # Adicionar stretch para empurrar botões para a esquerda
         acoes_layout.addStretch(1)
         
@@ -491,7 +700,7 @@ class Produtos(QWidget):
         """)
         
         # Configurar tabela
-        self.tabela.setColumnCount(6)  # Adicionei colunas para marca e código de barras
+        self.tabela.setColumnCount(6)
         self.tabela.setHorizontalHeaderLabels(["Código", "Nome", "Marca", "Grupo", "Preço de Venda", "Quant. Estoque"])
         self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.tabela.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -502,6 +711,9 @@ class Produtos(QWidget):
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabela.setSelectionMode(QTableWidget.SingleSelection)
+        
+        # Importante: Desativar edição direta na tabela
+        self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         
         # Definir altura menor para linhas da tabela
         self.tabela.verticalHeader().setDefaultSectionSize(25)
@@ -527,6 +739,7 @@ class Produtos(QWidget):
         self.btn_alterar.clicked.connect(self.alterar)
         self.btn_excluir.clicked.connect(self.excluir)
         self.btn_cadastrar.clicked.connect(self.cadastrar)
+        self.btn_estoque_baixo.clicked.connect(self.verificar_estoque_baixo)
         
         # Leitor de código de barras - única exceção, este deve disparar pesquisa automática
         self.barras_input.codigo_lido.connect(self.pesquisar_por_codigo_barras)
@@ -537,11 +750,63 @@ class Produtos(QWidget):
         # Conectar a tabela a selecionar_item, que agora não dispara pesquisa
         self.tabela.itemSelectionChanged.connect(self.selecionar_item)
         
-        # Certifique-se de que não há conexões diretas dos campos para pesquisar
-        # NÃO ADICIONE CONEXÕES COMO:
-        # self.codigo_input.textChanged.connect(self.pesquisar)
-        # self.nome_input.textChanged.connect(self.pesquisar)
-        # etc.
+        # Configurar duplo clique na tabela para abrir o formulário de alteração
+        self.tabela.doubleClicked.connect(self.alterar)
+    
+    def verificar_estoque_inicial(self):
+        """Verifica produtos com estoque baixo ao iniciar o sistema"""
+        produtos_baixo_estoque = verificar_produtos_estoque_baixo(limite=5)
+        
+        if produtos_baixo_estoque:
+            mensagem = "Os seguintes produtos estão com estoque baixo:\n\n"
+            for p in produtos_baixo_estoque:
+                mensagem += f"• {p['nome']} (Código: {p['codigo']}) - Estoque: {p['estoque']} unidades\n"
+            mensagem += "\nÉ necessário repor o estoque destes produtos!"
+            
+            self.mostrar_alerta("Alerta de Estoque Baixo", mensagem, QMessageBox.Warning)
+    
+    def verificar_estoque_baixo(self):
+        """Verifica produtos com estoque baixo sob demanda"""
+        produtos_baixo_estoque = verificar_produtos_estoque_baixo(limite=5)
+        
+        if produtos_baixo_estoque:
+            mensagem = "Os seguintes produtos estão com estoque baixo:\n\n"
+            for p in produtos_baixo_estoque:
+                mensagem += f"• {p['nome']} (Código: {p['codigo']}) - Estoque: {p['estoque']} unidades\n"
+            mensagem += "\nÉ necessário repor o estoque destes produtos!"
+            
+            self.mostrar_alerta("Alerta de Estoque Baixo", mensagem, QMessageBox.Warning)
+        else:
+            self.mostrar_mensagem("Estoque", "Todos os produtos estão com estoque adequado.")
+    
+    def mostrar_alerta(self, titulo, texto, icone=QMessageBox.Warning):
+        """Exibe uma caixa de alerta personalizada"""
+        msg_box = QMessageBox()
+        msg_box.setIcon(icone)
+        
+        msg_box.setWindowTitle(titulo)
+        msg_box.setText(texto)
+        msg_box.setStyleSheet("""
+            QMessageBox { 
+                background-color: #043b57;
+            }
+            QLabel { 
+                color: white;
+                background-color: #043b57;
+            }
+            QPushButton {
+                background-color: #005079;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #003d5c;
+            }
+        """)
+        msg_box.exec_()
     
     def desconectar_sinais_temporariamente(self):
         """Desconecta sinais que poderiam disparar pesquisas automáticas"""
@@ -699,7 +964,13 @@ class Produtos(QWidget):
             self.tabela.setItem(row, 2, QTableWidgetItem(marca))
             self.tabela.setItem(row, 3, QTableWidgetItem(grupo))
             self.tabela.setItem(row, 4, QTableWidgetItem(f"R$ {preco_venda:.2f}".replace('.', ',')))
-            self.tabela.setItem(row, 5, QTableWidgetItem(str(quantidade_estoque)))
+            
+            # Definir cor de fundo para quantidade de estoque baixo
+            estoque_item = QTableWidgetItem(str(quantidade_estoque))
+            if quantidade_estoque <= 5:  # Definir limite para estoque baixo
+                estoque_item.setBackground(Qt.red)
+                estoque_item.setForeground(Qt.white)
+            self.tabela.setItem(row, 5, estoque_item)
     
     def limpar_filtros(self):
         """Limpa todos os campos de pesquisa e carrega todos os produtos novamente"""
@@ -805,10 +1076,6 @@ class Produtos(QWidget):
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao selecionar produto: {str(e)}", QMessageBox.Critical)
     
-    # Modifique a função alterar na classe Produtos (do arquivo produtos.py):
-
-    # Modifique a função alterar na classe Produtos:
-
     def alterar(self):
         """Abre o formulário para alterar os dados do produto selecionado"""
         try:    

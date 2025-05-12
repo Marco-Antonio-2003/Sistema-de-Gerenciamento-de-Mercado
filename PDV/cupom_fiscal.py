@@ -72,8 +72,8 @@ class CupomFiscalDialog(QDialog):
         options_layout = QHBoxLayout()
         options_layout.setSpacing(15)
         
-        # Botão Cupom Fiscal
-        self.btn_cupom_fiscal = QPushButton("CUPOM FISCAL")
+        # Botão Cupom Fiscal - F9
+        self.btn_cupom_fiscal = QPushButton("CUPOM FISCAL (F9)")
         self.btn_cupom_fiscal.setFixedHeight(60)
         self.btn_cupom_fiscal.setFont(QFont("Arial", 12, QFont.Bold))
         self.btn_cupom_fiscal.setStyleSheet("""
@@ -94,8 +94,8 @@ class CupomFiscalDialog(QDialog):
         self.btn_cupom_fiscal.clicked.connect(lambda: self.selecionar_cupom("FISCAL"))
         options_layout.addWidget(self.btn_cupom_fiscal)
         
-        # Botão Cupom Não Fiscal
-        self.btn_nao_fiscal = QPushButton("CUPOM NÃO FISCAL")
+        # Botão Cupom Não Fiscal - F10
+        self.btn_nao_fiscal = QPushButton("CUPOM NÃO FISCAL (F10)")
         self.btn_nao_fiscal.setFixedHeight(60)
         self.btn_nao_fiscal.setFont(QFont("Arial", 12, QFont.Bold))
         self.btn_nao_fiscal.setStyleSheet("""
@@ -116,8 +116,8 @@ class CupomFiscalDialog(QDialog):
         self.btn_nao_fiscal.clicked.connect(lambda: self.selecionar_cupom("NAO_FISCAL"))
         options_layout.addWidget(self.btn_nao_fiscal)
         
-        # Botão Conta Crédito
-        self.btn_conta_credito = QPushButton("CONTA CRÉDITO")
+        # Botão Conta Crédito - F11
+        self.btn_conta_credito = QPushButton("CONTA CRÉDITO (F11)")
         self.btn_conta_credito.setFixedHeight(60)
         self.btn_conta_credito.setFont(QFont("Arial", 12, QFont.Bold))
         self.btn_conta_credito.setStyleSheet("""
@@ -169,7 +169,7 @@ class CupomFiscalDialog(QDialog):
         cpf_layout.addLayout(cpf_input_layout)
         
         # Checkbox para CPF na Nota
-        self.chk_sem_cpf = QCheckBox("Não informar CPF")
+        self.chk_sem_cpf = QCheckBox("Não informar CPF (F8)")
         self.chk_sem_cpf.setFont(QFont("Arial", 12))
         self.chk_sem_cpf.toggled.connect(self.toggle_cpf_input)
         cpf_layout.addWidget(self.chk_sem_cpf)
@@ -177,11 +177,11 @@ class CupomFiscalDialog(QDialog):
         # Botões para confirmar ou voltar
         cpf_buttons_layout = QHBoxLayout()
         
-        self.btn_voltar = QPushButton("Voltar")
+        self.btn_voltar = QPushButton("Voltar (ESC)")
         self.btn_voltar.setFont(QFont("Arial", 12))
         self.btn_voltar.clicked.connect(self.voltar_selecao)
         
-        self.btn_confirmar = QPushButton("Confirmar")
+        self.btn_confirmar = QPushButton("Confirmar (F12)")
         self.btn_confirmar.setFont(QFont("Arial", 12, QFont.Bold))
         self.btn_confirmar.setStyleSheet("""
             QPushButton {
@@ -233,6 +233,32 @@ class CupomFiscalDialog(QDialog):
         
         # Stretch para empurrar tudo para cima
         main_layout.addStretch(1)
+    
+    def keyPressEvent(self, event):
+        """Captura eventos de teclado para responder às teclas de função"""
+        # Verificar se estamos na seleção de tipo de cupom ou na tela de CPF
+        if not self.cpf_frame.isVisible():
+            # Primeira tela - seleção de tipo de cupom
+            if event.key() == Qt.Key_F9:
+                self.selecionar_cupom("FISCAL")
+            elif event.key() == Qt.Key_F10:
+                self.selecionar_cupom("NAO_FISCAL")
+            elif event.key() == Qt.Key_F11:
+                self.selecionar_cupom("CONTA_CREDITO")
+            elif event.key() == Qt.Key_Escape:
+                self.reject()  # Fecha o diálogo
+        else:
+            # Segunda tela - informação de CPF
+            if event.key() == Qt.Key_F8:
+                # Alternar o estado do checkbox de "Não informar CPF"
+                self.chk_sem_cpf.setChecked(not self.chk_sem_cpf.isChecked())
+            elif event.key() == Qt.Key_F12:
+                self.confirmar_cpf()
+            elif event.key() == Qt.Key_Escape:
+                self.voltar_selecao()
+        
+        # Chamar o método da classe pai para processar outros eventos de teclado
+        super().keyPressEvent(event)
     
     def selecionar_cupom(self, tipo):
         """Armazena o tipo de cupom selecionado e mostra opções de CPF"""

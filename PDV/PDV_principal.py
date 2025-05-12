@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame, QSpacerItem, QSizePolicy, QGridLayout, QToolButton,
-    QMessageBox
+    QMessageBox, QDialog
 )
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap, QCursor, QPainter
 from PyQt5.QtCore import Qt, QDateTime, QTimer, QSize
@@ -159,6 +159,9 @@ class PDVWindow(QMainWindow):
 
         # Iniciar relógio
         self.iniciar_relogio()
+        
+        # Configurar o combo de pesquisa
+        self.configurar_combo_pesquisa()  # ADICIONAR ESTA LINHA
         
         # Conectar eventos
         self.entry_cod_barras.returnPressed.connect(self.processar_codigo_barras)
@@ -411,8 +414,8 @@ class PDVWindow(QMainWindow):
         self.clock_label.setObjectName("ClockLabel")
         header_layout.addWidget(self.clock_label)
 
-        # Botão Lista de Vendas com ícone
-        btn_vendas = QPushButton("  Lista de Vendas")
+        # Botão Lista de Vendas com ícone - ADICIONADO F3
+        btn_vendas = QPushButton("  Lista de Vendas (F3)")
         btn_vendas.setObjectName("HeaderButton")
         btn_vendas.setObjectName("VendasButton")
         btn_vendas.setIcon(QIcon(self.create_svg_icon(SVG_ICONS["history"], "#FFFFFF")))
@@ -421,11 +424,11 @@ class PDVWindow(QMainWindow):
 
         header_layout.addStretch(1)
 
-        # Botão Fechar Caixa com nova função
-        btn_acoes = QPushButton("Fechar Caixa")
+        # Botão Fechar Caixa com nova função - ADICIONADO F7
+        btn_acoes = QPushButton("Fechar Caixa (F7)")
         btn_acoes.setObjectName("HeaderButton")
         btn_acoes.setObjectName("AcoesButton")
-        btn_acoes.clicked.connect(self.confirmar_fechar_caixa)  # Nova função
+        btn_acoes.clicked.connect(self.confirmar_fechar_caixa)
         header_layout.addWidget(btn_acoes)
 
         header_layout.addStretch(1)  # Espaço antes dos botões de controle
@@ -579,6 +582,264 @@ class PDVWindow(QMainWindow):
             from PyQt5.QtWidgets import QMessageBox
             print(f"Erro ao fechar caixa: {e}")
             QMessageBox.critical(self, "Erro", f"Erro ao fechar caixa: {str(e)}")
+
+    def configurar_combo_pesquisa(self):
+        """Configura o combo de pesquisa para buscar produtos diretamente"""
+        # Desconectar sinais existentes para evitar chamadas duplicadas
+        try:
+            self.combo_pesquisa.currentIndexChanged.disconnect()
+        except:
+            pass  # Ignora se não houver conexões
+        
+        # Limpar o combo
+        self.combo_pesquisa.clear()
+        
+        # Adicionar item padrão
+        self.combo_pesquisa.addItem("Pesquisar produtos (F2)")
+        
+        # Tornar o combo editável para permitir digitação
+        self.combo_pesquisa.setEditable(True)
+        
+        # Configurar para mostrar um menu suspenso com os resultados
+        self.combo_pesquisa.setInsertPolicy(QComboBox.NoInsert)
+        
+        # Conectar sinais
+        self.combo_pesquisa.lineEdit().returnPressed.connect(self.pesquisar_produto_combo)
+    
+    def pesquisar_produto_combo(self):
+        """Pesquisa um produto a partir do texto digitado no combo"""
+        texto_pesquisa = self.combo_pesquisa.currentText().strip()
+        
+        if not texto_pesquisa or texto_pesquisa == "Pesquisar produtos (F2)":
+            return
+        
+        try:
+            # Importar função do banco de dados
+            import os
+            import sys
+            
+            # Adicionar diretório pai ao path para acessar a pasta base
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(current_dir)
+            if parent_dir not in sys.path:
+                sys.path.append(parent_dir)
+            
+            from base.banco import execute_query
+            
+            # Determinar as colunas para pesquisa
+            # Primeiro, obter a estrutura da tabela
+            structure_query = """
+            SELECT RDB$FIELD_NAME
+            FROM RDB$RELATION_FIELDS
+            WHERE RDB$RELATION_NAME = 'PRODUTOS'
+            ORDER BY RDB$FIELD_POSITION
+            """
+            
+            try:
+                # Tentar obter a estrutura
+                columns = execute_query(structure_query)
+                column_names = [col[0].strip() if col[0] else "" for col in columns]
+                
+                # Possíveis colunas de pesquisa com alternativas
+                possible_columns = {
+                    "NOME": ["NOME", "DESCRICAO", "PRODUTO", "DESCR"],
+                    "CODIGO": ["CODIGO", "ID", "ID_PRODUTO", "PRODUTO_ID", "COD"],
+                    "BARRAS": ["BARRAS", "CODIGO_BARRAS", "EAN", "GTIN", "COD_BARRAS"]
+                }
+                
+                # Construir a lista de colunas para pesquisa
+                search_columns = []
+                for key, alternatives in possible_columns.items():
+                    for alt in alternatives:
+                        if alt in column_names:
+                            search_columns.append(alt)
+                            break
+                
+                # Se não encontrou nenhuma coluna para pesquisa, usar consulta genérica
+                if not search_columns:
+                    query = "SELECT * FROM PRODUTOS"
+                    params = ()
+                else:
+                    # Construir a cláusula WHERE para pesquisa por texto
+                    where_clause = " OR ".join([f"{col} LIKE ?" for col in search_columns])
+                    params = tuple([f"%{texto_pesquisa}%" for _ in search_columns])
+                    
+                    query = f"""
+                    SELECT * FROM PRODUTOS
+                    WHERE {where_clause}
+                    ORDER BY NOME
+                    LIMIT 20
+                    """
+            
+            except Exception as structure_error:
+                # Consulta simplificada em caso de erro
+                print(f"Erro ao obter estrutura: {structure_error}")
+                query = "SELECT * FROM PRODUTOS LIMIT 20"
+                params = ()
+            
+            # Executar a consulta para buscar produtos
+            result = execute_query(query, params)
+            
+            # Se não encontrou resultados
+            if not result or len(result) == 0:
+                self.combo_pesquisa.showPopup()  # Fecha o popup se estiver aberto
+                QMessageBox.information(self, "Pesquisa", f"Nenhum produto encontrado com '{texto_pesquisa}'")
+                return
+            
+            # Se encontrou apenas um resultado, adicionar diretamente
+            if len(result) == 1:
+                produto_encontrado = result[0]
+                
+                # Criar dicionário com os dados do produto
+                try:
+                    produto = {
+                        "id": produto_encontrado[0],
+                        "codigo": produto_encontrado[1] if len(produto_encontrado) > 1 else produto_encontrado[0],
+                        "nome": produto_encontrado[2] if len(produto_encontrado) > 2 else "Produto",
+                        "preco_venda": float(produto_encontrado[3]) if len(produto_encontrado) > 3 and produto_encontrado[3] is not None else 0
+                    }
+                    
+                    # Adicionar ao carrinho diretamente
+                    self.adicionar_produto_ao_carrinho(produto)
+                    
+                    # Limpar e resetar o combo
+                    self.combo_pesquisa.lineEdit().clear()
+                    self.combo_pesquisa.setCurrentIndex(0)
+                    return
+                    
+                except Exception as e:
+                    print(f"Erro ao processar produto único: {e}")
+            
+            # Se encontrou múltiplos resultados, mostrar diálogo de seleção
+            self.mostrar_selecao_produtos(result)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao pesquisar produto: {str(e)}")
+            print(f"Erro na pesquisa: {e}")
+
+    def mostrar_selecao_produtos(self, produtos):
+        """Mostra um diálogo para selecionar entre vários produtos encontrados"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Selecionar Produto")
+        dialog.setMinimumWidth(600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Label informativo
+        lbl_info = QLabel("Selecione um produto para adicionar ao carrinho:")
+        layout.addWidget(lbl_info)
+        
+        # Tabela de produtos
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(["Código", "Nome", "Preço", "Estoque"])
+        
+        # Ajustar comportamento da tabela
+        table.setSelectionBehavior(QTableWidget.SelectRows)  # Selecionar linha inteira
+        table.setSelectionMode(QTableWidget.SingleSelection)  # Permitir apenas uma seleção
+        table.setEditTriggers(QTableWidget.NoEditTriggers)  # Não permitir edição
+        
+        # Ajustar cabeçalhos
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        
+        # Preencher a tabela com os produtos
+        for row, produto in enumerate(produtos):
+            table.insertRow(row)
+            
+            # Código (assumindo que está na primeira posição)
+            codigo = str(produto[0]) if produto[0] is not None else ""
+            table.setItem(row, 0, QTableWidgetItem(codigo))
+            
+            # Nome (assumindo que está na segunda posição, se existir)
+            nome = str(produto[1]) if len(produto) > 1 and produto[1] is not None else ""
+            table.setItem(row, 1, QTableWidgetItem(nome))
+            
+            # Preço (assumindo que está na terceira posição, se existir)
+            if len(produto) > 2 and produto[2] is not None and isinstance(produto[2], (int, float)):
+                preco = float(produto[2])
+                preco_str = f"R$ {preco:.2f}".replace('.', ',')
+                item_preco = QTableWidgetItem(preco_str)
+                item_preco.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                table.setItem(row, 2, item_preco)
+            else:
+                table.setItem(row, 2, QTableWidgetItem(""))
+            
+            # Estoque (assumindo que está na quarta posição, se existir)
+            if len(produto) > 3 and produto[3] is not None and isinstance(produto[3], (int, float)):
+                estoque = int(produto[3])
+                table.setItem(row, 3, QTableWidgetItem(str(estoque)))
+            else:
+                table.setItem(row, 3, QTableWidgetItem(""))
+        
+        layout.addWidget(table)
+        
+        # Botões
+        btn_layout = QHBoxLayout()
+        
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.clicked.connect(dialog.reject)
+        
+        btn_selecionar = QPushButton("Adicionar ao Carrinho (Enter)")
+        btn_selecionar.setDefault(True)  # Tornar este o botão padrão para Enter
+        
+        def selecionar_e_fechar():
+            rows = table.selectionModel().selectedRows()
+            if rows:
+                row = rows[0].row()
+                # Obter dados do produto selecionado
+                codigo = table.item(row, 0).text()
+                nome = table.item(row, 1).text()
+                preco_str = table.item(row, 2).text().replace("R$ ", "").replace(".", "").replace(",", ".")
+                preco = float(preco_str) if preco_str else 0.0
+                
+                # Criar dicionário com os dados do produto
+                produto = {
+                    "codigo": codigo,
+                    "nome": nome,
+                    "preco_venda": preco
+                }
+                
+                # Adicionar ao carrinho
+                self.adicionar_produto_ao_carrinho(produto)
+                
+                # Limpar e resetar o combo
+                self.combo_pesquisa.lineEdit().clear()
+                self.combo_pesquisa.setCurrentIndex(0)
+                
+                dialog.accept()
+        
+        btn_selecionar.clicked.connect(selecionar_e_fechar)
+        
+        # Conectar duplo clique na tabela para selecionar
+        table.doubleClicked.connect(selecionar_e_fechar)
+        
+        btn_layout.addWidget(btn_cancelar)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_selecionar)
+        
+        layout.addLayout(btn_layout)
+        
+        # Modificar o keyPressEvent do diálogo para capturar Enter
+        original_key_press = dialog.keyPressEvent
+        
+        def new_key_press(event):
+            if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                selecionar_e_fechar()
+            else:
+                original_key_press(event)
+        
+        dialog.keyPressEvent = new_key_press
+        
+        # Selecionar a primeira linha automaticamente
+        if table.rowCount() > 0:
+            table.selectRow(0)
+        
+        # Mostrar o diálogo
+        dialog.exec_()
 
     def abrir_historico_vendas(self):
         """Abre a janela de histórico de vendas dos últimos 30 dias"""
@@ -826,14 +1087,14 @@ class PDVWindow(QMainWindow):
 
         left_layout.addWidget(self.table_itens, 1)
 
-        # --- Rodapé Esquerdo (REESCRITO COMPLETAMENTE) ---
+        # --- Rodapé Esquerdo (Desconto e Acréscimo) ---
         bottom_left_frame = QFrame()
         bottom_left_layout = QHBoxLayout(bottom_left_frame)
         bottom_left_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Desconto com botão de edição
+        # Desconto com botão de edição - ADICIONADO F5
         desconto_layout = QHBoxLayout()
-        self.lbl_desconto = QLabel("Desconto: R$ 0,00")
+        self.lbl_desconto = QLabel("Desconto: R$ 0,00 (F5)")
         desconto_layout.addWidget(self.lbl_desconto)
         
         btn_editar_desconto = QPushButton()
@@ -851,14 +1112,14 @@ class PDVWindow(QMainWindow):
             }
         """)
         btn_editar_desconto.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_editar_desconto.setToolTip("Editar desconto")
+        btn_editar_desconto.setToolTip("Editar desconto (F5)")
         btn_editar_desconto.clicked.connect(self.editar_desconto)
         desconto_layout.addWidget(btn_editar_desconto)
         bottom_left_layout.addLayout(desconto_layout)
         
-        # Acréscimo com botão de edição
+        # Acréscimo com botão de edição - ADICIONADO F6
         acrescimo_layout = QHBoxLayout()
-        self.lbl_acrescimo = QLabel("Acréscimo: R$ 0,00")
+        self.lbl_acrescimo = QLabel("Acréscimo: R$ 0,00 (F6)")
         acrescimo_layout.addWidget(self.lbl_acrescimo)
         
         btn_editar_acrescimo = QPushButton()
@@ -876,15 +1137,13 @@ class PDVWindow(QMainWindow):
             }
         """)
         btn_editar_acrescimo.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_editar_acrescimo.setToolTip("Editar acréscimo")
+        btn_editar_acrescimo.setToolTip("Editar acréscimo (F6)")
         btn_editar_acrescimo.clicked.connect(self.editar_acrescimo)
         acrescimo_layout.addWidget(btn_editar_acrescimo)
         bottom_left_layout.addLayout(acrescimo_layout)
         
-        # Adicionar espaço expansível - remove a "Lista de Preços"
+        # Adicionar espaço expansível
         bottom_left_layout.addStretch(1)
-        
-        # A "Lista de Preços" foi removida completamente
         
         left_layout.addWidget(bottom_left_frame)
 
@@ -1239,32 +1498,32 @@ class PDVWindow(QMainWindow):
 
     def criar_area_direita(self):
         right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
+        right_layout = QVBoxLayout(right_widget)    
         right_layout.setContentsMargins(15, 15, 15, 15)
         right_layout.setSpacing(15)
 
         # --- Botões Superiores Direita com SVG ---
         top_right_layout = QHBoxLayout()
         
-        # Botão 1: Listar Clientes
-        btn_clientes = QPushButton()
+        # Botão 1: Listar Clientes - ADICIONADO F1
+        btn_clientes = QPushButton("Clientes (F1)")
         btn_clientes.setObjectName("SidebarButton1")
         btn_clientes.setIcon(QIcon(self.create_svg_icon(SVG_ICONS["user"], "#FFFFFF")))
         btn_clientes.setIconSize(QSize(24, 24))
         btn_clientes.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         btn_clientes.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_clientes.setToolTip("Listar Clientes")
+        btn_clientes.setToolTip("Listar Clientes (F1)")
         btn_clientes.clicked.connect(self.listar_clientes)
         top_right_layout.addWidget(btn_clientes)
         
-        # Botão 2: Listar Produtos
-        btn_produtos = QPushButton()
+        # Botão 2: Listar Produtos - ADICIONADO F2
+        btn_produtos = QPushButton("Produtos (F2)")
         btn_produtos.setObjectName("SidebarButton2")
         btn_produtos.setIcon(QIcon(self.create_svg_icon(SVG_ICONS["list"], "#FFFFFF")))
         btn_produtos.setIconSize(QSize(24, 24))
         btn_produtos.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         btn_produtos.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_produtos.setToolTip("Listar Produtos")
+        btn_produtos.setToolTip("Listar Produtos (F2)")
         btn_produtos.clicked.connect(self.listar_produtos)
         top_right_layout.addWidget(btn_produtos)
         
@@ -1283,7 +1542,7 @@ class PDVWindow(QMainWindow):
         self.lbl_total_valor.setObjectName("TotalValue")
         right_layout.addWidget(self.lbl_total_valor)
 
-        # --- Forma de Pagamento com todas as opções da imagem ---
+        # --- Forma de Pagamento ---
         lbl_forma_pagamento = QLabel("Forma de Pagamento")
         lbl_forma_pagamento.setStyleSheet("font-weight: bold;")
         right_layout.addWidget(lbl_forma_pagamento)
@@ -1307,7 +1566,7 @@ class PDVWindow(QMainWindow):
         self.combo_pagamento.addItem("90 - Sem pagamento")
         self.combo_pagamento.addItem("99 - Outros")
         
-        self.combo_pagamento.setCurrentIndex(0)  # Iniciar com "Selecione o Tipo de pagamento"
+        self.combo_pagamento.setCurrentIndex(0)
         self.combo_pagamento.currentIndexChanged.connect(self.atualizar_layout_pagamento)
         
         right_layout.addWidget(self.combo_pagamento)
@@ -1335,13 +1594,13 @@ class PDVWindow(QMainWindow):
         
         right_layout.addWidget(self.troco_widget)
         
-        # Inicialmente oculta o widget de troco (até que a forma de pagamento adequada seja selecionada)
+        # Inicialmente oculta o widget de troco
         self.troco_widget.setVisible(False)
         self.lbl_valor_recebido.setVisible(False)
         self.entry_valor_recebido.setVisible(False)
 
-        # --- Botão Finalizar com ícone SVG ---
-        self.btn_finalizar = QPushButton("Finalizar R$ 0,00")
+        # --- Botão Finalizar com ícone SVG e tecla F4 ---
+        self.btn_finalizar = QPushButton("Finalizar R$ 0,00 (F4)")
         self.btn_finalizar.setObjectName("FinalizarButton")
         check_icon = self.create_svg_icon(SVG_ICONS["check"], "#FFFFFF")
         self.btn_finalizar.setIcon(QIcon(check_icon))
@@ -1349,6 +1608,28 @@ class PDVWindow(QMainWindow):
         self.btn_finalizar.setCursor(QCursor(Qt.PointingHandCursor))
         self.btn_finalizar.clicked.connect(self.finalizar_venda_com_cupom)
         right_layout.addWidget(self.btn_finalizar)
+
+        # --- Botão adicional para Limpar Venda (F8) ---
+        self.btn_limpar_venda = QPushButton("Limpar Venda (F8)")
+        self.btn_limpar_venda.setObjectName("ClearButton")
+        self.btn_limpar_venda.setStyleSheet("""
+            QPushButton#ClearButton { 
+                background-color: #f44336; 
+                color: white; 
+                font-size: 14px; 
+                font-weight: bold; 
+                padding: 10px; 
+                border: none; 
+                border-radius: 3px; 
+                margin-top: 10px;
+            }
+            QPushButton#ClearButton:hover { 
+                background-color: #e53935; 
+            }
+        """)
+        self.btn_limpar_venda.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_limpar_venda.clicked.connect(self.limpar_venda)
+        right_layout.addWidget(self.btn_limpar_venda)
 
         return right_widget
     
@@ -1391,6 +1672,54 @@ class PDVWindow(QMainWindow):
             self.troco_widget.setVisible(False)
             self.entry_valor_recebido.clear()  # Limpar valor recebido
 
+    def atualizar_botao_finalizar(self, valor_total=None):
+        """Atualiza o texto do botão finalizar garantindo que o indicador (F4) esteja sempre presente"""
+        if valor_total is None:
+            valor_total = self.lbl_total_valor.text()
+            
+        self.btn_finalizar.setText(f"Finalizar R$ {valor_total} (F4)")
+
+    # Esse método precisa ser chamado em todos os lugares que afetam o total
+
+    def atualizar_total(self):
+        """Atualiza o valor total da compra"""
+        # Calcular o subtotal (soma dos itens)
+        subtotal = 0.0
+        for row in range(self.table_itens.rowCount()):
+            # Obter o valor do item na coluna de valor
+            valor_texto = self.table_itens.item(row, 4).text()
+            
+            # Obter a quantidade na coluna de quantidade
+            quantidade_widget = self.table_itens.cellWidget(row, 3)
+            quantidade = quantidade_widget.get_value() if quantidade_widget else 1
+            
+            # Converter o valor de texto para float
+            try:
+                # Remover "R$ " e substituir vírgula por ponto
+                valor_limpo = valor_texto.replace("R$ ", "").replace(".", "").replace(",", ".")
+                valor = float(valor_limpo)
+                # Adicionar ao subtotal (valor * quantidade)
+                subtotal += valor * quantidade
+            except (ValueError, AttributeError):
+                continue
+        
+        # Aplicar desconto e acréscimo
+        total_com_ajustes = subtotal - self.valor_desconto + self.valor_acrescimo
+        
+        # Garantir que o total não seja negativo
+        if total_com_ajustes < 0:
+            total_com_ajustes = 0
+        
+        # Atualizar o label com o total formatado
+        total_formatado = f"{total_com_ajustes:.2f}".replace(".", ",")
+        self.lbl_total_valor.setText(total_formatado)
+        
+        # Atualizar o botão finalizar com o novo método dedicado
+        self.atualizar_botao_finalizar(total_formatado)
+        
+        # Recalcular o troco se houver valor recebido
+        if self.entry_valor_recebido.text():
+            self.calcular_troco()
 
     # 3. Melhorar o método calcular_troco para ser mais robusto
 
@@ -1419,7 +1748,7 @@ class PDVWindow(QMainWindow):
             if not valor_recebido_text.strip():
                 self.troco_widget.setVisible(False)
                 return
-                
+                    
             valor_recebido = float(valor_recebido_text) if valor_recebido_text else 0.0
             
             # Calcular o troco
@@ -1441,9 +1770,9 @@ class PDVWindow(QMainWindow):
                 self.lbl_troco.setText(f"Troco R$ {troco_formatado}")
                 self.lbl_troco.setStyleSheet("color: #673AB7; font-size: 18px; font-weight: bold; background-color: transparent; qproperty-alignment: 'AlignCenter'; padding: 12px;")
             
-            # Atualizar o texto do botão finalizar
+            # Atualizar o texto do botão finalizar - ADICIONADO (F4)
             total_formatado = f"{total:.2f}".replace('.', ',')
-            self.btn_finalizar.setText(f"Finalizar R$ {total_formatado}")
+            self.btn_finalizar.setText(f"Finalizar R$ {total_formatado} (F4)")
             
         except (ValueError, TypeError) as e:
             # Em caso de erro de conversão, ocultar o troco
@@ -1498,7 +1827,81 @@ class PDVWindow(QMainWindow):
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "Aviso", f"Digite o valor recebido para pagamento com {forma_pagamento}.")
                 return
-            
+            # Verificar disponibilidade de estoque
+            try:
+                from base.banco import execute_query
+                
+                # Verificar a estrutura da tabela PRODUTOS para encontrar o campo de estoque
+                structure_query_produtos = """
+                SELECT RDB$FIELD_NAME
+                FROM RDB$RELATION_FIELDS
+                WHERE RDB$RELATION_NAME = 'PRODUTOS'
+                ORDER BY RDB$FIELD_POSITION
+                """
+                
+                produtos_fields = execute_query(structure_query_produtos)
+                
+                # Possíveis nomes para o campo de estoque
+                estoque_alternatives = ["ESTOQUE", "QUANTIDADE_ESTOQUE", "ESTOQUE_ATUAL", "QTD", "QUANTIDADE", "SALDO", "SALDO_ESTOQUE"]
+                
+                # Encontrar o nome real da coluna de estoque
+                estoque_field = None
+                for field in produtos_fields:
+                    field_name = field[0].strip() if field[0] else ""
+                    if field_name.upper() in [alt.upper() for alt in estoque_alternatives]:
+                        estoque_field = field_name
+                        break
+                
+                if estoque_field:
+                    # Verificar estoque de cada item
+                    produtos_sem_estoque = []
+                    
+                    for row in range(self.table_itens.rowCount()):
+                        id_produto = self.table_itens.item(row, 1).text()
+                        qtd_pedida = self.table_itens.cellWidget(row, 3).get_value()
+                        nome_produto = self.table_itens.item(row, 2).text()
+                        
+                        # Verificar estoque atual
+                        query_estoque = f"""
+                        SELECT {estoque_field}
+                        FROM PRODUTOS
+                        WHERE CODIGO = ?
+                        """
+                        
+                        result = execute_query(query_estoque, (id_produto,))
+                        
+                        if result and len(result) > 0 and result[0][0] is not None:
+                            estoque_atual = float(result[0][0])
+                            if estoque_atual < qtd_pedida:
+                                produtos_sem_estoque.append({
+                                    'codigo': id_produto,
+                                    'nome': nome_produto,
+                                    'estoque': estoque_atual,
+                                    'pedido': qtd_pedida
+                                })
+                    
+                    if produtos_sem_estoque:
+                        from PyQt5.QtWidgets import QMessageBox
+                        
+                        msg = "Os seguintes produtos não possuem estoque suficiente:\n\n"
+                        for produto in produtos_sem_estoque:
+                            msg += f"- {produto['nome']}: disponível {produto['estoque']}, pedido {produto['pedido']}\n"
+                        
+                        msg += "\nDeseja continuar com a venda mesmo assim?"
+                        
+                        resposta = QMessageBox.question(
+                            self,
+                            "Estoque Insuficiente",
+                            msg,
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+                        
+                        if resposta == QMessageBox.No:
+                            return  # Interrompe a finalização da venda
+                        
+            except Exception as e:
+                print(f"Erro ao verificar estoque: {e}")
             # Obter itens da venda
             itens = []
             for row in range(self.table_itens.rowCount()):
@@ -1772,6 +2175,7 @@ class PDVWindow(QMainWindow):
             import traceback
             traceback.print_exc()
 
+
     def limpar_venda(self):
         """Limpa a venda atual, resetando campos e tabela"""
         # Limpar a tabela
@@ -1781,8 +2185,7 @@ class PDVWindow(QMainWindow):
         self.lbl_total_valor.setText("0,00")
         self.entry_valor_recebido.clear()
         self.lbl_troco.setText("Troco R$ 0,00")
-        self.lbl_troco.setStyleSheet("color: #673AB7; font-size: 18px; font-weight: bold; background-color: transparent; qproperty-alignment: 'AlignCenter'; padding: 12px;")
-        self.btn_finalizar.setText("Finalizar R$ 0,00")
+        self.btn_finalizar.setText("Finalizar R$ 0,00 (F4)")  # ADICIONADO (F4)
         
         # Resetar forma de pagamento
         self.combo_pagamento.setCurrentIndex(0)
@@ -2090,21 +2493,23 @@ class PDVWindow(QMainWindow):
             header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
             
+            # Configurar comportamento de seleção
+            table.setSelectionBehavior(QTableWidget.SelectRows)  # Selecionar linha inteira
+            table.setSelectionMode(QTableWidget.SingleSelection)  # Permitir apenas uma seleção
+            
             layout.addWidget(table)
             
             # Botões de ação
             button_layout = QHBoxLayout()
             
-            adicionar_btn = QPushButton("Adicionar ao Carrinho")
+            adicionar_btn = QPushButton("Adicionar ao Carrinho (F6)")
             adicionar_btn.clicked.connect(lambda: self.adicionar_produto_da_lista(table, dialog))
             
-            novo_btn = QPushButton("Novo Produto")
-            novo_btn.clicked.connect(self.novo_produto)
+            # Botão "Novo Produto" removido
             
-            fechar_btn = QPushButton("Fechar")
+            fechar_btn = QPushButton("Fechar (ESC)")
             fechar_btn.clicked.connect(dialog.close)
             
-            button_layout.addWidget(novo_btn)
             button_layout.addStretch(1)
             button_layout.addWidget(adicionar_btn)
             button_layout.addWidget(fechar_btn)
@@ -2116,6 +2521,21 @@ class PDVWindow(QMainWindow):
             
             # Conectar o evento de duplo clique para adicionar produto
             table.doubleClicked.connect(lambda: self.adicionar_produto_da_lista(table, dialog))
+            
+            # Adicionar captura de teclas para o diálogo
+            original_key_press = dialog.keyPressEvent
+            
+            def new_key_press(event):
+                if event.key() == Qt.Key_F6:
+                    self.adicionar_produto_da_lista(table, dialog)
+                elif event.key() == Qt.Key_Escape:
+                    dialog.close()
+                elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                    self.adicionar_produto_da_lista(table, dialog)
+                else:
+                    original_key_press(event)
+            
+            dialog.keyPressEvent = new_key_press
             
             # Mostrar diálogo
             dialog.exec_()
@@ -2145,15 +2565,29 @@ class PDVWindow(QMainWindow):
             
             from base.banco import execute_query
             
-            # Primeiro, vamos verificar as colunas existentes na tabela PRODUTOS
-            structure_query = """
-            SELECT RDB$FIELD_NAME
-            FROM RDB$RELATION_FIELDS
-            WHERE RDB$RELATION_NAME = 'PRODUTOS'
-            ORDER BY RDB$FIELD_POSITION
+            # Consulta direta para obter CODIGO, NOME, MARCA, PRECO_VENDA, ESTOQUE, GRUPO
+            simple_query = """
+            SELECT CODIGO, NOME, MARCA, PRECO_VENDA, ESTOQUE, GRUPO 
+            FROM PRODUTOS 
+            ORDER BY NOME
             """
             
             try:
+                # Tentar primeiro uma consulta simples e direta
+                result = execute_query(simple_query)
+                print("Consulta simples de produtos executada com sucesso")
+                
+            except Exception as simple_query_error:
+                print(f"Erro na consulta simples: {simple_query_error}")
+                
+                # Se a consulta simples falhar, tentar a abordagem dinâmica
+                structure_query = """
+                SELECT RDB$FIELD_NAME
+                FROM RDB$RELATION_FIELDS
+                WHERE RDB$RELATION_NAME = 'PRODUTOS'
+                ORDER BY RDB$FIELD_POSITION
+                """
+                
                 # Tentar obter a estrutura da tabela
                 columns = execute_query(structure_query)
                 print("Colunas encontradas na tabela PRODUTOS:")
@@ -2169,112 +2603,80 @@ class PDVWindow(QMainWindow):
                 
                 print(f"Total de colunas: {len(column_names)}")
                 
-                # Verificar se as colunas essenciais existem
-                # Vamos mapear os nomes que queremos com possíveis alternativas
+                # Mapeamento de colunas com possíveis nomes
                 column_mapping = {
                     "CODIGO": ["CODIGO", "ID", "ID_PRODUTO", "PRODUTO_ID", "COD"],
-                    "NOME": ["NOME", "DESCRICAO", "PRODUTO", "DESCR"],
-                    "MARCA": ["MARCA", "FABRICANTE", "FORNECEDOR"],
-                    "PRECO_VENDA": ["PRECO_VENDA", "VALOR_VENDA", "PRECO", "VALOR", "PRECO_VAREJO"],
-                    "ESTOQUE": ["ESTOQUE", "ESTOQUE_ATUAL", "QTD", "QUANTIDADE"],
-                    "GRUPO": ["GRUPO", "CATEGORIA", "DEPARTAMENTO", "TIPO"]
+                    "NOME": ["NOME", "DESCRICAO", "PRODUTO", "DESCR", "DESCRITIVO"],
+                    "MARCA": ["MARCA", "FABRICANTE", "FORNECEDOR", "MARCA_PRODUTO"],
+                    "PRECO_VENDA": ["PRECO_VENDA", "VALOR_VENDA", "PRECO", "VALOR", "PRECO_VAREJO", "VALOR_UNITARIO"],
+                    "ESTOQUE": ["QUANTIDADE_ESTOQUE", "ESTOQUE", "ESTOQUE_ATUAL", "QTD", "QUANTIDADE", "SALDO", "SALDO_ESTOQUE"],
+                    "GRUPO": ["GRUPO", "CATEGORIA", "DEPARTAMENTO", "TIPO", "CATEGORIA_PRODUTO"]
                 }
                 
-                # Função para encontrar a coluna correspondente
-                def find_column(desired, alternatives):
+                # Tentar encontrar os nomes de colunas reais no banco
+                def find_real_column(alternatives):
                     for alt in alternatives:
                         if alt in column_names:
                             return alt
                     return None
                 
-                # Construir a consulta dinâmica com as colunas existentes
+                # Construir a consulta dinâmica
                 selected_columns = []
-                column_aliases = []
-                
-                for desired, alternatives in column_mapping.items():
-                    found = find_column(desired, alternatives)
-                    if found:
-                        selected_columns.append(found)
-                        if found != desired:
-                            column_aliases.append(f"{found} as {desired}")
-                        else:
-                            column_aliases.append(found)
+                for field, alternatives in column_mapping.items():
+                    real_column = find_real_column(alternatives)
+                    if real_column:
+                        selected_columns.append(f"{real_column} AS {field}")
                     else:
-                        # Se não encontrar, use um valor padrão
-                        selected_columns.append("'N/A' as " + desired)
-                        column_aliases.append("'N/A' as " + desired)
+                        selected_columns.append(f"NULL AS {field}")
                 
-                # Construir a consulta final
-                query = f"""
-                SELECT {', '.join(column_aliases)}
+                dynamic_query = f"""
+                SELECT {', '.join(selected_columns)}
                 FROM PRODUTOS
+                ORDER BY {find_real_column(column_mapping['NOME']) or 'CODIGO'}
                 """
                 
-                # Adicionar ordenação se a coluna NOME existir
-                if "NOME" in column_names:
-                    query += " ORDER BY NOME"
-                elif "DESCRICAO" in column_names:
-                    query += " ORDER BY DESCRICAO"
-                
-                print(f"Consulta construída: {query}")
-                
-            except Exception as structure_error:
-                # Se houver erro ao obter a estrutura, usar uma consulta simplificada
-                print(f"Erro ao obter estrutura da tabela: {structure_error}")
-                print("Usando consulta simplificada...")
-                
-                # Consulta simplificada usando * para obter todas as colunas
-                query = "SELECT * FROM PRODUTOS"
-                
-            # Executar a consulta final
-            print(f"Executando consulta: {query}")
-            result = execute_query(query)
+                print(f"Consulta dinâmica: {dynamic_query}")
+                result = execute_query(dynamic_query)
             
-            # Verificar a quantidade de colunas e ajustar os cabeçalhos da tabela
-            if result and len(result) > 0:
-                num_columns = len(result[0])
-                if num_columns < 6:  # Se tiver menos de 6 colunas
-                    # Ajustar os cabeçalhos da tabela para o número correto de colunas
-                    headers = ["Código", "Nome", "Marca", "Preço", "Estoque", "Grupo"][:num_columns]
-                    table.setColumnCount(num_columns)
-                    table.setHorizontalHeaderLabels(headers)
-                    
-                    # Ajustar o redimensionamento de colunas
-                    header = table.horizontalHeader()
-                    if num_columns == 1:
-                        header.setSectionResizeMode(0, QHeaderView.Stretch)
-                    else:
-                        for i in range(num_columns):
-                            if i == 1:  # Nome do produto (ou equivalente)
-                                header.setSectionResizeMode(i, QHeaderView.Stretch)
-                            else:
-                                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-            
-            # Preencher a tabela
+            # Preencher a tabela com os resultados
             for row, produto in enumerate(result):
                 table.insertRow(row)
                 
-                # Preencher cada coluna disponível
-                for col, valor in enumerate(produto):
-                    if col >= table.columnCount():
-                        break
-                        
-                    # Verificar se é coluna de preço (geralmente a 3ª coluna, índice 2)
-                    if col == 2 and isinstance(valor, (int, float)):
+                # Para cada coluna disponível
+                for col_idx, valor in enumerate(produto):
+                    if col_idx >= table.columnCount():
+                        continue
+                    
+                    # Se não tiver valor, mostrar '-' em vez de 'N/A'
+                    if valor is None:
+                        table.setItem(row, col_idx, QTableWidgetItem("-"))
+                        continue
+                    
+                    # Formatação específica para cada tipo de coluna
+                    if col_idx == 3:  # Preço (índice 3)
                         # Formatar como moeda
-                        valor_formatado = f"R$ {float(valor):.2f}".replace('.', ',')
-                        item = QTableWidgetItem(valor_formatado)
-                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                        table.setItem(row, col, item)
-                    # Verificar se é coluna de estoque (geralmente a 4ª coluna, índice 3)    
-                    elif col == 3 and isinstance(valor, (int, float)):
+                        try:
+                            preco = float(valor)
+                            preco_formatado = f"R$ {preco:.2f}".replace('.', ',')
+                            item = QTableWidgetItem(preco_formatado)
+                            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                            table.setItem(row, col_idx, item)
+                        except (ValueError, TypeError):
+                            table.setItem(row, col_idx, QTableWidgetItem("-"))
+                            
+                    elif col_idx == 4:  # Estoque (índice 4)
                         # Formatar como número inteiro
-                        item = QTableWidgetItem(str(int(valor)))
-                        item.setTextAlignment(Qt.AlignCenter)
-                        table.setItem(row, col, item)
+                        try:
+                            estoque = int(float(valor))
+                            item = QTableWidgetItem(str(estoque))
+                            item.setTextAlignment(Qt.AlignCenter)
+                            table.setItem(row, col_idx, item)
+                        except (ValueError, TypeError):
+                            table.setItem(row, col_idx, QTableWidgetItem("-"))
+                            
                     else:
-                        # Qualquer outro tipo de dado
-                        table.setItem(row, col, QTableWidgetItem(str(valor) if valor is not None else ""))
+                        # Outros campos como texto
+                        table.setItem(row, col_idx, QTableWidgetItem(str(valor)))
         
         except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
@@ -2311,45 +2713,56 @@ class PDVWindow(QMainWindow):
             
             from base.banco import execute_query
             
-            # Vamos obter as colunas disponíveis para construir a consulta
-            structure_query = """
-            SELECT RDB$FIELD_NAME
-            FROM RDB$RELATION_FIELDS
-            WHERE RDB$RELATION_NAME = 'PRODUTOS'
-            ORDER BY RDB$FIELD_POSITION
-            """
-            
+            # Consulta simples primeiro
             try:
-                # Tentar obter a estrutura
+                simple_query = """
+                SELECT CODIGO, NOME, MARCA, PRECO_VENDA, ESTOQUE, GRUPO
+                FROM PRODUTOS
+                WHERE (CODIGO LIKE ?) OR (NOME LIKE ?) OR (MARCA LIKE ?)
+                ORDER BY NOME
+                """
+                
+                params = (f"%{termo}%", f"%{termo}%", f"%{termo}%")
+                result = execute_query(simple_query, params)
+                
+            except Exception as simple_query_error:
+                print(f"Erro na busca simples: {simple_query_error}")
+                
+                # Se falhar, usar consulta dinâmica
+                structure_query = """
+                SELECT RDB$FIELD_NAME
+                FROM RDB$RELATION_FIELDS
+                WHERE RDB$RELATION_NAME = 'PRODUTOS'
+                ORDER BY RDB$FIELD_POSITION
+                """
+                
                 columns = execute_query(structure_query)
                 column_names = [col[0].strip() if col[0] else "" for col in columns]
                 
-                # Verificar se as colunas para pesquisa existem
-                search_columns = []
-                
                 # Possíveis colunas de pesquisa com alternativas
-                possible_columns = {
-                    "NOME": ["NOME", "DESCRICAO", "PRODUTO", "DESCR"],
+                search_mapping = {
                     "CODIGO": ["CODIGO", "ID", "ID_PRODUTO", "PRODUTO_ID", "COD"],
+                    "NOME": ["NOME", "DESCRICAO", "PRODUTO", "DESCR", "DESCRITIVO"],
+                    "MARCA": ["MARCA", "FABRICANTE", "FORNECEDOR", "MARCA_PRODUTO"],
                     "BARRAS": ["BARRAS", "CODIGO_BARRAS", "EAN", "GTIN", "COD_BARRAS"]
                 }
                 
-                # Função para encontrar a coluna correspondente
-                def find_column(alternatives):
+                # Tentar encontrar as colunas reais
+                def find_real_column(alternatives):
                     for alt in alternatives:
                         if alt in column_names:
                             return alt
                     return None
                 
-                # Construir a lista de colunas para pesquisa
-                for key, alternatives in possible_columns.items():
-                    column = find_column(alternatives)
-                    if column:
-                        search_columns.append(column)
+                # Construir a cláusula WHERE
+                search_columns = []
+                for field, alternatives in search_mapping.items():
+                    real_column = find_real_column(alternatives)
+                    if real_column:
+                        search_columns.append(real_column)
                 
-                # Se não encontrou nenhuma coluna para pesquisa, usar todas as colunas de texto
+                # Se não encontrou nenhuma coluna para pesquisa, usar todas as de texto
                 if not search_columns:
-                    print("Não foi possível identificar colunas específicas para pesquisa.")
                     query = """
                     SELECT *
                     FROM PRODUTOS
@@ -2375,47 +2788,45 @@ class PDVWindow(QMainWindow):
                     # Executar a consulta
                     result = execute_query(query, params)
             
-            except Exception as structure_error:
-                # Se houver erro, usar uma consulta simplificada
-                print(f"Erro ao obter estrutura para pesquisa: {structure_error}")
-                print("Usando consulta de pesquisa simplificada...")
-                
-                # Consulta simplificada
-                query = """
-                SELECT *
-                FROM PRODUTOS
-                """
-                
-                # Executar sem filtro (retorna todos)
-                result = execute_query(query)
-            
-            # Preencher a tabela
-            num_columns = table.columnCount()
-            
+            # Preencher a tabela com os resultados
             for row, produto in enumerate(result):
                 table.insertRow(row)
                 
-                # Preencher cada coluna disponível
-                for col, valor in enumerate(produto):
-                    if col >= num_columns:
-                        break
-                        
-                    # Verificar se é coluna de preço (geralmente a 3ª coluna, índice 2)
-                    if col == 2 and isinstance(valor, (int, float)):
+                # Para cada coluna disponível
+                for col_idx, valor in enumerate(produto):
+                    if col_idx >= table.columnCount():
+                        continue
+                    
+                    # Se não tiver valor, mostrar '-' em vez de 'N/A'
+                    if valor is None:
+                        table.setItem(row, col_idx, QTableWidgetItem("-"))
+                        continue
+                    
+                    # Formatação específica para cada tipo de coluna
+                    if col_idx == 3:  # Preço (índice 3)
                         # Formatar como moeda
-                        valor_formatado = f"R$ {float(valor):.2f}".replace('.', ',')
-                        item = QTableWidgetItem(valor_formatado)
-                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                        table.setItem(row, col, item)
-                    # Verificar se é coluna de estoque (geralmente a 4ª coluna, índice 3)    
-                    elif col == 3 and isinstance(valor, (int, float)):
+                        try:
+                            preco = float(valor)
+                            preco_formatado = f"R$ {preco:.2f}".replace('.', ',')
+                            item = QTableWidgetItem(preco_formatado)
+                            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                            table.setItem(row, col_idx, item)
+                        except (ValueError, TypeError):
+                            table.setItem(row, col_idx, QTableWidgetItem("-"))
+                            
+                    elif col_idx == 4:  # Estoque (índice 4)
                         # Formatar como número inteiro
-                        item = QTableWidgetItem(str(int(valor)))
-                        item.setTextAlignment(Qt.AlignCenter)
-                        table.setItem(row, col, item)
+                        try:
+                            estoque = int(float(valor))
+                            item = QTableWidgetItem(str(estoque))
+                            item.setTextAlignment(Qt.AlignCenter)
+                            table.setItem(row, col_idx, item)
+                        except (ValueError, TypeError):
+                            table.setItem(row, col_idx, QTableWidgetItem("-"))
+                            
                     else:
-                        # Qualquer outro tipo de dado
-                        table.setItem(row, col, QTableWidgetItem(str(valor) if valor is not None else ""))
+                        # Outros campos como texto
+                        table.setItem(row, col_idx, QTableWidgetItem(str(valor)))
         
         except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
@@ -2423,7 +2834,6 @@ class PDVWindow(QMainWindow):
             print(f"Erro ao buscar produtos: {e}")
             import traceback
             traceback.print_exc()
-
 
     # Correção 1: Melhorar o método adicionar_produto_da_lista para extrair o preço corretamente
 
@@ -2450,71 +2860,36 @@ class PDVWindow(QMainWindow):
             # Obter o nome do produto (coluna 1)
             nome = table.item(row, 1).text() if num_cols > 1 and table.item(row, 1) else ""
             
-            # Obter o preço - melhorado para procurar em qualquer coluna que pareça conter um preço
+            # Obter o preço
             preco = 0.0
             
-            # Primeiro, tentar encontrar na coluna 3 (índice 2) que geralmente contém o preço
+            # Tentar obter o preço da coluna 3 (índice 2)
             if num_cols > 2 and table.item(row, 2) and table.item(row, 2).text():
                 preco_str = table.item(row, 2).text()
                 try:
                     # Se contém R$, remover e converter
                     if "R$" in preco_str:
                         preco = float(preco_str.replace("R$", "").replace(".", "").replace(",", ".").strip())
-                    # Se não, tentar converter direto (pode ser apenas um número)
+                    # Se não, tentar converter direto
                     else:
                         preco = float(preco_str.replace(",", ".").strip())
                 except ValueError:
-                    print(f"Não foi possível converter o valor '{preco_str}' na coluna 2")
+                    preco = 0.0
             
-            # Se ainda não tiver preço, procurar em todas as colunas
+            # Se não conseguir obter o preço, buscar o produto no banco de dados
             if preco <= 0:
-                for col_idx in range(num_cols):
-                    if table.item(row, col_idx) and table.item(row, col_idx).text():
-                        valor_text = table.item(row, col_idx).text()
-                        
-                        # Verificar se parece ser um valor monetário (contém R$ ou é um número)
-                        if "R$" in valor_text:
-                            try:
-                                # Limpar e converter
-                                valor_limpo = valor_text.replace("R$", "").replace(".", "").replace(",", ".").strip()
-                                preco = float(valor_limpo)
-                                print(f"Encontrou preço na coluna {col_idx}: {preco}")
-                                break
-                            except ValueError:
-                                continue
-            
-            # Se ainda não tiver preço e houver apenas números na coluna 2, usar isso
-            if preco <= 0 and num_cols > 2 and table.item(row, 2):
                 try:
-                    valor_text = table.item(row, 2).text().strip()
-                    if valor_text and all(c.isdigit() or c in ",.+-" for c in valor_text):
-                        preco = float(valor_text.replace(",", "."))
-                        print(f"Usando valor numérico da coluna 2: {preco}")
-                except ValueError:
-                    pass
+                    from base.banco import buscar_produto_por_codigo
+                    produto_db = buscar_produto_por_codigo(codigo)
+                    
+                    if produto_db and len(produto_db) > 7:
+                        preco = float(produto_db[7])  # Posição onde normalmente está o preço_venda
+                    
+                except Exception as db_error:
+                    print(f"Erro ao buscar preço no banco: {db_error}")
+                    # Continuar com o preço 0
             
-            # Fallback: se ainda não tiver preço, solicitar ao usuário
-            if preco <= 0:
-                from PyQt5.QtWidgets import QInputDialog, QMessageBox
-                
-                preco, ok = QInputDialog.getDouble(
-                    self,
-                    "Preço do Produto",
-                    f"Digite o preço para '{nome}':",
-                    0.0,
-                    0.0,
-                    10000.0,
-                    2
-                )
-                
-                if not ok:
-                    QMessageBox.warning(self, "Aviso", "Operação cancelada pelo usuário.")
-                    return
-            
-            # Debbugging - mostrar o preço encontrado
-            print(f"Código: {codigo}, Nome: {nome}, Preço: {preco}")
-            
-            # Criar um objeto produto
+            # Criar um objeto produto (usando sempre o preço do banco)
             produto = {
                 "codigo": codigo,
                 "nome": nome,
@@ -2524,11 +2899,9 @@ class PDVWindow(QMainWindow):
             # Adicionar ao carrinho
             self.adicionar_produto_ao_carrinho(produto)
             
-            # Confirmar adição
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Produto Adicionado", 
-                                f"Produto '{nome}' adicionado ao carrinho com preço R$ {preco:.2f}".replace('.', ','))
-            
+            # Fechar o diálogo
+            dialog.accept()
+                
         except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Erro", f"Erro ao adicionar produto: {str(e)}")
@@ -2548,24 +2921,27 @@ class PDVWindow(QMainWindow):
         nome = produto.get("nome", "")
         preco = float(produto.get("preco_venda", 0))
         
-        # Verificação para garantir que o preço não seja zero
+        # Se o preço for zero, buscar no banco de dados
         if preco <= 0:
-            from PyQt5.QtWidgets import QInputDialog, QMessageBox
-            
-            # Solicitar o preço ao usuário se for zero
-            preco, ok = QInputDialog.getDouble(
-                self,
-                "Preço do Produto",
-                f"Digite o preço para '{nome}':",
-                0.0,
-                0.0,
-                10000.0,
-                2
+            try:
+                from base.banco import buscar_produto_por_codigo
+                produto_db = buscar_produto_por_codigo(id_produto)
+                
+                if produto_db and len(produto_db) > 7:
+                    preco = float(produto_db[7])  # Posição onde normalmente está o preço_venda
+            except Exception as e:
+                print(f"Erro ao buscar preço no banco: {e}")
+                # Continuar com preço 0
+        
+        # Verificação final para garantir que o preço não seja zero
+        if preco <= 0:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, 
+                "Aviso", 
+                f"Não foi possível determinar o preço do produto '{nome}'. Por favor, verifique o cadastro."
             )
-            
-            if not ok:
-                QMessageBox.warning(self, "Aviso", "Produto não adicionado: preço não informado.")
-                return
+            return
         
         # Formatar nome do produto (código + nome)
         nome_formatado = f"{id_produto} - {nome}"
@@ -2816,10 +3192,69 @@ class PDVWindow(QMainWindow):
                 ))
                 
                 print(f"Item inserido com sucesso: {codigo_produto}")
-            
+            # Após registrar todos os itens na tabela VENDAS_ITENS
+            print("\n----- ATUALIZANDO ESTOQUE DOS PRODUTOS -----")
+
+            # Verificar a estrutura da tabela PRODUTOS para encontrar o campo de estoque
+            structure_query_produtos = """
+            SELECT RDB$FIELD_NAME
+            FROM RDB$RELATION_FIELDS
+            WHERE RDB$RELATION_NAME = 'PRODUTOS'
+            ORDER BY RDB$FIELD_POSITION
+            """
+
+            try:
+                produtos_fields = execute_query(structure_query_produtos)
+                print("\nColunas da tabela PRODUTOS:")
+                
+                # Possíveis nomes para o campo de estoque
+                estoque_alternatives = ["ESTOQUE", "QUANTIDADE_ESTOQUE", "ESTOQUE_ATUAL", "QTD", "QUANTIDADE", "SALDO", "SALDO_ESTOQUE"]
+                
+                # Encontrar o nome real da coluna de estoque
+                estoque_field = None
+                for field in produtos_fields:
+                    field_name = field[0].strip() if field[0] else ""
+                    print(f"  - {field_name}")
+                    
+                    # Verificar se este campo corresponde a alguma alternativa para estoque
+                    if field_name.upper() in [alt.upper() for alt in estoque_alternatives]:
+                        estoque_field = field_name
+                        print(f"  >>> Campo de estoque encontrado: {estoque_field}")
+                        break
+                
+                if not estoque_field:
+                    raise Exception("Não foi possível identificar o campo de estoque na tabela PRODUTOS")
+                
+                # Agora vamos atualizar o estoque para cada item vendido
+                for item in itens:
+                    codigo_produto = item['id_produto']
+                    quantidade = int(item['quantidade'])
+                    
+                    # Query para atualizar o estoque
+                    query_update_estoque = f"""
+                    UPDATE PRODUTOS
+                    SET {estoque_field} = {estoque_field} - ?
+                    WHERE CODIGO = ?
+                    """
+                    
+                    print(f"Atualizando estoque do produto {codigo_produto}: reduzindo em {quantidade} unidades")
+                    print(f"Query: {query_update_estoque}")
+                    
+                    # Executar a atualização
+                    execute_query(query_update_estoque, (quantidade, codigo_produto))
+                    print(f"Estoque atualizado com sucesso para o produto {codigo_produto}")
+                    
+                print("\n===== ESTOQUE ATUALIZADO COM SUCESSO =====")
+                
+            except Exception as e:
+                print(f"\n***** ERRO AO ATUALIZAR ESTOQUE *****")
+                print(f"Erro detalhado: {e}")
+                import traceback
+                traceback.print_exc()
+
             print("\n===== VENDA FINALIZADA COM SUCESSO =====")
             return id_venda
-                
+
         except Exception as e:
             print(f"\n***** ERRO AO REGISTRAR VENDA *****")
             print(f"Erro detalhado: {e}")
@@ -2867,7 +3302,7 @@ class PDVWindow(QMainWindow):
             
             # Atualizar o texto do botão finalizar
             total_formatado = f"{total:.2f}".replace('.', ',')
-            self.btn_finalizar.setText(f"Finalizar R$ {total_formatado}")
+            self.btn_finalizar.setText(f"Finalizar R$ {total_formatado} (F4)")
             
         except (ValueError, TypeError) as e:
             # Em caso de erro de conversão, manter os valores padrão
@@ -2908,13 +3343,30 @@ class PDVWindow(QMainWindow):
         total_formatado = f"{total_com_ajustes:.2f}".replace(".", ",")
         self.lbl_total_valor.setText(total_formatado)
         
-        # Atualizar o botão finalizar
-        self.btn_finalizar.setText(f"Finalizar R$ {total_formatado}")
+        # Atualizar o botão finalizar - ADICIONADO (F4)
+        self.btn_finalizar.setText(f"Finalizar R$ {total_formatado} (F4)")
         
         # Recalcular o troco se houver valor recebido
         if self.entry_valor_recebido.text():
             self.calcular_troco()
-
+        
+        # Aplicar desconto e acréscimo
+        total_com_ajustes = subtotal - self.valor_desconto + self.valor_acrescimo
+        
+        # Garantir que o total não seja negativo
+        if total_com_ajustes < 0:
+            total_com_ajustes = 0
+        
+        # Atualizar o label com o total formatado
+        total_formatado = f"{total_com_ajustes:.2f}".replace(".", ",")
+        self.lbl_total_valor.setText(total_formatado)
+        
+        # Atualizar o botão finalizar - ADICIONADO (F4)
+        self.btn_finalizar.setText(f"Finalizar R$ {total_formatado} (F4)")
+        
+        # Recalcular o troco se houver valor recebido
+        if self.entry_valor_recebido.text():
+            self.calcular_troco()
 
     def create_svg_icon(self, svg_content, color="#000000"):
         """Função auxiliar para criar pixmap a partir de SVG com cor personalizada"""
@@ -2949,6 +3401,31 @@ class PDVWindow(QMainWindow):
             # Quando pressionar Enter, verificar se temos um código de barras
             if self.entry_cod_barras.text():
                 self.buscar_produto_por_codigo_barras(self.entry_cod_barras.text())
+        # Adicionar captura das teclas de função
+        elif event.key() == Qt.Key_F1:
+            # F1 - Listar Clientes
+            self.listar_clientes()
+        elif event.key() == Qt.Key_F2:
+            # F2 - Listar Produtos
+            self.listar_produtos()
+        elif event.key() == Qt.Key_F3:
+            # F3 - Lista de Vendas
+            self.abrir_historico_vendas()
+        elif event.key() == Qt.Key_F4:
+            # F4 - Finalizar Venda
+            self.finalizar_venda_com_cupom()
+        elif event.key() == Qt.Key_F5:
+            # F5 - Editar Desconto
+            self.editar_desconto()
+        elif event.key() == Qt.Key_F6:
+            # F6 - Editar Acréscimo
+            self.editar_acrescimo()
+        elif event.key() == Qt.Key_F7:
+            # F7 - Fechar Caixa
+            self.confirmar_fechar_caixa()
+        elif event.key() == Qt.Key_F8:
+            # F8 - Limpar Venda
+            self.limpar_venda()
         else:
             # Qualquer outra tecla que não seja de controle é adicionada ao campo de código de barras
             # A maioria dos leitores termina com um Enter automaticamente
