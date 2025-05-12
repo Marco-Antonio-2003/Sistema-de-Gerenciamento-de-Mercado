@@ -197,6 +197,19 @@ class FormularioEmpresa(QWidget):
         "--hidden-import=matplotlib.figure",
         "--hidden-import=numpy",
         "--hidden-import=datetime",
+        "--hidden-import=reportlab",  # Adicione esta linha
+        "--hidden-import=reportlab.pdfgen",  # Adicione também submódulos importantes
+        "--hidden-import=reportlab",
+        "--hidden-import=reportlab.pdfgen",
+        "--hidden-import=reportlab.pdfgen.canvas",  # Adicione esta linha específica
+        "--hidden-import=reportlab.lib",
+        "--hidden-import=reportlab.lib.pagesizes",
+        "--hidden-import=reportlab.lib.units",
+        "--hidden-import=reportlab.lib.styles",
+        "--hidden-import=reportlab.lib.enums",
+        "--hidden-import=reportlab.lib.colors",
+        "--hidden-import=reportlab.platypus",
+        "--hidden-import=reportlab.lib",
         "login.py"
     ])
     
@@ -246,7 +259,7 @@ class FormularioEmpresa(QWidget):
     if "hiddenimports=[]" in spec_content:
         spec_content = spec_content.replace(
             "hiddenimports=[]",
-            "hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'PyQt5', 'PyQt5.QtSvg']"
+            "hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'PyQt5', 'PyQt5.QtSvg', 'reportlab', 'reportlab.pdfgen', 'reportlab.pdfgen.canvas', 'reportlab.lib', 'reportlab.lib.pagesizes', 'reportlab.lib.units', 'reportlab.platypus']"
         )
     
     with open("MBSistema.spec", "w", encoding="utf-8") as f:
