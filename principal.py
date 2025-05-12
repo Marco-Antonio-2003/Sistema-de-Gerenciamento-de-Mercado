@@ -242,6 +242,26 @@ class MainWindow(QMainWindow):
 
         home_layout.addWidget(info_frame)
 
+        # Botão de diagnóstico (adicione próximo ao final do initUI, antes do return)
+        # self.btn_diagnostico = QPushButton("Diagnosticar Banco", self)
+        # self.btn_diagnostico.clicked.connect(self.diagnosticar_banco)
+        # self.btn_diagnostico.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #FFD700;
+        #         color: black;
+        #         border: 2px solid #DAA520;
+        #         border-radius: 5px;
+        #         padding: 5px 10px;
+        #         font-weight: bold;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #DAA520;
+        #     }
+        # """)
+        # self.btn_diagnostico.setFixedSize(150, 40)
+        # self.btn_diagnostico.move(30, 180)  # Posicione abaixo do botão PDV
+        # self.btn_diagnostico.raise_()
+
         # Informações do usuário
         user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
         user_info.setFont(QFont("Arial", 14))
@@ -560,9 +580,26 @@ class MainWindow(QMainWindow):
         
         label_icone.setAlignment(Qt.AlignCenter)
         
-        # Contagem
-        label_contagem = QLabel(str(contagem))
-        label_contagem.setFont(QFont("Arial", 24, QFont.Bold))
+        # Contagem (formatada como moeda se for Vendas)
+        if titulo == "Vendas":
+            # Registrar valor recebido para depuração
+            print(f"DEBUG: Formatando valor de vendas: {contagem} (tipo: {type(contagem)})")
+            
+            # Garantir que é número antes de formatar
+            try:
+                valor_numerico = float(contagem)
+                valor_formatado = f"R$ {valor_numerico:.2f}".replace('.', ',')
+            except (ValueError, TypeError):
+                print(f"ERRO: Valor inválido para formatação: {contagem}")
+                valor_formatado = "R$ 0,00"
+                
+            label_contagem = QLabel(valor_formatado)
+            label_contagem.setFont(QFont("Arial", 20, QFont.Bold))
+        else:
+            # Formato normal para contagens
+            label_contagem = QLabel(str(contagem))
+            label_contagem.setFont(QFont("Arial", 24, QFont.Bold))
+        
         label_contagem.setStyleSheet("color: white;")
         label_contagem.setAlignment(Qt.AlignCenter)
         
@@ -577,51 +614,91 @@ class MainWindow(QMainWindow):
         self.contadores_labels[titulo] = label_contagem
         
         return label_contagem
-
-    def forcar_atualizacao_contadores(self):
-        """Força a atualização imediata dos contadores na tela principal"""
-        # Chamar a função de atualização de contadores
-        self.atualizar_contadores()
+    
+        
 
     def atualizar_contadores(self):
         """Atualiza os contadores de todas as caixas de informação"""
         try:
-            # Atualizar contador de clientes
+            print("Iniciando atualização dos contadores...")
+            
+            # Atualizar contador de clientes (com animação)
             if "Clientes" in self.contadores_labels:
                 novo_valor = self.obter_contagem_pessoas()
                 self.atualizar_contador_com_animacao(self.contadores_labels["Clientes"], novo_valor)
-                
-            # Atualizar contador de produtos
+                print(f"Contador de Clientes atualizado: {novo_valor}")
+                    
+            # Atualizar contador de produtos (com animação)
             if "Produtos" in self.contadores_labels:
                 novo_valor = self.obter_contagem_produtos()
                 self.atualizar_contador_com_animacao(self.contadores_labels["Produtos"], novo_valor)
-                
-            # Atualizar contador de vendas
+                print(f"Contador de Produtos atualizado: {novo_valor}")
+                    
+            # Atualizar contador de vendas SEM animação de cor
             if "Vendas" in self.contadores_labels:
                 novo_valor = self.obter_contagem_vendas()
-                self.atualizar_contador_com_animacao(self.contadores_labels["Vendas"], novo_valor)
+                label = self.contadores_labels["Vendas"]
                 
+                # Apenas atualizar o texto sem mudar a cor
+                valor_formatado = f"R$ {novo_valor:.2f}".replace('.', ',')
+                label.setText(valor_formatado)
+                print(f"Contador de Vendas atualizado: {valor_formatado}")
+                    
             print("Contadores atualizados com sucesso!")
         except Exception as e:
             print(f"Erro ao atualizar contadores: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Método para garantir que o PDV atualize a tela principal
+    def forcar_atualizacao_contadores(self):
+        """Força a atualização imediata dos contadores na tela principal"""
+        print("Forçando atualização dos contadores a partir do PDV...")
+        QTimer.singleShot(100, self.atualizar_contadores) 
 
     def atualizar_contador_com_animacao(self, label, novo_valor):
         """Atualiza um contador com uma animação de destaque"""
-        # Verificar se o valor mudou
-        valor_atual = int(label.text()) if label.text().isdigit() else 0
-        
-        if valor_atual != novo_valor:
-            # Salvar o estilo original
-            estilo_original = label.styleSheet()
+        # Verificar se é um valor monetário (texto começa com R$)
+        texto_atual = label.text()
+        if texto_atual.startswith("R$"):
+            # Extrair o valor numérico atual
+            try:
+                valor_atual = float(texto_atual.replace("R$", "").replace(".", "").replace(",", ".").strip())
+                
+                # Verificar se o valor mudou
+                if abs(valor_atual - novo_valor) > 0.01:  # Pequena margem para comparação de float
+                    # Salvar o estilo original
+                    estilo_original = label.styleSheet()
+                    
+                    # Aplicar estilo de destaque
+                    label.setStyleSheet("color: #00E676; font-weight: bold;")
+                    
+                    # Atualizar o valor formatado como moeda
+                    valor_formatado = f"R$ {novo_valor:.2f}".replace('.', ',')
+                    label.setText(valor_formatado)
+                    
+                    # Criar timer para restaurar o estilo original após 1 segundo
+                    QTimer.singleShot(1000, lambda: label.setStyleSheet(estilo_original))
+            except ValueError:
+                # Se houver erro ao converter, apenas atualiza o texto
+                valor_formatado = f"R$ {novo_valor:.2f}".replace('.', ',')
+                label.setText(valor_formatado)
+        else:
+            # Para valores não monetários (contadores simples)
+            valor_atual = int(texto_atual) if texto_atual.isdigit() else 0
             
-            # Aplicar estilo de destaque
-            label.setStyleSheet("color: #00E676; font-weight: bold;")
-            
-            # Atualizar o valor
-            label.setText(str(novo_valor))
-            
-            # Criar timer para restaurar o estilo original após 1 segundo
-            QTimer.singleShot(1000, lambda: label.setStyleSheet(estilo_original))
+            if valor_atual != novo_valor:
+                # Salvar o estilo original
+                estilo_original = label.styleSheet()
+                
+                # Aplicar estilo de destaque
+                label.setStyleSheet("color: #00E676; font-weight: bold;")
+                
+                # Atualizar o valor
+                label.setText(str(novo_valor))
+                
+                # Criar timer para restaurar o estilo original após 1 segundo
+                QTimer.singleShot(1000, lambda: label.setStyleSheet(estilo_original))
 
     def animar_botao(self, botao, fator_escala):
         """Anima o botão para aumentar/diminuir de tamanho"""
@@ -694,17 +771,113 @@ class MainWindow(QMainWindow):
             return 0
 
     def obter_contagem_vendas(self):
-        """Obtém a contagem de VENDAS do dia de hoje do banco de dados"""
+        """Obtém o valor total de TODAS as vendas do banco de dados (sem filtro de data)"""
         try:
-            from base.banco import execute_query
-            from datetime import datetime
+            # Usar conexão direta
+            from base.banco import get_connection
             
-            hoje = datetime.now().strftime("%Y-%m-%d")
-            result = execute_query("SELECT COUNT(*) FROM PEDIDOS_VENDA WHERE DATA_PEDIDO = ?", (hoje,))
-            return result[0][0] if result and result[0][0] else 0
+            # Obter conexão e criar cursor
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Em vez de usar SUM, vamos pegar os valores individuais e somá-los no Python
+            cursor.execute("SELECT VALOR_TOTAL FROM VENDAS")
+            valores = cursor.fetchall()
+            
+            # Somar valores manualmente
+            total = 0.0
+            for valor in valores:
+                if valor[0] is not None:
+                    try:
+                        total += float(valor[0])
+                    except (ValueError, TypeError):
+                        print(f"Aviso: Valor inválido encontrado: {valor[0]}")
+            
+            # Fechar cursor e conexão
+            cursor.close()
+            conn.close()
+            
+            print(f"Valor total de todas as vendas: {total}")
+            return total
+            
         except Exception as e:
-            print(f"Erro ao contar vendas: {e}")
-            return 0
+            print(f"Erro ao obter total de vendas: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0.0
+
+    def diagnosticar_banco(self):
+        """Executa diagnóstico completo do banco e valores"""
+        try:
+            # Executar verificações
+            print("\n=== DIAGNÓSTICO DE BANCO DE DADOS ===")
+            
+            # Testar consulta via conexão direta
+            from base.banco import get_connection
+            
+            # Obter conexão e criar cursor
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Verificar estrutura da tabela VENDAS
+            cursor.execute("SELECT COUNT(*) FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'VENDAS'")
+            tabela_existe = cursor.fetchone()[0] > 0
+            print(f"Tabela VENDAS existe: {tabela_existe}")
+            
+            if tabela_existe:
+                # Verificar quantidade de registros
+                cursor.execute("SELECT COUNT(*) FROM VENDAS")
+                total_registros = cursor.fetchone()[0]
+                print(f"Total de registros na tabela VENDAS: {total_registros}")
+                
+                # Verificar colunas da tabela
+                cursor.execute("SELECT RDB$FIELD_NAME FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = 'VENDAS'")
+                colunas = [col[0].strip() for col in cursor.fetchall()]
+                print(f"Colunas na tabela VENDAS: {colunas}")
+                
+                # Verificar se a coluna VALOR_TOTAL existe
+                if 'VALOR_TOTAL' in colunas:
+                    print("Coluna VALOR_TOTAL encontrada!")
+                else:
+                    print("ERRO: Coluna VALOR_TOTAL não encontrada na tabela!")
+                
+                # Em vez de usar SUM, vamos pegar os valores individuais e somá-los no Python
+                cursor.execute("SELECT VALOR_TOTAL FROM VENDAS")
+                valores = cursor.fetchall()
+                
+                # Somar valores manualmente
+                total = 0.0
+                for valor in valores:
+                    if valor[0] is not None:
+                        try:
+                            total += float(valor[0])
+                        except (ValueError, TypeError):
+                            print(f"Aviso: Valor inválido encontrado: {valor[0]}")
+                
+                print(f"Total calculado manualmente: {total}")
+                
+                # Atualizar o contador na interface
+                if hasattr(self, 'contadores_labels') and "Vendas" in self.contadores_labels:
+                    valor_formatado = f"R$ {total:.2f}".replace('.', ',')
+                    self.contadores_labels["Vendas"].setText(valor_formatado)
+                    print(f"Interface atualizada com: {valor_formatado}")
+            
+            # Fechar cursor e conexão
+            cursor.close()
+            conn.close()
+            
+            # Mostrar mensagem com o resultado
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Diagnóstico", 
+                                f"Diagnóstico concluído! Total de vendas: R$ {total:.2f}")
+            
+        except Exception as e:
+            print(f"Erro no diagnóstico: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Erro", f"Erro no diagnóstico: {str(e)}")
 
     def normalize_text(self, text):
         normalized = unicodedata.normalize('NFD', text)

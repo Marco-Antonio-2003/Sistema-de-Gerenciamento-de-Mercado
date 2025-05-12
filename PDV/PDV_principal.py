@@ -1351,7 +1351,8 @@ class PDVWindow(QMainWindow):
         right_layout.addWidget(self.btn_finalizar)
 
         return right_widget
-
+    
+        
 
     # 2. Adicionar o método para atualizar o layout conforme a forma de pagamento escolhida
 
@@ -1591,6 +1592,19 @@ class PDVWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Erro", f"Erro ao finalizar venda: {str(e)}")
+        
+        
+
+    def notificar_venda_finalizada(self):
+        """Notifica a janela principal sobre uma venda finalizada para atualizar os contadores"""
+        try:
+            # Verificar se existe uma referência para a janela principal
+            if hasattr(self, 'janela_principal') and self.janela_principal is not None:
+                # Chamar o método de atualização de contadores na janela principal
+                print("Notificando a janela principal sobre venda finalizada...")
+                self.janela_principal.forcar_atualizacao_contadores()
+        except Exception as e:
+            print(f"Erro ao notificar janela principal: {e}")
 
     def imprimir_cupom(self, id_venda, tipo_cupom, cpf):
         """Imprime o cupom fiscal ou não fiscal e gera um PDF"""

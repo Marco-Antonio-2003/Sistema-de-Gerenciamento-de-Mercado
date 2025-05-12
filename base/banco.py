@@ -7079,7 +7079,40 @@ def buscar_funcionario_por_usuario(nome_usuario):
     except Exception as e:
         print(f"Erro ao buscar funcionário por usuário: {e}")
         return None
-    
+
+#Vendas
+def verificar_tabela_vendas(self):
+    """Verifica a estrutura da tabela VENDAS"""
+    try:
+        from base.banco import execute_query
+        
+        # Verificar se a tabela existe
+        result = execute_query("SELECT COUNT(*) FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'VENDAS'")
+        tabela_existe = result[0][0] > 0
+        print(f"Tabela VENDAS existe: {tabela_existe}")
+        
+        if tabela_existe:
+            # Verificar estrutura
+            colunas = execute_query("SELECT RDB$FIELD_NAME FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = 'VENDAS'")
+            print("Colunas da tabela VENDAS:")
+            for col in colunas:
+                print(f"- {col[0].strip()}")
+                
+            # Verificar quantidade de registros
+            count = execute_query("SELECT COUNT(*) FROM VENDAS")
+            print(f"Total de registros: {count[0][0]}")
+            
+            # Mostrar amostra de dados
+            amostra = execute_query("SELECT ID_VENDA, VALOR_TOTAL FROM VENDAS LIMIT 5")
+            print("Amostra de dados:")
+            for reg in amostra:
+                print(f"ID: {reg[0]}, VALOR_TOTAL: {reg[1]}")
+                
+        return tabela_existe
+    except Exception as e:
+        print(f"Erro ao verificar tabela VENDAS: {e}")
+        return False
+
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
     try:
