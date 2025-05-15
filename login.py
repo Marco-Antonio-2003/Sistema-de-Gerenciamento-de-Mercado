@@ -147,7 +147,7 @@ class LoginWindow(QMainWindow):
         main_layout.addWidget(login_frame)
         
         # Versão do programa
-        versao_label = QLabel("V. 0.0.9")
+        versao_label = QLabel("V. 0.1.0")
         versao_label.setStyleSheet("color: white; font-size: 12px;")
         versao_label.setAlignment(Qt.AlignRight)
         main_layout.addWidget(versao_label)

@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, QSize, QDate
 
 # Importar funções do banco
 from base.banco import (verificar_tabela_recebimentos_clientes, criar_recebimento,
-                       listar_clientes, buscar_recebimento_por_codigo)
+                       listar_clientes, buscar_recebimento_por_codigo, registrar_pagamento)
 
 from base.banco import verificar_e_corrigir_tabela_recebimentos
 verificar_e_corrigir_tabela_recebimentos()
@@ -467,6 +467,38 @@ class LancamentoFinanceiroWindow(QWidget):
             
         except ValueError:
             self.mostrar_mensagem("Erro", "Por favor, informe valores numéricos válidos!")
+
+    def processar_pagamento(self):
+        """Processa o pagamento da parcela selecionada"""
+        # Obter o ID do recebimento selecionado na tabela
+        recebimento_id = self.obter_recebimento_selecionado()
+        if not recebimento_id:
+            self.mostrar_mensagem("Atenção", "Por favor, selecione um recebimento!")
+            return
+        
+        # Obter o valor que o usuário digitou
+        try:
+            valor_texto = self.valor_pago_input.text().replace(".", "").replace(",", ".")
+            valor_pago = float(valor_texto)
+            
+            if valor_pago <= 0:
+                self.mostrar_mensagem("Atenção", "O valor do pagamento deve ser maior que zero!")
+                return
+        except ValueError:
+            self.mostrar_mensagem("Erro", "Por favor, informe um valor válido!")
+            return
+        
+        # Chamar a função de confirmar pagamento
+        sucesso, mensagem = registrar_pagamento(recebimento_id, valor_pago)
+        
+        # Mostrar mensagem ao usuário
+        if sucesso:
+            self.mostrar_mensagem("Sucesso", mensagem)
+            # Atualizar a tabela de recebimentos para refletir o novo status
+            self.carregar_recebimentos()
+        else:
+            self.mostrar_mensagem("Erro", mensagem)
+
     def preencher_codigo_cliente(self):
         """Preenche o campo de código automaticamente com o código do cliente selecionado"""
         cliente_id = self.obter_cliente_id()

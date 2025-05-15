@@ -4162,58 +4162,94 @@ def buscar_recebimentos_por_cliente(cliente):
 
 def filtrar_recebimentos(codigo=None, cliente=None, data_inicio=None, data_fim=None, status=None):
     """
-    Filtra recebimentos com base em vários critérios
+    Filtra recebimentos com base nos critérios especificados
     
     Args:
-        codigo (str, optional): Código do recebimento
-        cliente (str, optional): Nome do cliente (busca parcial)
-        data_inicio (date, optional): Data de vencimento inicial
-        data_fim (date, optional): Data de vencimento final
-        status (str, optional): Status do recebimento ('Pendente', 'Recebido')
+        codigo (str, optional): Filtra por código. Defaults to None.
+        cliente (str, optional): Filtra por cliente. Defaults to None.
+        data_inicio (date, optional): Data de início para filtrar. Defaults to None.
+        data_fim (date, optional): Data final para filtrar. Defaults to None.
+        status (str, optional): Status do recebimento. Defaults to None.
         
     Returns:
-        list: Lista de recebimentos filtrados
+        list: Lista de tuplas com os recebimentos filtrados
     """
     try:
-        # Montar a query base
+        # Começar com uma consulta base
         query = """
-        SELECT ID, CODIGO, CLIENTE, VENCIMENTO, VALOR, STATUS
-        FROM RECEBIMENTOS_CLIENTES
+        SELECT ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS, VALOR_ORIGINAL
+        FROM RECEBIMENTOS_CLIENTES 
         WHERE 1=1
         """
         
-        # Lista para armazenar os parâmetros
         params = []
         
-        # Adicionar filtros se fornecidos
+        # Adicionar condições conforme os filtros fornecidos
         if codigo:
-            query += " AND CODIGO = ?"
-            params.append(codigo)
-            
-        if cliente:
-            query += " AND UPPER(CLIENTE) LIKE UPPER(?)"
-            params.append(f"%{cliente}%")
-            
-        if data_inicio:
-            query += " AND VENCIMENTO >= ?"
-            params.append(data_inicio)
-            
-        if data_fim:
-            query += " AND VENCIMENTO <= ?"
-            params.append(data_fim)
-            
-        if status:
-            query += " AND STATUS = ?"
-            params.append(status)
-            
-        # Ordenação
-        query += " ORDER BY VENCIMENTO"
+            # Para código, usamos busca por prefixo ou código exato
+            codigo_base = codigo.split('-')[0] if '-' in codigo else codigo
+            query += " AND (CODIGO LIKE ? OR CODIGO = ?)"
+            params.extend([f"{codigo_base}%", codigo])
         
-        return execute_query(query, tuple(params) if params else None)
+        if cliente:
+            # Para cliente, usamos busca parcial com LIKE e case-insensitive
+            query += " AND UPPER(TRIM(CLIENTE)) LIKE UPPER(?)"
+            params.append(f"%{cliente}%")
+        
+        if data_inicio:
+            # Converter para string se for um objeto date
+            if hasattr(data_inicio, 'strftime'):
+                data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+            else:
+                data_inicio_str = data_inicio
+            
+            query += " AND VENCIMENTO >= ?"
+            params.append(data_inicio_str)
+        
+        if data_fim:
+            # Converter para string se for um objeto date
+            if hasattr(data_fim, 'strftime'):
+                data_fim_str = data_fim.strftime('%Y-%m-%d')
+            else:
+                data_fim_str = data_fim
+            
+            query += " AND VENCIMENTO <= ?"
+            params.append(data_fim_str)
+        
+        if status:
+            # Usar TRIM para comparar sem espaços extras
+            query += " AND TRIM(STATUS) = ?"
+            params.append(status.strip())
+        
+        # Executar a consulta
+        result = execute_query(query, tuple(params) if params else None)
+        
+        # Imprimir resultados para debug
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        print(f"Resultados encontrados: {len(result) if result else 0}")
+        
+        if result and len(result) > 0:
+            print(f"Primeiro resultado: {result[0]}")
+            
+            # Verificar se há resultados com status "Recebido"
+            recebidos = [r for r in result if r[7] and r[7].strip() == 'Recebido']
+            print(f"Registros com status 'Recebido': {len(recebidos)}")
+            
+            # Verificar os diferentes status presentes nos resultados
+            status_set = set()
+            for r in result:
+                if r[7]:
+                    status_set.add(r[7].strip())
+            print(f"Status encontrados nos resultados: {status_set}")
+        
+        return result
     except Exception as e:
         print(f"Erro ao filtrar recebimentos: {e}")
-        raise Exception(f"Erro ao filtrar recebimentos: {str(e)}")
-
+        import traceback
+        traceback.print_exc()
+        return []
+    
 def criar_recebimento(codigo, cliente, cliente_id=None, vencimento=None, valor=0, valor_original=None):
     """
     Cria um novo recebimento no banco de dados
@@ -7233,6 +7269,243 @@ def verificar_tabela_vendas(self):
     except Exception as e:
         print(f"Erro ao verificar tabela VENDAS: {e}")
         return False
+
+#Lancamento
+def registrar_pagamento(self, recebimento_id, valor_pago):
+    """
+    Registra um pagamento (total ou parcial) de uma parcela
+    
+    Args:
+        recebimento_id: ID do recebimento/parcela
+        valor_pago: Valor que está sendo pago agora
+    """
+    import sqlite3
+    from datetime import date
+    
+    # Conectar ao banco de dados
+    conn = sqlite3.connect('base/banco_sistema.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Buscar informações atuais da parcela
+        cursor.execute("""
+            SELECT VALOR, VALOR_ORIGINAL, STATUS
+            FROM RECEBIMENTOS_CLIENTES
+            WHERE ID = ?
+        """, (recebimento_id,))
+        
+        resultado = cursor.fetchone()
+        if not resultado:
+            raise Exception(f"Recebimento ID {recebimento_id} não encontrado")
+        
+        valor_pendente, valor_original, status_atual = resultado
+        
+        # Validar valor do pagamento
+        if valor_pago <= 0:
+            raise Exception("O valor do pagamento deve ser maior que zero")
+            
+        if valor_pago > valor_pendente:
+            raise Exception(f"O valor do pagamento (R$ {valor_pago:.2f}) excede o valor pendente (R$ {valor_pendente:.2f})")
+        
+        # Calcular novo valor pendente
+        novo_valor_pendente = valor_pendente - valor_pago
+        
+        # Determinar novo status
+        if novo_valor_pendente == 0:
+            novo_status = "PAGO"
+        else:
+            novo_status = "PARCIAL"
+        
+        # Registrar a data do pagamento apenas se for pagamento total
+        data_recebimento = None
+        if novo_status == "PAGO":
+            data_recebimento = date.today()
+        
+        # Atualizar a parcela
+        cursor.execute("""
+            UPDATE RECEBIMENTOS_CLIENTES
+            SET VALOR = ?,
+                STATUS = ?,
+                DATA_RECEBIMENTO = ?
+            WHERE ID = ?
+        """, (novo_valor_pendente, novo_status, data_recebimento, recebimento_id))
+        
+        conn.commit()
+        
+        # Registrar este pagamento no log ou histórico se desejar
+        # Esta parte é opcional, mas útil para manter um histórico de pagamentos
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS HISTORICO_PAGAMENTOS (
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                RECEBIMENTO_ID INTEGER,
+                DATA_PAGAMENTO DATE,
+                VALOR_PAGO DECIMAL(10,2),
+                OBSERVACAO TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO HISTORICO_PAGAMENTOS (
+                RECEBIMENTO_ID, DATA_PAGAMENTO, VALOR_PAGO, OBSERVACAO
+            ) VALUES (?, ?, ?, ?)
+        """, (recebimento_id, date.today(), valor_pago, f"Pagamento {'total' if novo_status == 'PAGO' else 'parcial'}"))
+        
+        conn.commit()
+        
+        return True, f"Pagamento de R$ {valor_pago:.2f} registrado com sucesso. Status: {novo_status}"
+        
+    except Exception as e:
+        conn.rollback()
+        return False, f"Erro ao registrar pagamento: {str(e)}"
+        
+    finally:
+        conn.close()
+
+def listar_recebimentos_baixados():
+    """
+    Lista todos os recebimentos com status 'Recebido'
+    
+    Returns:
+        list: Lista de tuplas com os dados dos recebimentos baixados
+    """
+    try:
+        print("Buscando recebimentos com status 'Recebido'...")
+        
+        # Use a função execute_query existente no banco.py em vez de SQLite
+        query = """
+        SELECT ID, CODIGO, CLIENTE, CLIENTE_ID, VENCIMENTO, VALOR, DATA_RECEBIMENTO, STATUS, VALOR_ORIGINAL
+        FROM RECEBIMENTOS_CLIENTES
+        WHERE STATUS = 'Recebido'
+        ORDER BY DATA_RECEBIMENTO DESC
+        """
+        result = execute_query(query)
+        
+        # Informar no log quantos registros foram encontrados para debug
+        print(f"Encontrados {len(result) if result else 0} recebimentos com status 'Recebido'")
+        
+        # Verificar se há registros para debug
+        if result and len(result) > 0:
+            print(f"Primeiro registro encontrado: {result[0]}")
+        
+        return result
+    except Exception as e:
+        print(f"Erro ao listar recebimentos baixados: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def buscar_historico_pagamentos(codigo):
+    """
+    Busca o histórico de pagamentos de um determinado código
+    
+    Args:
+        codigo (str): Código do recebimento
+        
+    Returns:
+        list: Lista de tuplas (data_pagamento, valor_pago, observacao)
+    """
+    import sqlite3
+    from datetime import datetime
+    
+    conn = sqlite3.connect('base/MBDATA_NOVO.FDB')
+    cursor = conn.cursor()
+    
+    try:
+        # Primeiro, buscar o ID do recebimento pelo código
+        cursor.execute("SELECT ID FROM RECEBIMENTOS_CLIENTES WHERE CODIGO = ?", (codigo,))
+        resultado = cursor.fetchone()
+        
+        if not resultado:
+            return []
+        
+        recebimento_id = resultado[0]
+        
+        # Verifica se a tabela HISTORICO_PAGAMENTOS existe
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='HISTORICO_PAGAMENTOS'
+        """)
+        if not cursor.fetchone():
+            # Se a tabela não existir, cria ela
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS HISTORICO_PAGAMENTOS (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    RECEBIMENTO_ID INTEGER,
+                    DATA_PAGAMENTO DATE,
+                    VALOR_PAGO DECIMAL(10,2),
+                    OBSERVACAO TEXT
+                )
+            """)
+            conn.commit()
+            # Como a tabela acabou de ser criada, não há histórico
+            return []
+        
+        # Agora, buscar o histórico de pagamentos
+        cursor.execute("""
+            SELECT DATA_PAGAMENTO, VALOR_PAGO, OBSERVACAO
+            FROM HISTORICO_PAGAMENTOS
+            WHERE RECEBIMENTO_ID = ?
+            ORDER BY DATA_PAGAMENTO DESC
+        """, (recebimento_id,))
+        
+        historico = []
+        
+        # Converter strings de data para objetos date
+        for row in cursor.fetchall():
+            data_pagamento_str, valor_pago, observacao = row
+            
+            # Converter string de data de pagamento para date
+            data_pagamento = None
+            if data_pagamento_str:
+                try:
+                    if isinstance(data_pagamento_str, str):
+                        # Se for string, tenta converter para date
+                        data_pagamento = datetime.strptime(data_pagamento_str, '%Y-%m-%d').date()
+                    else:
+                        # Se não for string, assume que já é um objeto date
+                        data_pagamento = data_pagamento_str
+                except:
+                    pass
+            
+            historico.append((data_pagamento, valor_pago, observacao))
+        
+        # Se não houver histórico na tabela de histórico, criar um registro baseado no próprio recebimento
+        if not historico:
+            # Buscar as informações do recebimento
+            cursor.execute("""
+                SELECT DATA_RECEBIMENTO, VALOR_ORIGINAL - VALOR, 'Pagamento total'
+                FROM RECEBIMENTOS_CLIENTES
+                WHERE ID = ? AND STATUS = 'Recebido'
+            """, (recebimento_id,))
+            
+            result = cursor.fetchone()
+            if result:
+                data_recebimento_str, valor_pago, observacao = result
+                
+                # Converter string de data de recebimento para date
+                data_recebimento = None
+                if data_recebimento_str:
+                    try:
+                        if isinstance(data_recebimento_str, str):
+                            # Se for string, tenta converter para date
+                            data_recebimento = datetime.strptime(data_recebimento_str, '%Y-%m-%d').date()
+                        else:
+                            # Se não for string, assume que já é um objeto date
+                            data_recebimento = data_recebimento_str
+                    except:
+                        pass
+                
+                # Adicionar ao histórico
+                historico.append((data_recebimento, valor_pago, observacao))
+        
+        return historico
+    
+    except Exception as e:
+        print(f"Erro ao buscar histórico de pagamentos: {e}")
+        return []
+    
+    finally:
+        conn.close()
 
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":

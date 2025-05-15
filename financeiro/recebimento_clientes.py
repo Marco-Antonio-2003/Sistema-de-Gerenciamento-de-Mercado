@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QSizePolicy, QComboBox)
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QPalette, QColor
 from PyQt5.QtCore import Qt, QSize, QDate
+from financeiro.ver_baixados import VerBaixadosWindow
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from financeiro.formulario_recebimento_clientes import FormularioRecebimentoClientes
@@ -295,6 +296,34 @@ class RecebimentoClientesWindow(QWidget):
         btn_excluir.clicked.connect(self.excluir)
         acoes_layout.addWidget(btn_excluir)
         
+        # botao ver baixa 
+        btn_ver_baixados = QPushButton("Ver Baixados")
+        try:
+            # Ícone de verificação
+            btn_ver_baixados.setIcon(self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        except:
+            pass
+        btn_ver_baixados.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                font-size: 14px;
+                border-radius: 4px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        btn_ver_baixados.clicked.connect(self.abrir_tela_baixados)
+        acoes_layout.addWidget(btn_ver_baixados)
+
+        # Adicionar um espaçador para empurrar os botões para a esquerda
+        acoes_layout.addStretch()
+
+        main_layout.addLayout(acoes_layout)
         # Adicionar um espaçador para empurrar o botão para a esquerda
         acoes_layout.addStretch()
         
@@ -358,6 +387,26 @@ class RecebimentoClientesWindow(QWidget):
         # Carregar recebimentos do banco de dados
         self.carregar_recebimentos()
     
+    def abrir_tela_baixados(self):
+        """Abre a janela para visualização de recebimentos baixados"""
+        try:
+            # Criar uma nova janela
+            self.janela_baixados = QMainWindow()
+            self.janela_baixados.setWindowTitle("Recebimentos Baixados")
+            self.janela_baixados.setGeometry(100, 100, 1000, 600)
+            self.janela_baixados.setStyleSheet("background-color: #003b57;")
+            
+            # Instanciar o widget de recebimentos baixados
+            baixados_widget = VerBaixadosWindow(janela_parent=self.janela_baixados)
+            
+            self.janela_baixados.setCentralWidget(baixados_widget)
+            
+            # Mostrar a janela
+            self.janela_baixados.show()
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Não foi possível abrir a tela de recebimentos baixados: {str(e)}")
+
     def carregar_clientes(self):
         """Carrega a lista de clientes no ComboBox"""
         try:

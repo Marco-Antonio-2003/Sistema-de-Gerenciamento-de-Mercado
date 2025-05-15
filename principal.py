@@ -771,8 +771,14 @@ class MainWindow(QMainWindow):
             return 0
 
     def obter_contagem_vendas(self):
-        """Obtém o valor total de TODAS as vendas do banco de dados (sem filtro de data)"""
+        """Obtém o valor total das vendas do dia atual"""
         try:
+            # Importar datetime para obter a data atual
+            from datetime import datetime, date
+            
+            # Obter a data atual
+            data_atual = date.today()
+            
             # Usar conexão direta
             from base.banco import get_connection
             
@@ -780,8 +786,38 @@ class MainWindow(QMainWindow):
             conn = get_connection()
             cursor = conn.cursor()
             
-            # Em vez de usar SUM, vamos pegar os valores individuais e somá-los no Python
-            cursor.execute("SELECT VALOR_TOTAL FROM VENDAS")
+            # Verificar estrutura da tabela VENDAS para identificar a coluna de data
+            cursor.execute("SELECT RDB$FIELD_NAME FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = 'VENDAS'")
+            colunas = [col[0].strip() for col in cursor.fetchall()]
+            print(f"Colunas na tabela VENDAS: {colunas}")
+            
+            # Possíveis nomes para a coluna de data
+            possiveis_nomes_data = ['DATA_VENDA', 'DATA_EMISSAO', 'DATA', 'DT_VENDA', 'DT_EMISSAO', 'DATA_REGISTRO']
+            
+            # Encontrar a primeira coluna de data que existe na tabela
+            coluna_data = None
+            for nome in possiveis_nomes_data:
+                if nome in colunas:
+                    coluna_data = nome
+                    print(f"Coluna de data encontrada: {coluna_data}")
+                    break
+            
+            if not coluna_data:
+                print("AVISO: Nenhuma coluna de data encontrada. Usando todas as vendas.")
+                # Se não encontrar coluna de data, usar todas as vendas (comportamento atual)
+                cursor.execute("SELECT VALOR_TOTAL FROM VENDAS")
+            else:
+                # Usar EXTRACT para comparar apenas a data no Firebird
+                query = f"""
+                SELECT VALOR_TOTAL FROM VENDAS 
+                WHERE EXTRACT(YEAR FROM {coluna_data}) = ? 
+                AND EXTRACT(MONTH FROM {coluna_data}) = ? 
+                AND EXTRACT(DAY FROM {coluna_data}) = ?
+                """
+                params = (data_atual.year, data_atual.month, data_atual.day)
+                print(f"Executando query: {query} com parâmetros {params}")
+                cursor.execute(query, params)
+            
             valores = cursor.fetchall()
             
             # Somar valores manualmente
@@ -797,7 +833,11 @@ class MainWindow(QMainWindow):
             cursor.close()
             conn.close()
             
-            print(f"Valor total de todas as vendas: {total}")
+            if coluna_data:
+                print(f"Valor total das vendas do dia {data_atual.strftime('%d/%m/%Y')}: {total}")
+            else:
+                print(f"Valor total de todas as vendas: {total}")
+            
             return total
             
         except Exception as e:
@@ -805,7 +845,7 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             return 0.0
-
+    
     def diagnosticar_banco(self):
         """Executa diagnóstico completo do banco e valores"""
         try:
