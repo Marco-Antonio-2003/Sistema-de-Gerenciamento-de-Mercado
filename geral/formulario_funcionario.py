@@ -864,17 +864,42 @@ class FormularioFuncionario(QWidget):
         try:
             # Importar funções do banco
             from base.banco import criar_funcionario, atualizar_funcionario, buscar_funcionario_por_id
-            from base.banco import criar_usuario
+            from base.banco import criar_usuario, get_usuario_logado
             
             # Verificar se é uma atualização ou novo cadastro
             if self.btn_incluir.text() == "Atualizar" and codigo:
-                # Código de atualização...
+                # Atualizar o funcionário existente
+                atualizar_funcionario(
+                    int(codigo),
+                    nome,
+                    tipo_vendedor,
+                    telefone,
+                    tipo_pessoa,
+                    data_cadastro,
+                    cpf_cnpj,
+                    sexo,
+                    cep,
+                    rua,
+                    bairro,
+                    cidade,
+                    estado
+                )
                 
                 # Atualizar usuário se necessário
                 if criar_usuario:
-                    # Importar função para atualizar usuário se precisar
-                    # ...
+                    # Aqui você pode implementar a lógica de atualização do usuário se necessário
                     pass
+                    
+                self.mostrar_mensagem("Sucesso", 
+                                f"Funcionário atualizado com sucesso!\nNome: {nome}")
+                    
+                # Atualizar a tabela principal
+                if self.cadastro_tela:
+                    self.cadastro_tela.carregar_funcionarios()
+                    
+                # Fechar a janela
+                if self.janela_parent:
+                    self.janela_parent.close()
             else:
                 # Criar novo funcionário no banco de dados
                 novo_id = criar_funcionario(
@@ -894,22 +919,40 @@ class FormularioFuncionario(QWidget):
                 
                 # Criar usuário se solicitado
                 id_usuario = None
-                empresa = ""  # Definir a empresa padrão ou usar um campo adicional
+                msg_usuario = ""
                 
                 if criar_usuario:
-                    # Obter empresa padrão de alguma forma
-                    # Por exemplo: empresa = self.obter_empresa_padrao()
-                    empresa = "EMPRESA"  # Substituir pela lógica apropriada
+                    # Obter o ID do usuário master (usuário logado atualmente)
+                    usuario_logado_info = get_usuario_logado()
+                    usuario_master_id = usuario_logado_info.get("id")
                     
-                    # Criar usuário e vincular ao funcionário
-                    from base.banco import criar_usuario, vincular_usuario_funcionario
+                    # Obter a empresa do usuário logado
+                    empresa = usuario_logado_info.get("empresa", "EMPRESA")
                     
-                    id_usuario = criar_usuario(nome_usuario, senha, empresa)
+                    # Data de expiração (mesma do cliente principal)
+                    data_expiracao = None
+                    if usuario_master_id:
+                        # Buscar data de expiração do usuário master
+                        from base.banco import execute_query
+                        query = "SELECT DATA_EXPIRACAO FROM USUARIOS WHERE ID = ?"
+                        result = execute_query(query, (usuario_master_id,))
+                        if result and len(result) > 0 and result[0][0]:
+                            data_expiracao = result[0][0]
+                    
+                    # Criar usuário vinculado ao master
+                    id_usuario = criar_usuario(
+                        nome_usuario, 
+                        senha, 
+                        empresa, 
+                        usuario_master=usuario_master_id,
+                        data_expiracao=data_expiracao
+                    )
+                    
+                    # Vincular ao funcionário
+                    from base.banco import vincular_usuario_funcionario
                     vincular_usuario_funcionario(novo_id, id_usuario, nome_usuario)
                     
                     msg_usuario = f"\nUsuário '{nome_usuario}' criado com sucesso!"
-                else:
-                    msg_usuario = ""
                 
                 self.mostrar_mensagem("Sucesso", 
                                 f"Funcionário cadastrado com sucesso!\nNome: {nome}\nCódigo: {novo_id}{msg_usuario}")

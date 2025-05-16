@@ -3,10 +3,16 @@ Módulo para gerenciar conexões com o banco de dados Firebird
 """
 
 #banco.py
+from datetime import date
 import os
 import sys
 import fdb  # Módulo para conexão com Firebird
 from PyQt5.QtWidgets import QMessageBox
+import hashlib
+import base64
+import time
+import random
+import string
 
 # Função para encontrar o caminho do banco de dados
 
@@ -138,9 +144,10 @@ def execute_query(query, params=None, commit=True):
         if conn:
             conn.close()
 
+#LOGIN 
 def validar_login(usuario, senha, empresa):
     """
-    Valida o login do usuário
+    Valida o login do usuário e verifica se está bloqueado
     
     Args:
         usuario (str): Nome de usuário
@@ -148,9 +155,18 @@ def validar_login(usuario, senha, empresa):
         empresa (str): Nome da empresa
         
     Returns:
-        bool: True se o login for válido, False caso contrário
+        bool: True se o login for válido e não estiver bloqueado, False caso contrário
     """
     try:
+        # Primeiro verificar se o usuário está bloqueado
+        bloqueado, motivo = verificar_usuario_bloqueado(usuario, empresa)
+        if bloqueado:
+            # Adicionar o motivo ao log para depuração
+            print(f"Login negado para {usuario}: {motivo}")
+            # Criar exceção com a mensagem de bloqueio para ser exibida ao usuário
+            raise Exception(motivo)
+        
+        # Verificação normal de credenciais
         query = """
         SELECT ID, USUARIO, EMPRESA FROM USUARIOS 
         WHERE USUARIO = ? AND SENHA = ? AND EMPRESA = ?
@@ -211,6 +227,410 @@ def criar_usuario(usuario, senha, empresa):
     except Exception as e:
         print(f"Erro ao criar usuário: {e}")
         raise Exception(f"Erro ao criar usuário: {str(e)}")
+
+def bloquear_usuario(id_usuario, motivo=None):
+    """
+    Bloqueia um usuário e todos os usuários vinculados a ele
+    
+    Args:
+        id_usuario (int): ID do usuário a ser bloqueado
+        motivo (str, optional): Motivo do bloqueio
+        
+    Returns:
+        bool: True se o bloqueio foi bem-sucedido
+    """
+    try:
+        from datetime import date
+        
+        # Bloquear o usuário principal
+        query = """
+        UPDATE USUARIOS
+        SET BLOQUEADO = 'S', 
+            DATA_BLOQUEIO = ?,
+            MOTIVO_BLOQUEIO = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (date.today(), motivo, id_usuario))
+        
+        # Bloquear todos os usuários vinculados
+        query_vinculados = """
+        UPDATE USUARIOS
+        SET BLOQUEADO = 'S', 
+            DATA_BLOQUEIO = ?,
+            MOTIVO_BLOQUEIO = 'Conta principal bloqueada'
+        WHERE USUARIO_MASTER = ?
+        """
+        
+        execute_query(query_vinculados, (date.today(), id_usuario))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao bloquear usuário: {e}")
+        raise Exception(f"Erro ao bloquear usuário: {str(e)}")
+
+def desbloquear_usuario(id_usuario):
+    """
+    Desbloqueia um usuário e todos os usuários vinculados a ele
+    
+    Args:
+        id_usuario (int): ID do usuário a ser desbloqueado
+        
+    Returns:
+        bool: True se o desbloqueio foi bem-sucedido
+    """
+    try:
+        # Desbloquear o usuário principal
+        query = """
+        UPDATE USUARIOS
+        SET BLOQUEADO = 'N', 
+            DATA_BLOQUEIO = NULL,
+            MOTIVO_BLOQUEIO = NULL
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (id_usuario,))
+        
+        # Desbloquear todos os usuários vinculados
+        query_vinculados = """
+        UPDATE USUARIOS
+        SET BLOQUEADO = 'N', 
+            DATA_BLOQUEIO = NULL,
+            MOTIVO_BLOQUEIO = NULL
+        WHERE USUARIO_MASTER = ?
+        """
+        
+        execute_query(query_vinculados, (id_usuario,))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao desbloquear usuário: {e}")
+        raise Exception(f"Erro ao desbloquear usuário: {str(e)}")
+
+def verificar_usuario_bloqueado(usuario, empresa=None):
+    """
+    Verifica se um usuário está bloqueado ou com pagamento pendente
+    
+    Args:
+        usuario (str): Nome do usuário
+        empresa (str, optional): Nome da empresa
+        
+    Returns:
+        tuple: (bool, str) - (está_bloqueado, motivo)
+    """
+    try:
+        where_clause = "WHERE USUARIO = ?"
+        params = [usuario]
+        
+        if empresa:
+            where_clause += " AND EMPRESA = ?"
+            params.append(empresa)
+        
+        query = f"""
+        SELECT BLOQUEADO, MOTIVO_BLOQUEIO, DATA_EXPIRACAO, USUARIO_MASTER
+        FROM USUARIOS
+        {where_clause}
+        """
+        
+        result = execute_query(query, tuple(params))
+        
+        if not result or len(result) == 0:
+            return False, ""
+            
+        bloqueado, motivo, data_expiracao, usuario_master = result[0]
+        
+        # Verificar se o usuário está explicitamente bloqueado
+        if bloqueado and bloqueado.upper() == 'S':
+            return True, motivo or "Usuário bloqueado"
+            
+        # Verificar se a data de expiração foi atingida
+        if data_expiracao:
+            from datetime import date
+            hoje = date.today()
+            if hoje > data_expiracao:
+                return True, "Mensalidade vencida. Por favor, entre em contato com o suporte."
+                
+        # Se for um usuário vinculado a um master, verificar se o master está bloqueado
+        if usuario_master:
+            # Buscar o usuário master
+            query_master = """
+            SELECT BLOQUEADO, MOTIVO_BLOQUEIO
+            FROM USUARIOS
+            WHERE ID = ?
+            """
+            
+            result_master = execute_query(query_master, (usuario_master,))
+            
+            if result_master and len(result_master) > 0:
+                bloqueado_master, motivo_master = result_master[0]
+                
+                if bloqueado_master and bloqueado_master.upper() == 'S':
+                    return True, motivo_master or "Conta principal bloqueada"
+        
+        return False, ""
+    except Exception as e:
+        print(f"Erro ao verificar bloqueio: {e}")
+        return False, ""
+
+def atualizar_data_expiracao(id_usuario, nova_data):
+    """
+    Atualiza a data de expiração para um usuário e seus vinculados
+    
+    Args:
+        id_usuario (int): ID do usuário
+        nova_data (date): Nova data de expiração
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        # Atualizar usuário principal
+        query = """
+        UPDATE USUARIOS
+        SET DATA_EXPIRACAO = ?
+        WHERE ID = ?
+        """
+        
+        execute_query(query, (nova_data, id_usuario))
+        
+        # Atualizar usuários vinculados
+        query_vinculados = """
+        UPDATE USUARIOS
+        SET DATA_EXPIRACAO = ?
+        WHERE USUARIO_MASTER = ?
+        """
+        
+        execute_query(query_vinculados, (nova_data, id_usuario))
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao atualizar data de expiração: {e}")
+        raise Exception(f"Erro ao atualizar data de expiração: {str(e)}")
+
+def verificar_tabela_licencas():
+    """Verifica se a tabela de licenças existe e a cria se não existir"""
+    try:
+        query = """
+        SELECT COUNT(*) FROM RDB$RELATIONS 
+        WHERE RDB$RELATION_NAME = 'LICENCAS'
+        """
+        result = execute_query(query)
+        
+        if result[0][0] == 0:
+            query_create = """
+            CREATE TABLE LICENCAS (
+                ID INTEGER NOT NULL PRIMARY KEY,
+                USUARIO_ID INTEGER NOT NULL,
+                CODIGO VARCHAR(50) NOT NULL,
+                DATA_GERACAO DATE NOT NULL,
+                DATA_EXPIRACAO DATE NOT NULL,
+                ATIVO CHAR(1) DEFAULT 'S',
+                FOREIGN KEY (USUARIO_ID) REFERENCES USUARIOS(ID)
+            )
+            """
+            execute_query(query_create)
+            execute_query("CREATE SEQUENCE GEN_LICENCAS_ID")
+            
+            trigger_query = """
+            CREATE TRIGGER LICENCAS_BI FOR LICENCAS
+            ACTIVE BEFORE INSERT POSITION 0
+            AS
+            BEGIN
+                IF (NEW.ID IS NULL) THEN
+                    NEW.ID = NEXT VALUE FOR GEN_LICENCAS_ID;
+            END
+            """
+            execute_query(trigger_query)
+            
+            print("Tabela LICENCAS criada com sucesso.")
+    except Exception as e:
+        print(f"Erro ao verificar/criar tabela LICENCAS: {e}")
+        raise
+
+def gerar_codigo_licenca(usuario_id, data_expiracao):
+    """Gera um código de licença criptografado"""
+    # Criar string com os dados
+    expiracao_str = data_expiracao.strftime('%Y%m%d')
+    dados = f"{usuario_id}-{expiracao_str}-{int(time.time())}"
+    
+    # Adicionar salt aleatório
+    salt = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    dados_com_salt = f"{dados}-{salt}"
+    
+    # Criar hash
+    hash_obj = hashlib.sha256(dados_com_salt.encode())
+    hash_bytes = hash_obj.digest()
+    
+    # Converter para base64 e formatar
+    codigo_base64 = base64.b64encode(hash_bytes).decode()
+    codigo_limpo = codigo_base64.replace('/', '_').replace('+', '-').replace('=', '')
+    
+    # Código final no formato: ID-HASH
+    codigo_final = f"{usuario_id:04d}-{codigo_limpo[:16]}"
+    
+    return codigo_final
+
+def salvar_codigo_licenca(usuario_id, codigo, data_geracao, data_expiracao):
+    """Salva um código de licença no banco"""
+    try:
+        # Inativar códigos anteriores
+        execute_query("UPDATE LICENCAS SET ATIVO = 'N' WHERE USUARIO_ID = ? AND ATIVO = 'S'", 
+                     (usuario_id,))
+        
+        # Inserir novo código
+        execute_query("""INSERT INTO LICENCAS 
+                       (USUARIO_ID, CODIGO, DATA_GERACAO, DATA_EXPIRACAO, ATIVO)
+                       VALUES (?, ?, ?, ?, 'S')""",
+                     (usuario_id, codigo, data_geracao.strftime('%Y-%m-%d'), 
+                      data_expiracao.strftime('%Y-%m-%d')))
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar código: {e}")
+        return False
+
+def validar_codigo_licenca(codigo, usuario_id):
+    """Verifica se um código é válido"""
+    try:
+        # Verificar formato do código
+        partes = codigo.split('-')
+        if len(partes) < 2 or int(partes[0]) != usuario_id:
+            return False
+        
+        # Consultar banco
+        query = """SELECT COUNT(*) FROM LICENCAS 
+                  WHERE USUARIO_ID = ? AND CODIGO = ? AND ATIVO = 'S' 
+                  AND DATA_EXPIRACAO >= CURRENT_DATE"""
+        result = execute_query(query, (usuario_id, codigo))
+        
+        return result[0][0] > 0
+    except Exception:
+        return False
+
+def obter_id_usuario(usuario, empresa):
+    """Obtém o ID do usuário com base no nome e empresa"""
+    try:
+        query = "SELECT ID FROM USUARIOS WHERE USUARIO = ? AND EMPRESA = ?"
+        result = execute_query(query, (usuario, empresa))
+        if result and len(result) > 0:
+            return result[0][0]
+        return None
+    except Exception as e:
+        print(f"Erro ao obter ID do usuário: {e}")
+        return None
+
+def verificar_necessidade_codigo_licenca(usuario_id):
+    """Verifica se o usuário precisa informar um código de licença"""
+    try:
+        # Verificar se é um usuário master
+        query = """
+        SELECT DATA_EXPIRACAO, USUARIO_MASTER 
+        FROM USUARIOS 
+        WHERE ID = ?
+        """
+        result = execute_query(query, (usuario_id,))
+        
+        if not result or len(result) == 0:
+            return False
+            
+        data_expiracao, usuario_master = result[0]
+        
+        # Se for usuário vinculado, verificar usuario master
+        if usuario_master:
+            query_master = "SELECT DATA_EXPIRACAO FROM USUARIOS WHERE ID = ?"
+            result_master = execute_query(query_master, (usuario_master,))
+            
+            if result_master and len(result_master) > 0:
+                data_expiracao_master = result_master[0][0]
+                
+                # Se o master estiver vencido, precisa de código
+                if data_expiracao_master and date.today() > data_expiracao_master:
+                    return True
+            
+            # Se não encontrou master ou não tem data vencida, verifica só este usuário
+        
+        # Verificar se a data de expiração está vencida
+        if data_expiracao and date.today() > data_expiracao:
+            return True
+            
+        # Verificar se está próximo de vencer (7 dias ou menos)
+        dias_para_vencer = (data_expiracao - date.today()).days
+        if dias_para_vencer <= 7:
+            # Opcional: mostrar aviso mas não exigir código ainda
+            pass
+            
+        return False
+    except Exception as e:
+        print(f"Erro ao verificar necessidade de código: {e}")
+        return False
+
+def atualizar_data_expiracao_por_codigo(codigo, usuario_id):
+    """Atualiza a data de expiração do usuário com base no código de licença"""
+    try:
+        # Buscar dados do código
+        query = """
+        SELECT DATA_EXPIRACAO 
+        FROM LICENCAS 
+        WHERE CODIGO = ? AND USUARIO_ID = ? AND ATIVO = 'S'
+        """
+        result = execute_query(query, (codigo, usuario_id))
+        
+        if result and len(result) > 0:
+            nova_data = result[0][0]
+            
+            # Atualizar data de expiração do usuário
+            update_query = "UPDATE USUARIOS SET DATA_EXPIRACAO = ? WHERE ID = ?"
+            execute_query(update_query, (nova_data, usuario_id))
+            
+            return True
+        return False
+    except Exception as e:
+        print(f"Erro ao atualizar data de expiração: {e}")
+        return False
+
+def verificar_usuario_bloqueado(usuario, empresa):
+    """Verifica se o usuário está bloqueado e retorna o motivo"""
+    try:
+        # Verificar bloqueio direto
+        query = """
+        SELECT BLOQUEADO, MOTIVO_BLOQUEIO, USUARIO_MASTER 
+        FROM USUARIOS 
+        WHERE USUARIO = ? AND EMPRESA = ?
+        """
+        result = execute_query(query, (usuario, empresa))
+        
+        if not result or len(result) == 0:
+            return False, ""
+            
+        bloqueado, motivo, usuario_master = result[0]
+        
+        # Verificar se está bloqueado diretamente
+        if bloqueado and bloqueado.upper() == 'S':
+            if not motivo:
+                motivo = "Usuário bloqueado. Entre em contato com o suporte."
+            return True, motivo
+        
+        # Se for um usuário vinculado, verificar se o master está bloqueado
+        if usuario_master:
+            query_master = """
+            SELECT BLOQUEADO, MOTIVO_BLOQUEIO 
+            FROM USUARIOS 
+            WHERE ID = ?
+            """
+            result_master = execute_query(query_master, (usuario_master,))
+            
+            if result_master and len(result_master) > 0:
+                bloqueado_master, motivo_master = result_master[0]
+                
+                if bloqueado_master and bloqueado_master.upper() == 'S':
+                    if not motivo_master:
+                        motivo_master = "Conta principal bloqueada. Entre em contato com o suporte."
+                    return True, motivo_master
+        
+        return False, ""
+    except Exception as e:
+        print(f"Erro ao verificar bloqueio: {e}")
+        return False, "Erro ao verificar status do usuário"
+    
 
 def verificar_tabela_usuarios():
     """
@@ -7170,8 +7590,7 @@ def autenticar_por_funcionario(nome_usuario, senha):
         print(f"Erro na autenticação por funcionário: {e}")
         return None
 
-# Modificar a função existente criar_usuario para retornar o ID
-def criar_usuario(usuario, senha, empresa):
+def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=None):
     """
     Cria um novo usuário no banco de dados
     
@@ -7179,6 +7598,8 @@ def criar_usuario(usuario, senha, empresa):
         usuario (str): Nome de usuário
         senha (str): Senha do usuário
         empresa (str): Nome da empresa
+        usuario_master (int, optional): ID do usuário master/principal
+        data_expiracao (date, optional): Data de expiração do acesso
     
     Returns:
         int: ID do usuário criado ou None em caso de erro
@@ -7202,10 +7623,11 @@ def criar_usuario(usuario, senha, empresa):
         
         # Inserir novo usuário com ID explícito
         query_insert = """
-        INSERT INTO USUARIOS (ID, USUARIO, SENHA, EMPRESA) 
-        VALUES (?, ?, ?, ?)
+        INSERT INTO USUARIOS (
+            ID, USUARIO, SENHA, EMPRESA, BLOQUEADO, USUARIO_MASTER, DATA_EXPIRACAO
+        ) VALUES (?, ?, ?, ?, 'N', ?, ?)
         """
-        execute_query(query_insert, (next_id, usuario, senha, empresa))
+        execute_query(query_insert, (next_id, usuario, senha, empresa, usuario_master, data_expiracao))
         
         return next_id
     except Exception as e:
