@@ -1,19 +1,18 @@
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                           QHBoxLayout, QPushButton, QLabel, QLineEdit,
-                           QMessageBox, QFrame)
-from PyQt5.QtGui import QFont, QIcon, QPixmap
-from PyQt5.QtCore import Qt, QSettings
+                          QHBoxLayout, QPushButton, QLabel, QLineEdit,
+                          QMessageBox, QFrame)
+from PyQt5.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush, QLinearGradient
+from PyQt5.QtCore import Qt, QSettings, QSize
 from principal import MainWindow
-# Alterar a importação para usar o novo módulo
 from base.banco import validar_login, verificar_tabela_usuarios
 
 class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MB Sistema - Login")
-        self.setFixedSize(450, 600)
+        self.setFixedSize(700, 500)
         
         # Centralizar a janela na tela
         self.center_on_screen()
@@ -34,7 +33,6 @@ class LoginWindow(QMainWindow):
         """Inicializa o banco de dados e cria as tabelas necessárias"""
         try:
             verificar_tabela_usuarios()
-            # criar_usuario_padrao()
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao inicializar banco de dados: {e}")
     
@@ -45,114 +43,196 @@ class LoginWindow(QMainWindow):
         y = (screen_geometry.height() - self.height()) // 2
         self.move(x, y)
     
-    def initUI(self):
-        # Define o estilo de fundo
-        self.setStyleSheet("background-color: #003b57;")
+    def paintEvent(self, event):
+        """Desenha o fundo e o painel de login semitransparente"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
         
-        # Widget central
+        # Definir o fundo (azul escuro como fallback)
+        painter.fillRect(self.rect(), QColor("#003366"))
+        
+        try:
+            # Carregar a imagem de fundo da pasta ico-img
+            background_path = resource_path(os.path.join("ico-img", "fundo_login.jpeg"))
+            background = QPixmap(background_path)
+            if not background.isNull():
+                painter.drawPixmap(self.rect(), background)
+            else:
+                print(f"Erro ao carregar imagem: {background_path} não encontrado")
+        except Exception as e:
+            print(f"Erro ao carregar imagem de fundo: {e}")
+            
+        # ==== AQUI É ONDE O QUADRADO TRANSPARENTE É DESENHADO ====
+            
+        # Desenhar o painel de login com gradiente semitransparente
+        panel_color = QColor("#6b809b")
+        panel_color.setAlpha(200)  # Ajustar transparência (0-255)
+        
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        
+        # Criar variações da cor base com diferentes níveis de transparência
+        top_color = QColor("#6b809b")
+        top_color.setAlpha(210)
+        
+        bottom_color = QColor("#6b809b")
+        bottom_color.setAlpha(190)
+        
+        gradient.setColorAt(0, top_color)
+        gradient.setColorAt(1, bottom_color)
+        
+        # Determinar tamanho e posição do painel
+        panel_width = 400  # Largura do quadrado
+        panel_height = 350  # Altura do quadrado
+        panel_x = (self.width() - panel_width) // 2  # Centralização horizontal
+        panel_y = (self.height() - panel_height) // 2 + 30  # Posição vertical (+ empurra para baixo)
+        
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(panel_x, panel_y, panel_width, panel_height, 10, 10)  # Último parâmetro: raio dos cantos arredondados
+    
+    def initUI(self):
+        # Widget central transparente
         central_widget = QWidget()
+        central_widget.setAttribute(Qt.WA_TranslucentBackground)
         self.setCentralWidget(central_widget)
         
-        # Layout principal
+        # Layout principal - reduzindo a margem superior para subir os elementos
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
-        main_layout.setAlignment(Qt.AlignCenter)
+        main_layout.setContentsMargins(0, 25, 0, 0)  # Diminuindo a margem superior
         
-        # # Logo
-        # logo_label = QLabel()
-        # # Caminho absoluto para o logo
-        # logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
-        # logo_pixmap = QPixmap(logo_path)
-        # if not logo_pixmap.isNull():
-        #     logo_label.setPixmap(logo_pixmap.scaled(400, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        # else:
-        #     # Se o logo não for encontrado, cria um texto alternativo
-        #     logo_label = QLabel("MB SISTEMA\nSOLUÇÕES TECNOLÓGICAS")
-        #     logo_label.setFont(QFont("Arial", 24, QFont.Bold))
-        #     logo_label.setStyleSheet("color: #00E676; text-align: center;")
-        #     logo_label.setAlignment(Qt.AlignCenter)
+        # Container para centralizar o form
+        form_container = QWidget()
+        form_container.setAttribute(Qt.WA_TranslucentBackground)
+        form_layout = QVBoxLayout(form_container)
+        form_layout.setContentsMargins(30, 15, 30, 30)  # Reduzindo a margem superior
+        form_layout.setSpacing(10)  # Reduzindo o espaçamento entre elementos
         
-        # logo_label.setAlignment(Qt.AlignCenter)
-        # main_layout.addWidget(logo_label)
+        # Título do sistema - com menos espaço abaixo
+        title_layout = QVBoxLayout()
+        title_layout.setAlignment(Qt.AlignHCenter)
+        title_layout.setContentsMargins(0, 0, 0, 5)  # Reduzindo o espaço abaixo dos títulos
         
-        # Espaço após o logo
-        main_layout.addSpacing(30)
+        # Ajustando cores conforme especificado
+        mb_label = QLabel("MB SISTEMA")
+        mb_label.setFont(QFont("Arial", 22, QFont.Bold))
+        mb_label.setStyleSheet("color: #a6a6a6;")
+        mb_label.setAlignment(Qt.AlignCenter)
+        title_layout.addWidget(mb_label)
         
-        # Frame para os campos de login
-        login_frame = QFrame()
-        login_frame.setStyleSheet("background-color: #00304d; border-radius: 10px;")
-        login_frame.setFrameShape(QFrame.Box)
-        login_frame.setFrameShadow(QFrame.Plain)
-        login_frame.setLineWidth(0)
+        subtitle_label = QLabel("SISTEMA DE GERENCIAMENTO")
+        subtitle_label.setFont(QFont("Arial", 18, QFont.Bold))
+        subtitle_label.setStyleSheet("color: #f7f8f9;")
+        subtitle_label.setAlignment(Qt.AlignCenter)
+        title_layout.addWidget(subtitle_label)
         
-        login_layout = QVBoxLayout(login_frame)
-        login_layout.setContentsMargins(30, 40, 30, 40)
-        login_layout.setSpacing(20)
+        # Adicionar títulos diretamente ao layout principal para ficarem fora do painel
+        # Usando um stretch pequeno (0 em vez de 1) para abaixar os títulos
+        main_layout.addStretch(0)
+        main_layout.addLayout(title_layout)
         
-        # Estilo comum para QLineEdit
-        lineedit_style = """
-            QLineEdit {
-                background-color: #fffff0;
-                border: 1px solid #cccccc;
-                padding: 12px;
-                font-size: 15px;
-                border-radius: 20px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #0078d7;
-            }
-        """
+        form_layout.addSpacing(10)  # Reduzindo o espaçamento
+        
+        # Estilo para os rótulos
+        label_style = "color: white; font-size: 14px; font-weight: bold;"
         
         # Campo Usuário
+        usuario_label = QLabel("USUÁRIO")
+        usuario_label.setStyleSheet(label_style)
+        form_layout.addWidget(usuario_label)
+        
         self.usuario_input = QLineEdit()
-        self.usuario_input.setPlaceholderText("Usuario")
-        self.usuario_input.setStyleSheet(lineedit_style)
-        login_layout.addWidget(self.usuario_input)
-        
-        # Campo Senha
-        self.senha_input = QLineEdit()
-        self.senha_input.setPlaceholderText("Senha")
-        self.senha_input.setEchoMode(QLineEdit.Password)  # Oculta a senha digitada
-        self.senha_input.setStyleSheet(lineedit_style)
-        login_layout.addWidget(self.senha_input)
-        
-        # Campo Empresa
-        self.empresa_input = QLineEdit()
-        self.empresa_input.setPlaceholderText("Empresa")
-        self.empresa_input.setStyleSheet(lineedit_style)
-        login_layout.addWidget(self.empresa_input)
-        
-        # Botão Login
-        self.login_button = QPushButton("Login")
-        self.login_button.setStyleSheet("""
-            QPushButton {
-                background-color: #000000;
-                color: white;
+        self.usuario_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white;
                 border: none;
-                padding: 12px;
-                font-size: 15px;
-                border-radius: 20px;
-            }
-            QPushButton:hover {
-                background-color: #1a1a1a;
-            }
-            QPushButton:pressed {
-                background-color: #333333;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 14px;
             }
         """)
+        form_layout.addWidget(self.usuario_input)
+        
+        # Campo Senha
+        senha_label = QLabel("SENHA")
+        senha_label.setStyleSheet(label_style)
+        form_layout.addWidget(senha_label)
+        
+        self.senha_input = QLineEdit()
+        self.senha_input.setEchoMode(QLineEdit.Password)
+        self.senha_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 14px;
+            }
+        """)
+        form_layout.addWidget(self.senha_input)
+        
+        # Campo Empresa
+        empresa_label = QLabel("EMPRESA")
+        empresa_label.setStyleSheet(label_style)
+        form_layout.addWidget(empresa_label)
+        
+        self.empresa_input = QLineEdit()
+        self.empresa_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 14px;
+            }
+        """)
+        form_layout.addWidget(self.empresa_input)
+        
+        form_layout.addSpacing(5)  # Reduzindo ainda mais o espaçamento antes do botão
+        
+        # Botão Login
+        self.login_button = QPushButton("LOGIN")
+        self.login_button.setStyleSheet("""
+            QPushButton {
+                background-color: #39c0ed;
+                color: #000000;
+                border: none;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                margin-top: 5px;  /* Reduzindo o espaço acima do botão */
+            }
+            QPushButton:hover {
+                background-color: #2fbce9;
+            }
+            QPushButton:pressed {
+                background-color: #25a7d3;
+            }
+        """)
+        self.login_button.setCursor(Qt.PointingHandCursor)
         self.login_button.clicked.connect(self.login)
-        login_layout.addWidget(self.login_button)
+        form_layout.addWidget(self.login_button)
         
-        main_layout.addWidget(login_frame)
+        # Centralizar o formulário na janela
+        container_layout = QHBoxLayout()
+        container_layout.addStretch(1)
+        container_layout.addWidget(form_container)
+        container_layout.addStretch(1)
+        main_layout.addLayout(container_layout)
         
-        # Versão do programa
-        versao_label = QLabel("V. 0.1.0")
-        versao_label.setStyleSheet("color: white; font-size: 12px;")
+        # Adicionar rótulo de versão no canto inferior direito
+        versao_layout = QHBoxLayout()
+        versao_label = QLabel("Versão: v0.1.0")
+        versao_label.setStyleSheet("color: #f7f8f9; font-size: 11px;")
         versao_label.setAlignment(Qt.AlignRight)
-        main_layout.addWidget(versao_label)
+        versao_layout.addStretch(1)  # Adiciona espaço à esquerda para empurrar para a direita
+        versao_layout.addWidget(versao_label)
+        versao_layout.setContentsMargins(0, 0, 10, 10)  # Margem direita e inferior
         
-        # Conectar evento Enter para entrar
+        main_layout.addLayout(versao_layout)
+        main_layout.addStretch(1)  # Menos espaço na parte inferior
+        
+        # Conectar evento Enter para campos
         self.usuario_input.returnPressed.connect(self.avancar_para_senha)
         self.senha_input.returnPressed.connect(self.avancar_para_empresa)
         self.empresa_input.returnPressed.connect(self.login)
@@ -186,16 +266,16 @@ class LoginWindow(QMainWindow):
         """Salva o usuário e empresa para uso futuro"""
         self.settings.setValue("ultimo_usuario", usuario)
         self.settings.setValue("ultima_empresa", empresa)
-        self.settings.sync()  # Garante que as configurações sejam salvas imediatamente
+        self.settings.sync()
     
     def login(self):
         usuario = self.usuario_input.text().strip()
         senha = self.senha_input.text().strip()
         empresa = self.empresa_input.text().strip()
         
-        # validações de campo...
+        # validações de campo
         if not usuario or not senha or not empresa:
-            # (código de validação existente)
+            self.mostrar_mensagem("Atenção", "Preencha todos os campos!")
             return
         
         # salva usuário e empresa para próxima vez
@@ -270,7 +350,7 @@ class LoginWindow(QMainWindow):
                 background-color: white;
             }
             QPushButton {
-                background-color: #003b57;
+                background-color: #003366;
                 color: white;
                 border: none;
                 padding: 5px 15px;
@@ -278,6 +358,17 @@ class LoginWindow(QMainWindow):
             }
         """)
         msg_box.exec_()
+
+
+# Para ajudar com o carregamento da imagem de fundo
+def resource_path(relative_path):
+    """ Obtém o caminho absoluto para o recurso """
+    try:
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_path, relative_path)
+    except Exception as e:
+        print(f"Erro ao obter caminho do recurso: {e}")
+        return relative_path
 
 
 if __name__ == "__main__":
