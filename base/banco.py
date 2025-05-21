@@ -13,9 +13,168 @@ import base64
 import time
 import random
 import string
+import threading
+import atexit
+
+# Variáveis globais para controle de sincronização (adicione junto às outras variáveis globais)
+SINCRONIZACAO_ATIVA = False
+ULTIMA_SINCRONIZACAO = 0
+INTERVALO_MIN_SYNC = 300  # 5 minutos entre sincronizações
+
+def iniciar_syncthing_se_necessario():
+    """Inicia o Syncthing se ele não estiver em execução, usando o gerenciador singleton"""
+    try:
+        # Importar o gerenciador singleton
+        from base.syncthing_manager import syncthing_manager
+        
+        # Iniciar o Syncthing através do gerenciador
+        return syncthing_manager.iniciar_syncthing()
+        
+    except Exception as e:
+        print(f"Erro ao tentar iniciar Syncthing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def configurar_syncthing():
+    """Configura o comportamento do Syncthing para minimizar conflitos"""
+    try:
+        import os
+        import json
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        
+        # Encontrar o diretório de configuração do Syncthing
+        home = str(Path.home())
+        
+        # Possíveis locais de configuração
+        config_paths = [
+            os.path.join(home, ".config", "syncthing"), # Linux
+            os.path.join(home, "AppData", "Local", "Syncthing") # Windows
+        ]
+        
+        config_path = None
+        for path in config_paths:
+            if os.path.exists(path):
+                config_path = path
+                break
+        
+        if not config_path:
+            print("Diretório de configuração do Syncthing não encontrado")
+            return False
+        
+        config_file = os.path.join(config_path, "config.xml")
+        if not os.path.exists(config_file):
+            print(f"Arquivo de configuração não encontrado: {config_file}")
+            return False
+        
+        # Carregar e modificar configuração XML
+        tree = ET.parse(config_file)
+        root = tree.getroot()
+        
+        # Definir configurações para reduzir conflitos
+        # Encontrar a seção de opções
+        options = root.find("options")
+        
+        if options is not None:
+            # Configurar para usar estratégia de resolução de conflitos mais conservadora
+            conflict_elem = options.find("conflictResolutionStrategy")
+            if conflict_elem is None:
+                conflict_elem = ET.SubElement(options, "conflictResolutionStrategy")
+            conflict_elem.text = "newest" # Usar o arquivo mais recente como vencedor
+            
+            # Salvar as alterações
+            tree.write(config_file)
+            print("Configuração do Syncthing atualizada")
+            return True
+        else:
+            print("Seção de opções não encontrada no arquivo de configuração")
+            return False
+    
+    except Exception as e:
+        print(f"Erro ao configurar Syncthing: {e}")
+        return False
+
+def limpar_arquivos_conflito():
+    """
+    Remove arquivos temporários, de conflito e backups antigos da pasta do banco de dados
+    """
+    try:
+        import os
+        import time
+        import glob
+        from datetime import datetime, timedelta
+        
+        print("Verificando arquivos de conflito e temporários...")
+        
+        # Obter o diretório do banco de dados
+        banco_dir = os.path.dirname(get_db_path())
+        
+        # Padrões de arquivos para remover
+        padroes = [
+            "*sync-conflict*",  # Arquivos de conflito do Syncthing
+            "*.tmp",            # Arquivos temporários
+            "*.bkp_*",          # Backups antigos com timestamp
+            "*.old"             # Versões antigas
+        ]
+        
+        # Data limite para manter backups (manter apenas últimos 3 dias)
+        data_limite = datetime.now() - timedelta(days=3)
+        
+        total_removidos = 0
+        for padrao in padroes:
+            # Combinar o padrão com o diretório do banco
+            caminho_padrao = os.path.join(banco_dir, padrao)
+            
+            # Encontrar arquivos correspondentes
+            arquivos = glob.glob(caminho_padrao)
+            
+            for arquivo in arquivos:
+                try:
+                    # Verificar data de modificação
+                    data_modificacao = datetime.fromtimestamp(os.path.getmtime(arquivo))
+                    
+                    # Para arquivos de backup, manter alguns recentes
+                    if "_bkp" in arquivo and data_modificacao > data_limite:
+                        continue
+                    
+                    # Verificar se o arquivo não está em uso
+                    if not arquivo_esta_em_uso(arquivo):
+                        print(f"Removendo arquivo: {os.path.basename(arquivo)}")
+                        os.remove(arquivo)
+                        total_removidos += 1
+                except Exception as e:
+                    print(f"Erro ao remover arquivo {arquivo}: {e}")
+        
+        print(f"Limpeza concluída. {total_removidos} arquivos removidos.")
+        return total_removidos
+    except Exception as e:
+        print(f"Erro ao limpar arquivos de conflito: {e}")
+        return 0
+
+def arquivo_esta_em_uso(caminho_arquivo):
+    """
+    Verifica se um arquivo está em uso (bloqueado) por outro processo
+    
+    Args:
+        caminho_arquivo (str): Caminho do arquivo a verificar
+        
+    Returns:
+        bool: True se o arquivo estiver em uso, False caso contrário
+    """
+    try:
+        # Tenta abrir o arquivo em modo exclusivo
+        with open(caminho_arquivo, 'a+b') as f:
+            # Se conseguir obter um lock exclusivo, o arquivo não está em uso
+            return False
+    except IOError:
+        # Se ocorrer erro, o arquivo está em uso
+        return True
+    except Exception:
+        # Para qualquer outro erro, assumir que está em uso por segurança
+        return True
 
 # Função para encontrar o caminho do banco de dados
-
 # Função adicionada para resolver problemas de caminho no executável
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -25,6 +184,7 @@ def get_base_path():
         # Executando em desenvolvimento
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return base_dir
+
 def get_db_path():
     """
     Determina o caminho do banco de dados considerando diferentes ambientes
@@ -36,20 +196,20 @@ def get_db_path():
         base_dir = os.path.dirname(sys.executable)
         db_paths = [
             # Caminho relativo ao executável
-            os.path.join(base_dir, "base", "MBDATA_NOVO.FDB"),
+            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
             # Caminho relativo ao executável (pasta pai)
-            os.path.join(os.path.dirname(base_dir), "base", "MBDATA_NOVO.FDB"),
+            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
             # Caminho absoluto fixo (caso seja uma instalação específica)
-            r"C:\MBSistema\base\MBDATA_NOVO.FDB",
+            r"C:\MBSistema\base\banco\MBDATA_NOVO.FDB",
         ]
     else:
         # Se estiver executando em modo de desenvolvimento
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         db_paths = [
             # Caminho relativo ao script atual
-            os.path.join(base_dir, "base", "MBDATA_NOVO.FDB"),
+            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
             # Caminho alternativo (um nível acima)
-            os.path.join(os.path.dirname(base_dir), "base", "MBDATA_NOVO.FDB"),
+            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
         ]
     
     # Verificar qual caminho existe
@@ -99,22 +259,14 @@ def get_connection():
         print(f"Erro de conexão: {e}")
         raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
 
-def execute_query(query, params=None, commit=True):
+def execute_query(query, params=None, commit=True, verificar_sync=True):
     """
-    Executa uma query no banco de dados
-    
-    Args:
-        query (str): Query SQL a ser executada
-        params (tuple, optional): Parâmetros para a query
-        commit (bool, optional): Se deve fazer commit após a execução
-        
-    Returns:
-        list: Resultados da query (se for SELECT)
+    Executa uma query no banco de dados com suporte a sincronização
     """
     conn = None
     cursor = None
     try:
-        conn = get_connection()
+        conn = get_connection(verificar_sync=verificar_sync)
         cursor = conn.cursor()
         
         if params:
@@ -143,6 +295,234 @@ def execute_query(query, params=None, commit=True):
             cursor.close()
         if conn:
             conn.close()
+
+def verificar_conectividade():
+    """Verifica se há conexão com a internet"""
+    try:
+        import socket
+        socket.create_connection(("www.google.com", 80), timeout=3)
+        return True
+    except OSError:
+        return False
+def banco_em_uso():
+    """Verifica se o banco de dados está em uso no momento"""
+    try:
+        # Tenta abrir o arquivo do banco para verificar se está bloqueado
+        caminho_banco = get_db_path()
+        with open(caminho_banco, 'rb') as f:
+            # Tenta apenas ler o começo do arquivo para verificar acesso
+            f.read(10)
+            return False  # Se conseguir abrir, o banco não está em uso exclusivo
+    except (IOError, PermissionError):
+        return True  # Erro ao abrir, indica que o banco está em uso
+    except Exception as e:
+        print(f"Erro ao verificar uso do banco: {e}")
+        return True  # Em caso de dúvida, considerar como em uso
+
+def controlar_sincronizacao():
+    """Controla o processo de sincronização do banco principal"""
+    global SINCRONIZACAO_ATIVA, ULTIMA_SINCRONIZACAO
+    
+    # Verificar condições para sincronização
+    agora = time.time()
+    tempo_passado = agora - ULTIMA_SINCRONIZACAO
+    
+    # Se sincronização já estiver ativa ou tempo mínimo não passou
+    if SINCRONIZACAO_ATIVA or tempo_passado < INTERVALO_MIN_SYNC:
+        return False
+    
+    try:
+        # Marcar como ativa
+        SINCRONIZACAO_ATIVA = True
+        
+        # Verificar conectividade
+        if not verificar_conectividade():
+            print("Sem conectividade para sincronização")
+            SINCRONIZACAO_ATIVA = False
+            return False
+        
+        # Aguardar banco ficar livre (tentar por até 10 segundos)
+        tentativas = 10
+        while banco_em_uso() and tentativas > 0:
+            time.sleep(1)
+            tentativas -= 1
+        
+        if banco_em_uso():
+            print("Banco em uso, sincronização adiada")
+            SINCRONIZACAO_ATIVA = False
+            return False
+        
+        # Limpar arquivos de conflito ANTES da sincronização
+        try:
+            limpar_arquivos_conflito()
+        except Exception as e:
+            print(f"Aviso: Erro ao limpar arquivos de conflito: {e}")
+        
+        # Banco livre, pode sincronizar
+        print(f"Sincronizando banco principal em {time.strftime('%H:%M:%S')}")
+        
+        # O Syncthing fará a sincronização por conta própria
+        # Vamos apenas garantir que o arquivo seja "tocado" para ser detectado
+        caminho_banco = get_db_path()
+        os.utime(caminho_banco, None)
+        
+        # Atualizar timestamp da última sincronização
+        ULTIMA_SINCRONIZACAO = time.time()
+        
+        print("Sincronização do banco completa!")
+        return True
+        
+    except Exception as e:
+        print(f"Erro durante sincronização do banco: {e}")
+        return False
+    finally:
+        # Garantir que o status seja atualizado
+        SINCRONIZACAO_ATIVA = False
+
+# Função para executar em uma thread separada
+def monitor_sincronizacao():
+    """Thread que monitora e executa sincronizações periódicas"""
+    while True:
+        # Verificar a cada 2 minutos
+        time.sleep(120)
+        if not banco_em_uso():
+            controlar_sincronizacao()
+
+def sincronizar_ao_encerrar():
+    """Realiza sincronização ao encerrar o programa"""
+    if verificar_conectividade() and not banco_em_uso():
+        print("Sincronizando banco antes de encerrar...")
+        # O Syncthing detectará as alterações e sincronizará
+        caminho_banco = get_db_path()
+        try:
+            # Tocar o arquivo para garantir que o Syncthing o detecte
+            os.utime(caminho_banco, None)
+            time.sleep(2)  # Pequena pausa para o Syncthing iniciar o processo
+        except Exception as e:
+            print(f"Erro na sincronização final: {e}")
+
+def obter_caminho_banco_backup():
+    """Retorna o caminho para o arquivo de backup na pasta banco"""
+    import os
+    # Usamos a mesma pasta base, mas com nome de arquivo diferente para backup
+    caminho_base = get_base_path()
+    caminho_pasta_banco = os.path.join(caminho_base, "base", "banco")
+    
+    # Garantir que a pasta base/banco existe
+    if not os.path.exists(caminho_pasta_banco):
+        os.makedirs(caminho_pasta_banco, exist_ok=True)
+    
+    return os.path.join(caminho_pasta_banco, "MBDATA_NOVO_bkp")
+
+def criar_backup_banco():
+    """Cria um backup do banco local"""
+    import shutil
+    import time
+    
+    try:
+        origem = get_db_path()  # Banco original
+        destino = obter_caminho_banco_backup()  # Arquivo de backup
+        
+        print(f"Criando backup: {origem} -> {destino}")
+        
+        # Aguardar um pouco para garantir que todas as transações estejam completas
+        time.sleep(1)
+        
+        # Verificar se o banco está sendo usado
+        try:
+            with open(origem, 'rb') as f_origem:
+                # Criar backup
+                shutil.copy2(origem, destino)
+            print("Backup criado com sucesso!")
+            return True
+        except PermissionError:
+            print("Não foi possível criar backup - banco em uso")
+            return False
+    except Exception as e:
+        print(f"Erro ao criar backup: {e}")
+        return False
+
+def restaurar_backup():
+    """Restaura o banco a partir do backup quando necessário"""
+    import shutil
+    import os
+    
+    try:
+        origem = obter_caminho_banco_backup()  # Arquivo de backup
+        destino = get_db_path()  # Banco original
+        
+        # Verificar se o backup existe
+        if not os.path.exists(origem):
+            print("Arquivo de backup não encontrado")
+            return False
+        
+        print(f"Restaurando backup: {origem} -> {destino}")
+        
+        # Verificar se é mais recente que o original
+        backup_time = os.path.getmtime(origem)
+        original_time = os.path.getmtime(destino) if os.path.exists(destino) else 0
+        
+        if backup_time <= original_time:
+            print("Backup é mais antigo que o banco atual - ignorando")
+            return False
+        
+        # Fazer backup do banco atual antes de substituir (por segurança)
+        if os.path.exists(destino):
+            shutil.copy2(destino, destino + ".old")
+        
+        # Restaurar o backup
+        shutil.copy2(origem, destino)
+        print("Backup restaurado com sucesso!")
+        return True
+    except Exception as e:
+        print(f"Erro ao restaurar backup: {e}")
+        return False
+
+def sincronizar_banco(force=False):
+    """Verifica e sincroniza o banco de dados"""
+    online = verificar_conectividade()
+    
+    # Se online, criar backup para sincronização
+    if online or force:
+        return criar_backup_banco()
+    
+    return False
+
+# Modifique a função get_connection para verificar sincronização
+def get_connection(verificar_sync=True):
+    """
+    Retorna uma conexão com o banco de dados Firebird
+    E realiza sincronização se necessário
+    """
+    try:
+        # Verificar se há um backup mais recente para restaurar
+        if verificar_sync and verificar_conectividade():
+            restaurar_backup()
+        
+        # Obter caminho do banco atual
+        db_path = get_db_path()
+        print(f"Tentando conectar ao banco de dados: {db_path}")
+        
+        # Conectar ao banco
+        conn = fdb.connect(
+            host=DB_HOST,
+            database=db_path,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            port=DB_PORT,
+            charset='UTF8'
+        )
+        
+        # Após a conexão bem-sucedida, verificar sincronização
+        if verificar_sync:
+            # Executar em background para não bloquear
+            import threading
+            threading.Thread(target=sincronizar_banco).start()
+            
+        return conn
+    except Exception as e:
+        print(f"Erro de conexão: {e}")
+        raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
 
 #LOGIN 
 def validar_login(usuario, senha, empresa):
@@ -7829,7 +8209,9 @@ def buscar_historico_pagamentos(codigo):
     import sqlite3
     from datetime import datetime
     
-    conn = sqlite3.connect('base/MBDATA_NOVO.FDB')
+    # Use get_db_path para obter o caminho correto
+    banco_path = get_db_path()
+    conn = sqlite3.connect(banco_path)
     cursor = conn.cursor()
     
     try:
@@ -7929,26 +8311,27 @@ def buscar_historico_pagamentos(codigo):
     finally:
         conn.close()
 
+def iniciar_sincronizacao():
+    """Inicia o sistema de sincronização"""
+    try:
+        t = threading.Thread(target=monitor_sincronizacao, daemon=True)
+        t.start()
+        print("Sistema de sincronização iniciado")
+        
+        # Registrar função para ser executada no encerramento do programa
+        atexit.register(sincronizar_ao_encerrar)
+    except Exception as e:
+        print(f"Erro ao iniciar sistema de sincronização: {e}")
+
 # Adicionar à lista de inicialização no final do arquivo
 if __name__ == "__main__":
     try:
         print(f"Iniciando configuração do banco de dados: {DB_PATH}")
-        verificar_tabela_usuarios()
-        verificar_tabela_empresas()
-        verificar_tabela_pessoas()
-        verificar_tabela_funcionarios()
-        verificar_tabela_produtos()
-        verificar_tabela_marcas()
-        verificar_tabela_grupos()
-        verificar_tabela_fornecedores()
-        verificar_tabela_tipos_fornecedores()
-        verificar_tabela_pedidos_venda() 
-        verificar_tabela_recebimentos_clientes()
-        verificar_tabela_vendas_produtos()  # Adicione esta linha
-        executar_correcoes()
-        verificar_tabela_configuracao_impressoras()
-
+        # Suas funções de verificação de tabelas...
         print("Banco de dados inicializado com sucesso!")
+        
+        # Adicione esta linha:
+        iniciar_sincronizacao()
         
     except Exception as e:
         print(f"Erro ao inicializar o banco de dados: {str(e)}")

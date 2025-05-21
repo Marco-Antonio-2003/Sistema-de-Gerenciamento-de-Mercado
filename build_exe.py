@@ -227,16 +227,16 @@ class FormularioEmpresa(QWidget):
             "PDV", "base"
         ]
         
-        # Adicionar diretório de ícones e arquivos específicos
+        # No bloco onde você constrói o data_str para o spec
         data_str = "datas=["
-        
+
         # Adicionar diretórios completos
         for d in data_dirs:
             if os.path.exists(d):
                 data_str += f"('{d}', '{d}'), "
             else:
                 print(f"AVISO: Diretório {d} não encontrado!")
-        
+
         # Adicionar diretório de ícones com tratamento especial
         if os.path.exists(ico_img_dir):
             data_str += f"('{ico_img_dir}', '{ico_img_dir}'), "
@@ -250,11 +250,28 @@ class FormularioEmpresa(QWidget):
             
             if os.path.exists(down_arrow_icon):
                 data_str += f"('{down_arrow_icon}', '{ico_img_dir}'), "
-        
+
+        # ADICIONE ESTA PARTE - para incluir o syncthing.exe no pacote
+        syncthing_exe = "syncthing.exe"
+        if os.path.exists(syncthing_exe):
+            print(f"Syncthing executável encontrado: {syncthing_exe}")
+            data_str += f"('{syncthing_exe}', '.'), "  # '.' significa colocar na raiz do pacote
+        else:
+            print(f"AVISO: Syncthing executável não encontrado em {syncthing_exe}!")
+            print("O Syncthing não será incluído no pacote final.")
+
         data_str += "]"
         
         spec_content = spec_content.replace("datas=[]", data_str)
     
+    # Verificar se syncthing.exe existe e incluí-lo explicitamente
+    syncthing_exe = "syncthing.exe"
+    if os.path.exists(syncthing_exe):
+        print(f"Syncthing executável encontrado: {syncthing_exe}")
+    else:
+        print(f"AVISO: Syncthing executável não encontrado em {syncthing_exe}!")
+        print("O Syncthing não será incluído no pacote final.")
+
     # Garantir que os hiddenimports incluam requests, PyQt5.QtSvg e suas dependências
     if "hiddenimports=[]" in spec_content:
         spec_content = spec_content.replace(
@@ -293,6 +310,15 @@ class FormularioEmpresa(QWidget):
             if os.path.exists(ico_img_dir):
                 shutil.copytree(ico_img_dir, dist_ico_img)
                 print("Pasta ico-img copiada com sucesso para o diretório dist.")
+        # Copiar explicitamente o syncthing.exe para a pasta dist
+        if os.path.exists(syncthing_exe):
+            dist_syncthing = os.path.join("dist", "syncthing.exe")
+            print(f"\nCopiando {syncthing_exe} para {dist_syncthing}...")
+            shutil.copy2(syncthing_exe, dist_syncthing)
+            print("Syncthing copiado com sucesso!")
+        else:
+            print("\nAVISO: syncthing.exe não encontrado, não será incluído no pacote!")
+            
     else:
         print("\nAVISO: A compilação pode não ter sido concluída corretamente.")
         print("Verifique as mensagens de erro acima.")

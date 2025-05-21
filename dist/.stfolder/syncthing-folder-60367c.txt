@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: exe-sistema
+created: 2025-05-20T15:15:31-03:00

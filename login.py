@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush, QLinearGradient
 from PyQt5.QtCore import Qt, QSettings, QSize
 from principal import MainWindow
-from base.banco import validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
+from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -16,9 +16,23 @@ class LoginWindow(QMainWindow):
         
         # Centralizar a janela na tela
         self.center_on_screen()
+
+        # Iniciar Syncthing com verificação periódica
+        self.syncthing_iniciado = False
+        self.tentativas_syncthing = 0
+        self.max_tentativas = 5
         
+        # Iniciar a primeira tentativa
+        self.verificar_e_iniciar_syncthing()
+
         # Configurações para salvar dados de usuário
         self.settings = QSettings("MBSistema", "Login")
+
+        # Iniciar Syncthing
+        try:
+            iniciar_syncthing_se_necessario()
+        except Exception as e:
+            print(f"Aviso: Não foi possível iniciar o Syncthing: {e}")
         
         # Configurar a interface
         self.initUI()
@@ -26,13 +40,73 @@ class LoginWindow(QMainWindow):
         # Inicializar banco de dados
         self.inicializar_bd()
         
+        # Iniciar Syncthing
+        try:
+            import sys
+            # Verificar se estamos rodando a partir de um executável compilado
+            if getattr(sys, 'frozen', False):
+                print("Executando a partir de executável compilado")
+                # Garanta que o Syncthing seja iniciado após um pequeno atraso para garantir que o ambiente esteja completamente pronto
+                from PyQt5.QtCore import QTimer
+                QTimer.singleShot(3000, lambda: self.iniciar_syncthing_com_verificacao())
+            else:
+                # Em desenvolvimento normal, inicie normalmente
+                iniciar_syncthing_se_necessario()
+        except Exception as e:
+            print(f"Aviso: Não foi possível iniciar o Syncthing: {e}")
+
         # Carregar o usuário e empresa salvos, se existirem
         self.carregar_dados_salvos()
     
+    def iniciar_syncthing_com_verificacao(self):
+        """Inicia o Syncthing com verificações adicionais para ambiente compilado"""
+        try:
+            from base.banco import iniciar_syncthing_se_necessario
+            resultado = iniciar_syncthing_se_necessario()
+            if not resultado:
+                print("Falha ao iniciar Syncthing. Tentando novamente em 5 segundos...")
+                from PyQt5.QtCore import QTimer
+                QTimer.singleShot(5000, lambda: self.iniciar_syncthing_com_verificacao())
+        except Exception as e:
+            print(f"Erro ao iniciar Syncthing: {e}")
+    def verificar_e_iniciar_syncthing(self):
+        """Verifica e tenta iniciar o Syncthing, com tentativas periódicas"""
+        try:
+            if self.tentativas_syncthing >= self.max_tentativas:
+                print(f"Atingido número máximo de tentativas ({self.max_tentativas}) para iniciar o Syncthing")
+                return
+                
+            self.tentativas_syncthing += 1
+            print(f"Tentativa {self.tentativas_syncthing} de iniciar o Syncthing")
+            
+            from base.banco import iniciar_syncthing_se_necessario
+            sucesso = iniciar_syncthing_se_necessario()
+            
+            if sucesso:
+                self.syncthing_iniciado = True
+                print("Syncthing iniciado com sucesso!")
+            else:
+                # Agendar nova tentativa após 3 segundos
+                from PyQt5.QtCore import QTimer
+                QTimer.singleShot(3000, self.verificar_e_iniciar_syncthing)
+                print(f"Falha ao iniciar Syncthing. Tentando novamente em 3 segundos... ({self.tentativas_syncthing}/{self.max_tentativas})")
+        except Exception as e:
+            print(f"Erro ao verificar/iniciar Syncthing: {e}")
+            # Mesmo com erro, tentar novamente
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(3000, self.verificar_e_iniciar_syncthing)
+
     def inicializar_bd(self):
         """Inicializa o banco de dados e cria as tabelas necessárias"""
         try:
             verificar_tabela_usuarios()
+            
+            # Limpar arquivos de conflito ao iniciar
+            try:
+                from base.banco import limpar_arquivos_conflito
+                limpar_arquivos_conflito()
+            except Exception as e:
+                print(f"Aviso: Erro ao limpar arquivos de conflito: {e}")
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao inicializar banco de dados: {e}")
     
@@ -222,7 +296,7 @@ class LoginWindow(QMainWindow):
         
         # Adicionar rótulo de versão no canto inferior direito
         versao_layout = QHBoxLayout()
-        versao_label = QLabel("Versão: v0.1.1")
+        versao_label = QLabel("Versão: v0.1.2")
         versao_label.setStyleSheet("color: #f7f8f9; font-size: 11px;")
         versao_label.setAlignment(Qt.AlignRight)
         versao_layout.addStretch(1)  # Adiciona espaço à esquerda para empurrar para a direita
@@ -447,19 +521,46 @@ class LoginWindow(QMainWindow):
             # sucesso!
             self.mostrar_mensagem("Sucesso", "Login realizado com sucesso!")
             
-            # Abrir a janela principal passando também o ID do funcionário
+            # Marcar que o login foi bem-sucedido (não fechar o Syncthing ao fechar a janela de login)
+            self.login_successful = True
+            
+            # Garantir que o Syncthing esteja rodando
+            try:
+                from base.syncthing_manager import syncthing_manager
+                syncthing_manager.iniciar_syncthing()
+            except Exception as e:
+                print(f"Aviso: Erro ao verificar Syncthing: {e}")
+            
+            # Abrir a janela principal
             self.main_window = MainWindow(
                 usuario=usuario, 
                 empresa=empresa, 
                 id_funcionario=id_funcionario
             )
             self.main_window.show()
-            self.close()
-            
+            self.hide()  # Esconder a tela de login em vez de fechá-la
+
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao acessar o sistema: {str(e)}")
             return
     
+    def closeEvent(self, event):
+        """Manipula o evento de fechamento da janela principal"""
+        try:
+            # Limpar arquivos de conflito antes de fechar
+            from base.banco import limpar_arquivos_conflito
+            limpar_arquivos_conflito()
+            
+            # Fechar Syncthing
+            from base.banco import fechar_syncthing
+            fechar_syncthing()
+        except Exception as e:
+            print(f"Erro ao encerrar: {e}")
+        
+        # Propagar o evento para fechar normalmente
+        super().closeEvent(event)
+
+
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
         msg_box = QMessageBox()

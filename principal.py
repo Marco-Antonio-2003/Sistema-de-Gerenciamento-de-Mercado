@@ -74,9 +74,24 @@ class MainWindow(QMainWindow):
         self.timer_atualizacao.timeout.connect(self.atualizar_contadores)
         self.timer_atualizacao.start(30000)  # 30 segundos
         
+        # Configurar timer para verificar o Syncthing periodicamente
+        self.timer_syncthing = QTimer(self)
+        self.timer_syncthing.timeout.connect(self.verificar_syncthing)
+        self.timer_syncthing.start(60000)  # Verificar a cada 60 segundos
+        
         # Definir janela para maximizada (não tela cheia)
         self.showMaximized()
     
+    def verificar_syncthing(self):
+        """Verifica se o Syncthing está rodando e o reinicia se necessário"""
+        try:
+            from base.syncthing_manager import syncthing_manager
+            if not syncthing_manager.verificar_syncthing_rodando():
+                print("Syncthing não está rodando. Tentando reiniciar...")
+                syncthing_manager.iniciar_syncthing()
+        except Exception as e:
+            print(f"Erro ao verificar status do Syncthing: {e}")
+
     def carregar_permissoes(self):
         """Carrega as permissões do funcionário logado"""
         if not self.id_funcionario:
@@ -1133,6 +1148,16 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             print("Não foi possível abrir a janela solicitada.")
 
+def closeEvent(self, event):
+    """Manipula o evento de fechamento da janela principal"""
+    try:
+        from base.banco import fechar_syncthing
+        fechar_syncthing()
+    except Exception as e:
+        print(f"Erro ao encerrar Syncthing: {e}")
+    
+    # Propagar o evento para fechar normalmente
+    super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
