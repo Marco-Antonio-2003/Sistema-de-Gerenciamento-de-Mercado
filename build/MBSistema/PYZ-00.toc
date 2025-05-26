@@ -286,6 +286,9 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\argparse.py',
    'PYMODULE'),
+  ('assistente',
+   'C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\assistente.py',
+   'PYMODULE'),
   ('ast',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\ast.py',

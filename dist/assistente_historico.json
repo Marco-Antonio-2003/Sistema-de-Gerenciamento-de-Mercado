@@ -1,0 +1,13 @@
+{
+  "ultima_atualizacao": "2025-05-26T16:23:34.050724",
+  "conversas": [
+    {
+      "role": "user",
+      "content": "cadastrar um produto"
+    },
+    {
+      "role": "assistant",
+      "content": "Para cadastrar um produto no **MB Sistema**, siga os passos abaixo: 🛒📝\n\n1. **Acesse o Módulo de Produtos e Serviços**:\n   - No menu principal, clique em **\"Produtos e Serviços\"**.\n\n2. **Selecione a Opção de Cadastro de Produtos**:\n   - Dentro do módulo, clique em **\"Produtos\"** e depois em **\"Cadastrar Produto\"**.\n\n3. **Preencha os Dados do Produto**:\n   - Na tela de cadastro, insira as informações necessárias, como:\n     - **Código do Produto** (se houver)\n     - **Descrição/Nome do Produto**\n     - **Grupo de Produto** (se aplicável)\n     - **Unidade de Medida** (ex: unidade, kg, litro)\n     - **Preço de Venda**\n     - **Código de Barras** (opcional)\n     - **Estoque Mínimo e Máximo** (se necessário)\n     - **Outros campos relevantes** (como NCM, CEST, etc.).\n\n4. **Salve o Produto**:\n   - Após preencher todos os campos, clique em **\"Salvar\"** para finalizar o cadastro.\n\n5. **Confirmação**:\n   - O sistema exibirá uma mensagem confirmando que o produto foi cadastrado com sucesso. ✅\n\n**Dica**: Se precisar cadastrar um **Grupo de Produtos** ou **Unidade de Medida** antes, acesse essas opções no mesmo módulo de **Produtos e Serviços**.\n\nSe tiver dúvidas ou precisar de mais ajuda, estou aqui! 😊"
+    }
+  ]
+}
