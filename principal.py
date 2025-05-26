@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer
 from PyQt5.QtGui import QDesktopServices
-
+from assistente import adicionar_assistente_ao_sistema
 
 class MenuButton(QPushButton):
     def __init__(self, text, parent=None):
@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         self.permissoes = {}  # Dicionário para armazenar permissões
         self.opened_windows = []
         self.contadores_labels = {}  # Armazenar referências aos labels de contagem
-
+        
         # Carregar permissões do funcionário (se aplicável)
         self.carregar_permissoes()
         
@@ -363,6 +363,14 @@ class MainWindow(QMainWindow):
         # Garantir que o botão fique por cima de outros widgets
         self.botao_whatsapp.raise_()
         
+        # Importar e adicionar o assistente virtual
+        try:
+            from assistente import adicionar_assistente_ao_sistema
+            adicionar_assistente_ao_sistema(self)
+            print("Assistente Virtual carregado com sucesso!")
+        except Exception as e:
+            print(f"Erro ao carregar Assistente Virtual: {e}")
+
         # Criação do botão de acesso ao PDV no canto superior esquerdo
         self.pdv_button = QPushButton("Acesso ao\nPDV", self)
         self.pdv_button.setFixedSize(180, 80)  # Aumentado o tamanho do botão
@@ -480,6 +488,34 @@ class MainWindow(QMainWindow):
             # PDV
             "PDV - Ponto de Venda":         "PDVWindow"
         }
+
+    def navegar_para_modulo(self, modulo, acao):
+        """Navegar para um módulo específico do sistema"""
+        print(f"Navegando para: {modulo} > {acao}")
+        
+        # Mapear para os action_titles corretos
+        mapa_navegacao = {
+            ("geral", "cadastro_pessoa"): "Cadastro de Clientes",
+            ("geral", "cadastro_empresa"): "Cadastro de empresa",
+            ("geral", "cadastro_funcionarios"): "Cadastro Funcionários",
+            ("geral", "consulta_cnpj"): "Consulta CNPJ",
+            ("produtos", "produtos"): "Produtos",
+            ("pdv", "pdv_principal"): "PDV - Ponto de Venda",
+            ("compras", "fornecedores"): "Fornecedores",
+            ("vendas", "pedido_vendas"): "Pedido de vendas",
+            ("financeiro", "recebimento_clientes"): "Recebimento de clientes",
+            ("financeiro", "lancamento_financeiro"): "Gerar lançamento Financeiro",
+            ("financeiro", "controle_caixa"): "Controle de caixa (PDV)",
+            ("financeiro", "conta_corrente"): "Conta corrente",
+            ("financeiro", "classes_financeiras"): "Classes financeiras",
+            ("relatorios", "relatorio_vendas_produtos"): "Relatório de Vendas de Produtos",
+            ("ferramentas", "configuracao_impressora"): "Configuração de estação",
+            ("ferramentas", "configuracao_sistema"): "Configuração do Sistema"
+        }
+        
+        chave = (modulo, acao)
+        if chave in mapa_navegacao:
+            self.menu_action_triggered(mapa_navegacao[chave])
 
     def abrir_pdv(self):
         """Abre o módulo do PDV"""
