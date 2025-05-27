@@ -18,33 +18,29 @@ class ConfiguracaoImpressoraWindow(QWidget):
         self.initUI()
         self.carregar_dados_do_banco()  # Carregar dados do banco ao iniciar
         
-    def create_palette(self):
-        """Cria uma paleta com cor de fundo azul escuro"""
-        from PyQt5.QtGui import QPalette, QColor
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor("#043b57"))
-        palette.setColor(QPalette.WindowText, Qt.white)
-        return palette
-        
     def initUI(self):
         # Layout principal
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(30)
         
-        # Fundo para todo o aplicativo
+        # Configurar cor de fundo apenas para este widget
         self.setAutoFillBackground(True)
-        self.setPalette(self.create_palette())
+        # Usar um estilo mais específico para evitar conflitos
+        self.setObjectName("ConfiguracaoWidget")
+        self.setStyleSheet("#ConfiguracaoWidget { background-color: #043b57; }")
         
         # Título em uma barra azul escura
         titulo_container = QWidget()
-        titulo_container.setStyleSheet("background-color: #043b57;")
+        titulo_container.setObjectName("tituloContainer")
+        titulo_container.setStyleSheet("#tituloContainer { background-color: #043b57; }")
         titulo_container_layout = QVBoxLayout(titulo_container)
         titulo_container_layout.setContentsMargins(10, 10, 10, 10)
         
         titulo = QLabel("Configuração de estação")
+        titulo.setObjectName("lblTitulo")
         titulo.setFont(QFont("Arial", 20, QFont.Bold))
-        titulo.setStyleSheet("color: white;")
+        titulo.setStyleSheet("#lblTitulo { color: white; }")
         titulo.setAlignment(Qt.AlignCenter)
         titulo_container_layout.addWidget(titulo)
         
@@ -54,6 +50,7 @@ class ConfiguracaoImpressoraWindow(QWidget):
         categorias_layout = QHBoxLayout()
         categorias_layout.setSpacing(5)
         
+        # Estilo dos botões de categoria - sem afetar botões de outras telas
         categoria_style = """
             QPushButton {
                 background-color: #005079;
@@ -68,42 +65,58 @@ class ConfiguracaoImpressoraWindow(QWidget):
             }
         """
         
-        self.categorias = ["Padrão", "Orçamento", "Pedidos", "Pedidos de Venda"]
+        # Apenas 2 categorias agora
+        self.categorias = ["Impressora padrão", "Impressora para o PDV"]
         self.categoria_buttons = []
+        
+        # Criar um widget específico para os botões de categoria
+        categorias_widget = QWidget()
+        categorias_widget.setObjectName("categoriasWidget")
+        categorias_inner_layout = QHBoxLayout(categorias_widget)
+        categorias_inner_layout.setContentsMargins(0, 0, 0, 0)
         
         for categoria in self.categorias:
             btn = QPushButton(categoria)
+            btn.setObjectName(f"btnCategoria_{categoria.replace(' ', '_')}")
             btn.setStyleSheet(categoria_style)
             btn.setCheckable(True)
-            categorias_layout.addWidget(btn)
+            categorias_inner_layout.addWidget(btn)
             self.categoria_buttons.append(btn)
             btn.clicked.connect(self.mudar_categoria)
         
         self.categoria_buttons[0].setChecked(True)  # Por padrão, selecionar o primeiro botão
+        categorias_layout.addWidget(categorias_widget)
         main_layout.addLayout(categorias_layout)
         
         # Área de seleção de impressora
         impressora_frame = QFrame()
-        impressora_frame.setStyleSheet("background-color: #fffff0; border-radius: 4px;")
+        impressora_frame.setObjectName("impressoraFrame")
+        impressora_frame.setStyleSheet("#impressoraFrame { background-color: #fffff0; border-radius: 4px; }")
         impressora_layout = QHBoxLayout(impressora_frame)
         impressora_layout.setContentsMargins(20, 20, 20, 20)
         
         # Texto "Escolher Impressora"
         escolher_label = QLabel("Escolher\nImpressora")
+        escolher_label.setObjectName("lblEscolher")
         escolher_label.setFont(QFont("Arial", 16, QFont.Bold))
-        escolher_label.setStyleSheet("color: black;")
+        escolher_label.setStyleSheet("#lblEscolher { color: black; }")
         impressora_layout.addWidget(escolher_label)
         
         # Campo para mostrar a impressora selecionada
         self.impressora_input = QLineEdit()
+        self.impressora_input.setObjectName("inputImpressora")
         self.impressora_input.setStyleSheet("""
-            QLineEdit {
+            #inputImpressora {
                 background-color: #e8f0ff;
                 border: 1px solid #cccccc;
                 padding: 10px;
                 font-size: 14px;
                 min-height: 25px;
                 border-radius: 4px;
+                color: black;
+            }
+            #inputImpressora:read-only {
+                background-color: #e8f0ff;
                 color: black;
             }
         """)
@@ -113,11 +126,13 @@ class ConfiguracaoImpressoraWindow(QWidget):
         
         # Botão com ícone de impressora
         self.btn_impressora = QPushButton()
+        self.btn_impressora.setObjectName("btnIconeImpressora")
         self.btn_impressora.setStyleSheet("""
-            QPushButton {
+            #btnIconeImpressora {
                 background-color: transparent;
                 border: none;
                 padding: 5px;
+                color: black;
             }
         """)
         # Definir um ícone de impressora
@@ -136,8 +151,9 @@ class ConfiguracaoImpressoraWindow(QWidget):
         
         # Botão Salvar
         self.btn_salvar = QPushButton("Salvar")
+        self.btn_salvar.setObjectName("btnSalvarConfig")
         self.btn_salvar.setStyleSheet("""
-            QPushButton {
+            #btnSalvarConfig {
                 background-color: #00ff9d;
                 color: black;
                 border: none;
@@ -147,7 +163,7 @@ class ConfiguracaoImpressoraWindow(QWidget):
                 border-radius: 25px;
                 margin: 10px 50px;
             }
-            QPushButton:hover {
+            #btnSalvarConfig:hover {
                 background-color: #00e088;
             }
         """)
@@ -157,27 +173,14 @@ class ConfiguracaoImpressoraWindow(QWidget):
         # Adicionar espaço no final
         main_layout.addStretch()
         
-        # Definir cor de fundo para a aplicação inteira
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet("QWidget { background-color: #043b57; color: white; }")
-            
-        # Aplicar estilo no widget atual
-        self.setStyleSheet("""
-            QWidget { background-color: #043b57; }
-            QMessageBox { background-color: white; }
-        """)
-        
         # Armazenar as configurações de impressoras
         self.impressoras = {
-            "Padrão": "",
-            "Orçamento": "",
-            "Pedidos": "",
-            "Pedidos de Venda": ""
+            "Impressora padrão": "",
+            "Impressora para o PDV": ""
         }
         
         # Categoria atual
-        self.categoria_atual = "Padrão"
+        self.categoria_atual = "Impressora padrão"
     
     def carregar_dados_do_banco(self):
         """Carrega as configurações de impressoras do banco de dados"""
@@ -240,7 +243,7 @@ class ConfiguracaoImpressoraWindow(QWidget):
     def salvar_configuracao(self):
         """Salva a configuração da impressora para a categoria atual"""
         if not self.impressora_input.text():
-            msg_box = QMessageBox()
+            msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setWindowTitle("Atenção")
             msg_box.setText(f"Por favor, selecione uma impressora para {self.categoria_atual}.")
@@ -248,11 +251,11 @@ class ConfiguracaoImpressoraWindow(QWidget):
                 QMessageBox { 
                     background-color: white;
                 }
-                QLabel { 
+                QMessageBox QLabel { 
                     color: black;
                     background-color: white;
                 }
-                QPushButton {
+                QMessageBox QPushButton {
                     background-color: #043b57;
                     color: white;
                     border: none;
@@ -271,19 +274,19 @@ class ConfiguracaoImpressoraWindow(QWidget):
             self.salvar_configuracao_impressora(self.categoria_atual, impressora, estacao)
             
             # Exibir mensagem de sucesso
-            msg_box = QMessageBox()
+            msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Information)
             msg_box.setWindowTitle("Configuração Salva")
-            msg_box.setText(f"Impressora para {self.categoria_atual} configurada com sucesso!")
+            msg_box.setText(f"{self.categoria_atual} configurada com sucesso!")
             msg_box.setStyleSheet("""
                 QMessageBox { 
                     background-color: white;
                 }
-                QLabel { 
+                QMessageBox QLabel { 
                     color: black;
                     background-color: white;
                 }
-                QPushButton {
+                QMessageBox QPushButton {
                     background-color: #043b57;
                     color: white;
                     border: none;
@@ -369,7 +372,7 @@ class ConfiguracaoImpressoraWindow(QWidget):
     
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
-        msg_box = QMessageBox()
+        msg_box = QMessageBox(self)
         if "Atenção" in titulo:
             msg_box.setIcon(QMessageBox.Warning)
         elif "Erro" in titulo:
@@ -383,11 +386,11 @@ class ConfiguracaoImpressoraWindow(QWidget):
             QMessageBox { 
                 background-color: white;
             }
-            QLabel { 
+            QMessageBox QLabel { 
                 color: black;
                 background-color: white;
             }
-            QPushButton {
+            QMessageBox QPushButton {
                 background-color: #043b57;
                 color: white;
                 border: none;
@@ -458,7 +461,10 @@ if __name__ == "__main__":
         window = QMainWindow()
         window.setWindowTitle("Configuração de Impressoras")
         window.setGeometry(100, 100, 800, 500)
-        window.setStyleSheet("background-color: #043b57;")
+        
+        # Aplicar estilo apenas na janela principal da configuração
+        window.setObjectName("MainConfigWindow")
+        window.setStyleSheet("#MainConfigWindow { background-color: #043b57; }")
         
         configuracao_widget = ConfiguracaoImpressoraWindow()
         window.setCentralWidget(configuracao_widget)
@@ -477,6 +483,22 @@ if __name__ == "__main__":
         msg.setIcon(QMessageBox.Critical)
         msg.setText(f"Erro ao iniciar aplicação: {str(e)}")
         msg.setWindowTitle("Erro")
+        msg.setStyleSheet("""
+            QMessageBox { 
+                background-color: white;
+            }
+            QMessageBox QLabel { 
+                color: black;
+                background-color: white;
+            }
+            QMessageBox QPushButton {
+                background-color: #043b57;
+                color: white;
+                border: none;
+                padding: 5px 15px;
+                border-radius: 2px;
+            }
+        """)
         msg.exec_()
         
         sys.exit(1)

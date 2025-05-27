@@ -1184,16 +1184,47 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             print("Não foi possível abrir a janela solicitada.")
 
-def closeEvent(self, event):
-    """Manipula o evento de fechamento da janela principal"""
-    try:
-        from base.banco import fechar_syncthing
-        fechar_syncthing()
-    except Exception as e:
-        print(f"Erro ao encerrar Syncthing: {e}")
-    
-    # Propagar o evento para fechar normalmente
-    super().closeEvent(event)
+    def closeEvent(self, event):
+            """Manipula o evento de fechamento da janela principal"""
+            try:
+                # Fechar todas as janelas abertas, EXCETO o PDV
+                for window in self.opened_windows:
+                    try:
+                        # Verificar se a janela ainda existe e está visível
+                        if window and window.isVisible():
+                            # Verificar se NÃO é o PDV (por título ou tipo)
+                            if window.windowTitle() != "PDV - Ponto de Venda":
+                                print(f"Fechando janela: {window.windowTitle()}")
+                                window.close()
+                            else:
+                                print("Mantendo PDV aberto")
+                    except Exception as e:
+                        print(f"Erro ao fechar janela: {e}")
+                
+                # Limpar a lista de janelas abertas, mantendo apenas o PDV
+                self.opened_windows = [w for w in self.opened_windows 
+                                    if w and w.isVisible() and w.windowTitle() == "PDV - Ponto de Venda"]
+                
+                # Parar timers
+                if hasattr(self, 'timer_atualizacao'):
+                    self.timer_atualizacao.stop()
+                if hasattr(self, 'timer_syncthing'):
+                    self.timer_syncthing.stop()
+                
+                # Fechar Syncthing
+                try:
+                    from base.banco import fechar_syncthing
+                    fechar_syncthing()
+                except Exception as e:
+                    print(f"Erro ao encerrar Syncthing: {e}")
+            
+            except Exception as e:
+                print(f"Erro no closeEvent: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            # Aceitar o evento para fechar a janela principal
+            event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
