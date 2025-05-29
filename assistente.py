@@ -1,9 +1,10 @@
-# assistente_otimizado.py
+# assistente.py - Versão integrada com banco de dados
 import json
 import requests
 from datetime import datetime
 import os
 import sys
+import re
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
                             QLineEdit, QPushButton, QLabel, QApplication,
                             QDockWidget, QMainWindow, QMessageBox, QFrame, 
@@ -11,6 +12,354 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
                            )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QTextCursor, QFont, QColor, QPalette, QTextDocument, QTextOption, QIcon
+
+# Importar funções do banco de dados
+try:
+    from base.banco import (
+        execute_query, listar_pessoas, listar_funcionarios, listar_produtos,
+        listar_fornecedores, listar_empresas, listar_recebimentos_pendentes,
+        listar_caixas, listar_pedidos_venda, listar_contas_correntes,
+        obter_vendas_por_periodo, verificar_produtos_estoque_baixo
+    )
+except ImportError:
+    print("Erro ao importar funções do banco de dados")
+    execute_query = None
+
+
+class BancoDadosAssistente:
+    """Classe para consultar dados do banco e responder perguntas"""
+    
+    def __init__(self):
+        self.padroes_perguntas = {
+            # Clientes/Pessoas
+            r'quantos?\s*clientes?': self.contar_clientes,
+            r'número\s*de\s*clientes?': self.contar_clientes,
+            r'total\s*de\s*clientes?': self.contar_clientes,
+            
+            # Funcionários
+            r'quantos?\s*funcionários?': self.contar_funcionarios,
+            r'número\s*de\s*funcionários?': self.contar_funcionarios,
+            r'total\s*de\s*funcionários?': self.contar_funcionarios,
+            
+            # Produtos
+            r'quantos?\s*produtos?': self.contar_produtos,
+            r'número\s*de\s*produtos?': self.contar_produtos,
+            r'total\s*de\s*produtos?': self.contar_produtos,
+            r'estoque\s*baixo': self.produtos_estoque_baixo,
+            
+            # Fornecedores 
+            r'quantos?\s*fornecedores?': self.contar_fornecedores,
+            r'número\s*de\s*fornecedores?': self.contar_fornecedores,
+            
+            # Empresas
+            r'quantas?\s*empresas?': self.contar_empresas,
+            r'número\s*de\s*empresas?': self.contar_empresas,
+            
+            # Recebimentos
+            r'recebimentos?\s*pendentes?': self.contar_recebimentos_pendentes,
+            r'contas?\s*a\s*receber': self.contar_recebimentos_pendentes,
+            r'valores?\s*a\s*receber': self.valor_total_receber,
+            
+            # Caixas
+            r'caixas?\s*abertos?': self.caixas_abertos,
+            r'situação\s*do\s*caixa': self.situacao_caixa,
+            
+            # Pedidos
+            r'pedidos?\s*de\s*venda': self.contar_pedidos_venda,
+            r'vendas?\s*do\s*mês': self.vendas_mes_atual,
+            
+            # Contas correntes
+            r'contas?\s*correntes?': self.contar_contas_correntes,
+            
+            # Resumo geral
+            r'resumo\s*geral': self.resumo_geral,
+            r'dashboard': self.resumo_geral,
+            r'visão\s*geral': self.resumo_geral,
+        }
+    
+    def processar_pergunta(self, pergunta):
+        """
+        Verifica se a pergunta é sobre dados do sistema e retorna resposta
+        
+        Args:
+            pergunta (str): Pergunta do usuário
+            
+        Returns:
+            tuple: (bool, str) - (é_pergunta_dados, resposta)
+        """
+        if not execute_query:
+            return False, ""
+            
+        pergunta_lower = pergunta.lower().strip()
+        
+        # Verificar cada padrão
+        for padrao, funcao in self.padroes_perguntas.items():
+            if re.search(padrao, pergunta_lower):
+                try:
+                    resposta = funcao()
+                    return True, resposta
+                except Exception as e:
+                    print(f"Erro ao executar consulta: {e}")
+                    return True, f"❌ Erro ao consultar dados: {str(e)}"
+        
+        return False, ""
+    
+    def contar_clientes(self):
+        """Conta o número total de clientes"""
+        try:
+            pessoas = listar_pessoas()
+            total = len(pessoas) if pessoas else 0
+            
+            if total == 0:
+                return "📊 Você não possui clientes cadastrados ainda."
+            elif total == 1:
+                return "📊 Você tem **1 cliente** cadastrado no sistema."
+            else:
+                return f"📊 Você tem **{total} clientes** cadastrados no sistema."
+        except:
+            # Fallback usando query direta
+            result = execute_query("SELECT COUNT(*) FROM PESSOAS")
+            total = result[0][0] if result else 0
+            return f"📊 Você tem **{total} clientes** cadastrados no sistema."
+    
+    def contar_funcionarios(self):
+        """Conta o número total de funcionários"""
+        try:
+            funcionarios = listar_funcionarios()
+            total = len(funcionarios) if funcionarios else 0
+            
+            if total == 0:
+                return "👥 Nenhum funcionário cadastrado no sistema."
+            elif total == 1:
+                return "👥 Você tem **1 funcionário** cadastrado."
+            else:
+                return f"👥 Você tem **{total} funcionários** cadastrados."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM FUNCIONARIOS")
+            total = result[0][0] if result else 0
+            return f"👥 Você tem **{total} funcionários** cadastrados."
+    
+    def contar_produtos(self):
+        """Conta o número total de produtos"""
+        try:
+            produtos = listar_produtos()
+            total = len(produtos) if produtos else 0
+            
+            if total == 0:
+                return "📦 Nenhum produto cadastrado no sistema."
+            elif total == 1:
+                return "📦 Você tem **1 produto** cadastrado."
+            else:
+                return f"📦 Você tem **{total} produtos** cadastrados no sistema."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM PRODUTOS")
+            total = result[0][0] if result else 0
+            return f"📦 Você tem **{total} produtos** cadastrados."
+    
+    def produtos_estoque_baixo(self):
+        """Verifica produtos com estoque baixo"""
+        try:
+            produtos_baixo = verificar_produtos_estoque_baixo(limite=5)
+            
+            if not produtos_baixo:
+                return "✅ Todos os produtos estão com estoque adequado!"
+            
+            total = len(produtos_baixo)
+            resposta = f"⚠️ **{total} produtos** com estoque baixo:\n\n"
+            
+            for produto in produtos_baixo[:5]:  # Mostrar apenas os primeiros 5
+                resposta += f"• **{produto['nome']}** - Estoque: {produto['estoque']}\n"
+            
+            if total > 5:
+                resposta += f"\n... e mais {total - 5} produtos."
+                
+            return resposta
+        except:
+            return "❌ Erro ao verificar estoque dos produtos."
+    
+    def contar_fornecedores(self):
+        """Conta o número total de fornecedores"""
+        try:
+            fornecedores = listar_fornecedores()
+            total = len(fornecedores) if fornecedores else 0
+            
+            if total == 0:
+                return "🏭 Nenhum fornecedor cadastrado."
+            elif total == 1:
+                return "🏭 Você tem **1 fornecedor** cadastrado."
+            else:
+                return f"🏭 Você tem **{total} fornecedores** cadastrados."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM FORNECEDORES")
+            total = result[0][0] if result else 0
+            return f"🏭 Você tem **{total} fornecedores** cadastrados."
+    
+    def contar_empresas(self):
+        """Conta o número total de empresas"""
+        try:
+            empresas = listar_empresas()
+            total = len(empresas) if empresas else 0
+            
+            if total == 0:
+                return "🏢 Nenhuma empresa cadastrada."
+            elif total == 1:
+                return "🏢 Você tem **1 empresa** cadastrada."
+            else:
+                return f"🏢 Você tem **{total} empresas** cadastradas."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM EMPRESAS")
+            total = result[0][0] if result else 0
+            return f"🏢 Você tem **{total} empresas** cadastradas."
+    
+    def contar_recebimentos_pendentes(self):
+        """Conta recebimentos pendentes"""
+        try:
+            recebimentos = listar_recebimentos_pendentes()
+            total = len(recebimentos) if recebimentos else 0
+            
+            if total == 0:
+                return "✅ Não há recebimentos pendentes!"
+            elif total == 1:
+                return "💰 Você tem **1 recebimento** pendente."
+            else:
+                return f"💰 Você tem **{total} recebimentos** pendentes."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Pendente'")
+            total = result[0][0] if result else 0
+            return f"💰 Você tem **{total} recebimentos** pendentes."
+    
+    def valor_total_receber(self):
+        """Calcula valor total a receber"""
+        try:
+            result = execute_query("SELECT SUM(VALOR) FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Pendente'")
+            total = result[0][0] if result and result[0][0] else 0
+            
+            if total == 0:
+                return "✅ Não há valores pendentes de recebimento!"
+            else:
+                return f"💰 Valor total a receber: **R$ {total:,.2f}**".replace(',', 'X').replace('.', ',').replace('X', '.')
+        except:
+            return "❌ Erro ao calcular valores a receber."
+    
+    def caixas_abertos(self):
+        """Verifica caixas abertos"""
+        try:
+            result = execute_query("SELECT COUNT(*) FROM CAIXA_CONTROLE WHERE STATUS = 'A'")
+            total = result[0][0] if result else 0
+            
+            if total == 0:
+                return "🔒 Nenhum caixa está aberto no momento."
+            elif total == 1:
+                return "🔓 Há **1 caixa aberto** no momento."
+            else:
+                return f"🔓 Há **{total} caixas abertos** no momento."
+        except:
+            return "❌ Erro ao verificar situação dos caixas."
+    
+    def situacao_caixa(self):
+        """Mostra situação geral dos caixas"""
+        try:
+            abertos = execute_query("SELECT COUNT(*) FROM CAIXA_CONTROLE WHERE STATUS = 'A'")[0][0]
+            fechados_hoje = execute_query("SELECT COUNT(*) FROM CAIXA_CONTROLE WHERE STATUS = 'F' AND DATA_FECHAMENTO = CURRENT_DATE")[0][0]
+            
+            resposta = f"💳 **Situação dos Caixas:**\n"
+            resposta += f"• Caixas abertos: **{abertos}**\n"
+            resposta += f"• Caixas fechados hoje: **{fechados_hoje}**"
+            
+            return resposta
+        except:
+            return "❌ Erro ao verificar situação dos caixas."
+    
+    def contar_pedidos_venda(self):
+        """Conta pedidos de venda"""
+        try:
+            pedidos = listar_pedidos_venda()
+            total = len(pedidos) if pedidos else 0
+            
+            if total == 0:
+                return "📋 Nenhum pedido de venda cadastrado."
+            elif total == 1:
+                return "📋 Você tem **1 pedido** de venda."
+            else:
+                return f"📋 Você tem **{total} pedidos** de venda."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM PEDIDOS_VENDA")
+            total = result[0][0] if result else 0
+            return f"📋 Você tem **{total} pedidos** de venda."
+    
+    def vendas_mes_atual(self):
+        """Mostra vendas do mês atual"""
+        try:
+            from datetime import date
+            hoje = date.today()
+            primeiro_dia = date(hoje.year, hoje.month, 1)
+            
+            # Verificar se a tabela VENDAS_PRODUTOS existe
+            result = execute_query(f"""
+                SELECT SUM(VALOR_TOTAL), COUNT(*) 
+                FROM VENDAS_PRODUTOS 
+                WHERE DATA BETWEEN '{primeiro_dia}' AND '{hoje}'
+            """)
+            
+            if result and result[0][0]:
+                valor_total = result[0][0]
+                quantidade = result[0][1]
+                return f"📊 **Vendas deste mês:**\n• Quantidade: **{quantidade}** vendas\n• Valor total: **R$ {valor_total:,.2f}**".replace(',', 'X').replace('.', ',').replace('X', '.')
+            else:
+                return "📊 Nenhuma venda registrada este mês."
+        except:
+            return "❌ Erro ao consultar vendas do mês."
+    
+    def contar_contas_correntes(self):
+        """Conta contas correntes"""
+        try:
+            contas = listar_contas_correntes()
+            total = len(contas) if contas else 0
+            
+            if total == 0:
+                return "💳 Nenhuma conta corrente cadastrada."
+            elif total == 1:
+                return "💳 Você tem **1 conta corrente** cadastrada."
+            else:
+                return f"💳 Você tem **{total} contas correntes** cadastradas."
+        except:
+            result = execute_query("SELECT COUNT(*) FROM CONTAS_CORRENTES")
+            total = result[0][0] if result else 0
+            return f"💳 Você tem **{total} contas correntes** cadastradas."
+    
+    def resumo_geral(self):
+        """Fornece um resumo geral do sistema"""
+        try:
+            resumo = "📊 **RESUMO GERAL DO SISTEMA**\n\n"
+            
+            # Clientes
+            clientes = execute_query("SELECT COUNT(*) FROM PESSOAS")[0][0]
+            resumo += f"👥 **Clientes:** {clientes}\n"
+            
+            # Produtos
+            produtos = execute_query("SELECT COUNT(*) FROM PRODUTOS")[0][0]
+            resumo += f"📦 **Produtos:** {produtos}\n"
+            
+            # Funcionários
+            funcionarios = execute_query("SELECT COUNT(*) FROM FUNCIONARIOS")[0][0]
+            resumo += f"👨‍💼 **Funcionários:** {funcionarios}\n"
+            
+            # Fornecedores
+            fornecedores = execute_query("SELECT COUNT(*) FROM FORNECEDORES")[0][0]
+            resumo += f"🏭 **Fornecedores:** {fornecedores}\n"
+            
+            # Recebimentos pendentes
+            recebimentos_pendentes = execute_query("SELECT COUNT(*) FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Pendente'")[0][0]
+            resumo += f"💰 **Recebimentos pendentes:** {recebimentos_pendentes}\n"
+            
+            # Valor a receber
+            valor_receber = execute_query("SELECT COALESCE(SUM(VALOR), 0) FROM RECEBIMENTOS_CLIENTES WHERE STATUS = 'Pendente'")[0][0]
+            resumo += f"💵 **Valor a receber:** R$ {valor_receber:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            
+            return resumo
+        except Exception as e:
+            return f"❌ Erro ao gerar resumo: {str(e)}"
+
 
 class AssistenteAPI(QThread):
     """Thread otimizada para fazer requisições com streaming"""
@@ -24,6 +373,7 @@ class AssistenteAPI(QThread):
         self.mensagem = ""
         self.historico_conversa = []
         self.use_streaming = True  # Ativar streaming
+        self.banco_assistente = BancoDadosAssistente()  # Instância para consultas do banco
         
     def configurar_mensagem(self, mensagem, historico=[], use_streaming=True):
         """Configura a mensagem e opções para a próxima requisição"""
@@ -34,6 +384,15 @@ class AssistenteAPI(QThread):
     def run(self):
         """Executa a requisição otimizada à API"""
         try:
+            # Primeiro, verificar se é uma pergunta sobre dados do sistema
+            eh_pergunta_dados, resposta_dados = self.banco_assistente.processar_pergunta(self.mensagem)
+            
+            if eh_pergunta_dados:
+                # Se é uma pergunta sobre dados, responder diretamente
+                self.resposta_completa.emit(resposta_dados)
+                return
+            
+            # Se não é pergunta sobre dados, continuar com a API externa
             messages = [
                 {
                     "role": "system",
@@ -45,6 +404,14 @@ class AssistenteAPI(QThread):
 - Responda em português brasileiro
 - Use emojis moderadamente (máximo 2 por resposta)
 - Forneça passos específicos quando solicitado
+
+**CAPACIDADES ESPECIAIS:**
+🔍 **CONSULTAS DE DADOS** - Posso fornecer informações sobre:
+• Quantos clientes, produtos, funcionários você tem
+• Recebimentos pendentes e valores a receber
+• Situação dos caixas e pedidos de venda
+• Produtos com estoque baixo
+• Resumo geral do sistema
 
 **MÓDULOS DO SISTEMA:**
 
@@ -86,7 +453,14 @@ class AssistenteAPI(QThread):
 **INSTRUÇÕES DE NAVEGAÇÃO:**
 - Para acessar qualquer módulo: "Menu [CATEGORIA] → [MÓDULO]"
 - PDV: Clique no botão verde "Acesso ao PDV"
-- Seja específico sobre onde encontrar cada funcionalidade"""
+- Seja específico sobre onde encontrar cada funcionalidade
+
+**EXEMPLOS DE PERGUNTAS SOBRE DADOS:**
+- "Quantos clientes eu tenho?"
+- "Qual o valor total a receber?"
+- "Produtos com estoque baixo"
+- "Resumo geral do sistema"
+- "Situação do caixa"""
                 }
             ]
             
@@ -376,7 +750,8 @@ class ChatWidget(QWidget):
         sugestoes_layout.setSpacing(8)
         sugestoes_layout.setContentsMargins(5, 0, 5, 0)
         
-        sugestoes = ["Cadastrar cliente", "Abrir PDV", "Ver relatórios"]
+        # Sugestões atualizadas com consultas de dados
+        sugestoes = ["Quantos clientes tenho?", "Resumo geral", "Abrir PDV", "Produtos estoque baixo"]
         for sugestao in sugestoes:
             btn = QPushButton(sugestao)
             btn.setStyleSheet("""
@@ -545,7 +920,12 @@ class ChatWidget(QWidget):
             "Posso ajudá-lo a:\n"
             "• Navegar pelo sistema\n"
             "• Encontrar módulos específicos\n"
+            "• **Consultar dados do sistema**\n"
             "• Explicar funcionalidades\n\n"
+            "**Experimente perguntar:**\n"
+            "• Quantos clientes tenho?\n"
+            "• Resumo geral do sistema\n"
+            "• Produtos com estoque baixo\n\n"
             "Como posso ajudá-lo hoje?"
         )
 

@@ -5,11 +5,253 @@ import importlib.util
 import unicodedata
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
-                             QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox)
-from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap
+                             QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog)
+from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer
 from PyQt5.QtGui import QDesktopServices
 from assistente import adicionar_assistente_ao_sistema
+
+
+class ContatosWhatsAppDialog(QDialog):
+    """Janela de contatos do WhatsApp com design melhorado"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.contatos = [
+            {
+                "nome": "Marcos Barros",
+                "funcao": "Suporte",
+                "telefone": "15 99102-3337",
+                "numero_limpo": "5515991023337"
+            },
+            {
+                "nome": "Marco Antônio",
+                "funcao": "Programador",
+                "telefone": "15 99612-5218",
+                "numero_limpo": "5515996125218"
+            }
+        ]
+        self.init_ui()
+    
+    def init_ui(self):
+        """Inicializa a interface da janela de contatos"""
+        self.setWindowTitle("Contatos - WhatsApp")
+        self.setWindowIcon(QIcon(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")))
+        # Aumentar largura para acomodar conteúdo
+        self.setFixedSize(600, 350)
+        
+        # Remover botões de minimizar/maximizar e '?' do título
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        
+        # Estilo geral da janela
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+            }
+        """)
+        
+        # Layout principal
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Header com gradiente
+        header_widget = QWidget()
+        header_widget.setFixedHeight(70)
+        header_widget.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #25D366, stop:1 #128C7E);
+                border-bottom: 2px solid #0d6e5a;
+            }
+        """)
+        
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 0, 20, 0)
+        
+        # Ícone do WhatsApp no header
+        icon_label = QLabel()
+        whatsapp_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")
+        if os.path.exists(whatsapp_icon_path):
+            pixmap = QPixmap(whatsapp_icon_path)
+            icon_label.setPixmap(pixmap.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            icon_label.setText("💬")
+            icon_label.setFont(QFont("Arial", 28))
+        icon_label.setStyleSheet("background: transparent;")
+        
+        # Título no header
+        titulo = QLabel("Contatos WhatsApp")
+        titulo.setFont(QFont("Arial", 20, QFont.Bold))
+        titulo.setStyleSheet("""
+            color: white;
+            background: transparent;
+            padding-left: 10px;
+        """)
+        
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(titulo)
+        header_layout.addStretch()
+        
+        layout.addWidget(header_widget)
+        
+        # Container principal com padding
+        main_container = QWidget()
+        main_container.setStyleSheet("background-color: #f5f5f5;")
+        main_layout = QVBoxLayout(main_container)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+        
+        # Criar cards para cada contato
+        for contato in self.contatos:
+            self.criar_card_contato(main_layout, contato)
+        
+        # Espaçador
+        main_layout.addStretch()
+        
+        # Adicionar o container principal ao layout
+        layout.addWidget(main_container)
+    
+    def criar_card_contato(self, layout, contato):
+        """Cria um card estilizado para um contato"""
+        # Card principal
+        card = QFrame()
+        card.setMinimumHeight(95)
+        card.setMaximumHeight(95)
+        card.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 12px;
+            }
+            QFrame:hover {
+                border: 2px solid #25D366;
+                background-color: #f0fff4;
+            }
+        """)
+        
+        # Adicionar sombra ao card
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(8)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 2)
+        card.setGraphicsEffect(shadow)
+        
+        # Layout do card
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(15, 10, 15, 10)
+        card_layout.setSpacing(15)
+        
+        # Avatar/Inicial do contato
+        avatar = QLabel()
+        avatar.setFixedSize(50, 50)
+        inicial = contato["nome"].split()[0][0].upper()
+        avatar.setText(inicial)
+        avatar.setAlignment(Qt.AlignCenter)
+        avatar.setStyleSheet("""
+            QLabel {
+                background-color: #25D366;
+                color: white;
+                border-radius: 25px;
+                font-size: 20px;
+                font-weight: bold;
+            }
+        """)
+        
+        # Informações do contato
+        info_widget = QWidget()
+        info_widget.setStyleSheet("background: transparent;")
+        info_widget.setFixedWidth(300)  # Largura fixa para garantir espaço
+        info_layout = QVBoxLayout(info_widget)
+        info_layout.setContentsMargins(0, 5, 0, 5)
+        info_layout.setSpacing(3)
+        
+        # Nome
+        nome_label = QLabel(contato["nome"])
+        nome_label.setFont(QFont("Arial", 14, QFont.Bold))
+        nome_label.setStyleSheet("color: #2c3e50; background: transparent;")
+        nome_label.setWordWrap(False)  # Evitar quebra de linha
+        nome_label.setMinimumWidth(200)  # Garantir largura mínima
+        
+        # Função
+        funcao_label = QLabel(contato["funcao"])
+        funcao_label.setFont(QFont("Arial", 11))
+        funcao_label.setStyleSheet("color: #7f8c8d; background: transparent;")
+        funcao_label.setWordWrap(False)
+        
+        # Telefone com ícone
+        telefone_label = QLabel(f"📱 {contato['telefone']}")
+        telefone_label.setFont(QFont("Arial", 10))
+        telefone_label.setStyleSheet("color: #34495e; background: transparent;")
+        telefone_label.setWordWrap(False)
+        
+        info_layout.addWidget(nome_label)
+        info_layout.addWidget(funcao_label)
+        info_layout.addWidget(telefone_label)
+        
+        # Botão WhatsApp
+        btn_whatsapp = QPushButton("WhatsApp")
+        btn_whatsapp.setFixedSize(120, 40)
+        btn_whatsapp.setStyleSheet("""
+            QPushButton {
+                background-color: #25D366;
+                color: white;
+                border: none;
+                border-radius: 20px;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+            QPushButton:hover {
+                background-color: #128C7E;
+            }
+            QPushButton:pressed {
+                background-color: #0d6e5a;
+            }
+        """)
+        btn_whatsapp.setCursor(QCursor(Qt.PointingHandCursor))
+        btn_whatsapp.clicked.connect(lambda: self.abrir_whatsapp(contato["numero_limpo"]))
+        
+        # Adicionar ícone ao botão
+        whatsapp_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")
+        if os.path.exists(whatsapp_icon_path):
+            btn_whatsapp.setIcon(QIcon(whatsapp_icon_path))
+            btn_whatsapp.setIconSize(QSize(18, 18))
+        
+        # Montar o layout do card
+        card_layout.addWidget(avatar)
+        card_layout.addWidget(info_widget)
+        card_layout.addStretch()  # Adicionar espaço flexível
+        card_layout.addWidget(btn_whatsapp)
+        
+        # Tornar o card clicável
+        card.mousePressEvent = lambda event: self.abrir_whatsapp(contato["numero_limpo"])
+        card.setCursor(QCursor(Qt.PointingHandCursor))
+        
+        layout.addWidget(card)
+    
+    def abrir_whatsapp(self, numero):
+        """Abre o WhatsApp com o número especificado"""
+        try:
+            url = QUrl(f"https://wa.me/{numero}")
+            
+            # Abrir URL
+            resultado = QDesktopServices.openUrl(url)
+            
+            if resultado:
+                print(f"WhatsApp aberto para o número: {numero}")
+                self.close()
+            else:
+                print("Falha ao abrir a URL do WhatsApp.")
+                import webbrowser
+                webbrowser.open(f"https://wa.me/{numero}")
+                self.close()
+                
+        except Exception as e:
+            print(f"Erro ao abrir WhatsApp: {e}")
+            QMessageBox.warning(self, "Erro", f"Erro ao abrir WhatsApp: {str(e)}")
+
 
 class MenuButton(QPushButton):
     def __init__(self, text, parent=None):
@@ -257,26 +499,6 @@ class MainWindow(QMainWindow):
 
         home_layout.addWidget(info_frame)
 
-        # Botão de diagnóstico (adicione próximo ao final do initUI, antes do return)
-        # self.btn_diagnostico = QPushButton("Diagnosticar Banco", self)
-        # self.btn_diagnostico.clicked.connect(self.diagnosticar_banco)
-        # self.btn_diagnostico.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #FFD700;
-        #         color: black;
-        #         border: 2px solid #DAA520;
-        #         border-radius: 5px;
-        #         padding: 5px 10px;
-        #         font-weight: bold;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #DAA520;
-        #     }
-        # """)
-        # self.btn_diagnostico.setFixedSize(150, 40)
-        # self.btn_diagnostico.move(30, 180)  # Posicione abaixo do botão PDV
-        # self.btn_diagnostico.raise_()
-
         # Informações do usuário
         user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
         user_info.setFont(QFont("Arial", 14))
@@ -284,10 +506,17 @@ class MainWindow(QMainWindow):
         user_info.setAlignment(Qt.AlignCenter)
         home_layout.addWidget(user_info)
 
+        # NOVO: Informações do desenvolvedor
+        dev_info = QLabel("Desenvolvido e programado por Marco Antônio")
+        dev_info.setFont(QFont("Arial", 12, -1, True))
+        dev_info.setStyleSheet("color: #cccccc; margin-top: 5px;")
+        dev_info.setAlignment(Qt.AlignCenter)
+        home_layout.addWidget(dev_info)
+
         # finalmente adiciona a tela home ao layout principal
         main_layout.addWidget(home_screen, 1)
         
-        # Botão de WhatsApp - versão corrigida
+        # Botão de WhatsApp - versão modificada para abrir janela de contatos
         self.botao_whatsapp = QPushButton(self)
         whatsapp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")
         
@@ -321,10 +550,10 @@ class MainWindow(QMainWindow):
         
         # Configurar cursor e tooltip
         self.botao_whatsapp.setCursor(QCursor(Qt.PointingHandCursor))
-        self.botao_whatsapp.setToolTip("Contato: +55 15 996125218")
+        self.botao_whatsapp.setToolTip("Clique para ver os contatos")
         
-        # Conectar ao evento de clique
-        self.botao_whatsapp.clicked.connect(lambda: self.abrir_whatsapp("+5515996125218"))
+        # MODIFICADO: Conectar ao evento de abrir janela de contatos
+        self.botao_whatsapp.clicked.connect(self.abrir_janela_contatos)
         
         # Posicionar o botão no canto inferior direito
         self.botao_whatsapp.move(
@@ -489,6 +718,16 @@ class MainWindow(QMainWindow):
             "PDV - Ponto de Venda":         "PDVWindow"
         }
 
+    def abrir_janela_contatos(self):
+        """Abre a janela de contatos do WhatsApp"""
+        try:
+            # Criar e exibir a janela de contatos
+            contatos_dialog = ContatosWhatsAppDialog(self)
+            contatos_dialog.exec_()  # Usar exec_() para janela modal
+        except Exception as e:
+            print(f"Erro ao abrir janela de contatos: {e}")
+            QMessageBox.warning(self, "Erro", f"Erro ao abrir janela de contatos: {str(e)}")
+
     def navegar_para_modulo(self, modulo, acao):
         """Navegar para um módulo específico do sistema"""
         print(f"Navegando para: {modulo} > {acao}")
@@ -575,7 +814,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erro", f"Não foi possível abrir o PDV: {str(e)}")
 
     def criar_caixa_info(self, layout_pai, titulo, nome_icone, contagem):
-        """Cria uma caixa de informação com título, ícone e contagem"""
+        """Cria uma caixa de informação com título, ícone e contagem - INTERATIVA"""
         box_frame = QFrame()
         box_frame.setMinimumSize(180, 150)
         box_frame.setStyleSheet("""
@@ -584,6 +823,9 @@ class MainWindow(QMainWindow):
                 border-radius: 15px;
             }
         """)
+        
+        # Tornar o frame clicável
+        box_frame.setCursor(QCursor(Qt.PointingHandCursor))
         
         # Adicionar efeito de sombra
         sombra = QGraphicsDropShadowEffect()
@@ -659,15 +901,69 @@ class MainWindow(QMainWindow):
         box_layout.addWidget(label_icone)
         box_layout.addWidget(label_contagem)
         
+        # Adicionar evento de clique baseado no título
+        def on_click(event):
+            if titulo == "Clientes":
+                # Abrir cadastro de pessoas/clientes
+                self.menu_action_triggered("Cadastro de Clientes")
+            elif titulo == "Produtos":
+                # Abrir produtos
+                self.menu_action_triggered("Produtos")
+            elif titulo == "Vendas":
+                # Abrir relatório de vendas
+                self.menu_action_triggered("Relatório de Vendas de Produtos")
+        
+        box_frame.mousePressEvent = on_click
+        
+        # Adicionar animação de hover
+        def on_enter(event):
+            # Criar animação para aumentar o tamanho
+            self.animar_caixa(box_frame, 1.1)  # Aumenta 10%
+            
+        def on_leave(event):
+            # Criar animação para voltar ao tamanho normal
+            self.animar_caixa(box_frame, 1.0)
+            
+        box_frame.enterEvent = on_enter
+        box_frame.leaveEvent = on_leave
+        
         layout_pai.addWidget(box_frame)
         
         # Armazenar referência ao label para atualização posterior
         self.contadores_labels[titulo] = label_contagem
         
-        return label_contagem
-    
+        # Armazenar referência ao frame para animações
+        if not hasattr(self, 'info_frames'):
+            self.info_frames = {}
+        self.info_frames[titulo] = box_frame
         
+        return label_contagem
 
+
+    def animar_caixa(self, caixa, fator_escala):
+        """Anima a caixa de informação para aumentar/diminuir de tamanho"""
+        # Calcular novos tamanhos
+        nova_largura = int(180 * fator_escala)
+        nova_altura = int(150 * fator_escala)
+        
+        # Criar animação para largura
+        anim_largura = QPropertyAnimation(caixa, b"minimumWidth")
+        anim_largura.setDuration(150)  # Mais rápido
+        anim_largura.setStartValue(caixa.minimumWidth())
+        anim_largura.setEndValue(nova_largura)
+        anim_largura.setEasingCurve(QEasingCurve.InOutQuad)
+        
+        # Criar animação para altura
+        anim_altura = QPropertyAnimation(caixa, b"minimumHeight")
+        anim_altura.setDuration(150)  # Mais rápido
+        anim_altura.setStartValue(caixa.minimumHeight())
+        anim_altura.setEndValue(nova_altura)
+        anim_altura.setEasingCurve(QEasingCurve.InOutQuad)
+        
+        # Iniciar animações
+        anim_largura.start()
+        anim_altura.start()
+        
     def atualizar_contadores(self):
         """Atualiza os contadores de todas as caixas de informação"""
         try:
@@ -1185,46 +1481,46 @@ class MainWindow(QMainWindow):
             print("Não foi possível abrir a janela solicitada.")
 
     def closeEvent(self, event):
-            """Manipula o evento de fechamento da janela principal"""
-            try:
-                # Fechar todas as janelas abertas, EXCETO o PDV
-                for window in self.opened_windows:
-                    try:
-                        # Verificar se a janela ainda existe e está visível
-                        if window and window.isVisible():
-                            # Verificar se NÃO é o PDV (por título ou tipo)
-                            if window.windowTitle() != "PDV - Ponto de Venda":
-                                print(f"Fechando janela: {window.windowTitle()}")
-                                window.close()
-                            else:
-                                print("Mantendo PDV aberto")
-                    except Exception as e:
-                        print(f"Erro ao fechar janela: {e}")
-                
-                # Limpar a lista de janelas abertas, mantendo apenas o PDV
-                self.opened_windows = [w for w in self.opened_windows 
-                                    if w and w.isVisible() and w.windowTitle() == "PDV - Ponto de Venda"]
-                
-                # Parar timers
-                if hasattr(self, 'timer_atualizacao'):
-                    self.timer_atualizacao.stop()
-                if hasattr(self, 'timer_syncthing'):
-                    self.timer_syncthing.stop()
-                
-                # Fechar Syncthing
+        """Manipula o evento de fechamento da janela principal"""
+        try:
+            # Fechar todas as janelas abertas, EXCETO o PDV
+            for window in self.opened_windows:
                 try:
-                    from base.banco import fechar_syncthing
-                    fechar_syncthing()
+                    # Verificar se a janela ainda existe e está visível
+                    if window and window.isVisible():
+                        # Verificar se NÃO é o PDV (por título ou tipo)
+                        if window.windowTitle() != "PDV - Ponto de Venda":
+                            print(f"Fechando janela: {window.windowTitle()}")
+                            window.close()
+                        else:
+                            print("Mantendo PDV aberto")
                 except Exception as e:
-                    print(f"Erro ao encerrar Syncthing: {e}")
+                    print(f"Erro ao fechar janela: {e}")
             
+            # Limpar a lista de janelas abertas, mantendo apenas o PDV
+            self.opened_windows = [w for w in self.opened_windows 
+                                if w and w.isVisible() and w.windowTitle() == "PDV - Ponto de Venda"]
+            
+            # Parar timers
+            if hasattr(self, 'timer_atualizacao'):
+                self.timer_atualizacao.stop()
+            if hasattr(self, 'timer_syncthing'):
+                self.timer_syncthing.stop()
+            
+            # Fechar Syncthing
+            try:
+                from base.banco import fechar_syncthing
+                fechar_syncthing()
             except Exception as e:
-                print(f"Erro no closeEvent: {e}")
-                import traceback
-                traceback.print_exc()
-            
-            # Aceitar o evento para fechar a janela principal
-            event.accept()
+                print(f"Erro ao encerrar Syncthing: {e}")
+        
+        except Exception as e:
+            print(f"Erro no closeEvent: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Aceitar o evento para fechar a janela principal
+        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

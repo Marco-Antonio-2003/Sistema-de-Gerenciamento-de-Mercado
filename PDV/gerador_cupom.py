@@ -11,7 +11,7 @@ import datetime
 
 def gerar_cupom_pdf(id_venda, tipo_cupom, cpf, data_venda, itens, total, forma_pagamento, 
                     dir_saida="cupons", nome_empresa="MB SISTEMA", 
-                    cnpj="36.920.085/0001-73"):
+                    cnpj="000000000"):
     """
     Gera um PDF de cupom fiscal ou não fiscal
     
@@ -67,11 +67,11 @@ def gerar_cupom_pdf(id_venda, tipo_cupom, cpf, data_venda, itens, total, forma_p
     
     # Endereço
     c.setFont("Helvetica", 8)
-    c.drawCentredString(largura/2, y_atual, "A ADE CONJUNTO 3 LOTE, 05")
+    c.drawCentredString(largura/2, y_atual, "VILA SANTANA")
     y_atual -= 3 * mm
-    c.drawCentredString(largura/2, y_atual, "AREA DE DESENVOLVIMENTO ECONÔMICO ÁGUAS CLARAS")
+    c.drawCentredString(largura/2, y_atual, "EMILIO FARRARI, 110")
     y_atual -= 3 * mm
-    c.drawCentredString(largura/2, y_atual, "BRASÍLIA-DF")
+    c.drawCentredString(largura/2, y_atual, "ITAPEVA - SP")
     y_atual -= 5 * mm
     
     # Tipo de documento

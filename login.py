@@ -296,7 +296,7 @@ class LoginWindow(QMainWindow):
         
         # Adicionar rótulo de versão no canto inferior direito
         versao_layout = QHBoxLayout()
-        versao_label = QLabel("Versão: v0.1.2")
+        versao_label = QLabel("Versão: v0.1.2.1")
         versao_label.setStyleSheet("color: #f7f8f9; font-size: 11px;")
         versao_label.setAlignment(Qt.AlignRight)
         versao_layout.addStretch(1)  # Adiciona espaço à esquerda para empurrar para a direita

@@ -1,4 +1,29 @@
 {
-  "ultima_atualizacao": "2025-05-26T18:31:45.678821",
-  "conversas": []
+  "ultima_atualizacao": "2025-05-29T10:07:57.726778",
+  "conversas": [
+    {
+      "role": "user",
+      "content": "Quantos clientes tenho?"
+    },
+    {
+      "role": "assistant",
+      "content": "📊 Você tem **3 clientes** cadastrados no sistema."
+    },
+    {
+      "role": "user",
+      "content": "Produtos estoque baixo"
+    },
+    {
+      "role": "assistant",
+      "content": "✅ Todos os produtos estão com estoque adequado!"
+    },
+    {
+      "role": "user",
+      "content": "Produtos estoque baixo"
+    },
+    {
+      "role": "assistant",
+      "content": "⚠️ **1 produtos** com estoque baixo:\n\n• **Herbissimo** - Estoque: 5\n"
+    }
+  ]
 }
