@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 import numpy as np
 import functools
 
+
 # Modificação na importação do banco de dados para funcionar tanto em desenvolvimento quanto no executável
 # Determinar se estamos rodando como um executável ou script normal
 if getattr(sys, 'frozen', False):

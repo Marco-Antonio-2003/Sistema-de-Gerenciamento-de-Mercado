@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog)
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer
+from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect
 from PyQt5.QtGui import QDesktopServices
 from assistente import adicionar_assistente_ao_sistema
 
@@ -438,7 +438,8 @@ class MainWindow(QMainWindow):
         ], self)
         
         self.add_menu_actions_with_permission(btn_relatorios, [
-            "Relatório de Vendas de Produtos"
+            "Relatório de Vendas de Produtos",
+            "Histórico de Cupons",
         ], self)
         
         self.add_menu_actions_with_permission(btn_ferramentas, [
@@ -681,7 +682,8 @@ class MainWindow(QMainWindow):
             "Conta corrente": os.path.join("financeiro", "conta_corrente.py"),
             "Classes financeiras": os.path.join("financeiro", "classes_financeiras.py"),
             #"Fiscal NF-e, SAT, NFC-e": os.path.join("relatorios", "relatorio_fiscal.py"),
-            "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"),  
+            "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"), 
+            "Histórico de Cupons": os.path.join("relatorios", "historico_cupom.py"), 
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
@@ -711,6 +713,7 @@ class MainWindow(QMainWindow):
             # RELATÓRIOS
             "Fiscal NF-e, SAT, NFC-e":      "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos":                      "RelatorioVendasWindow",
+            "Histórico de Cupons":          "HistoricoCuponsWindow",
             # FERRAMENTAS
             "Configuração de estação":      "ConfiguracaoImpressoraWindow",
             "Configuração do Sistema": "ConfiguracaoSistemaWindow",
@@ -813,14 +816,22 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.warning(self, "Erro", f"Não foi possível abrir o PDV: {str(e)}")
 
+    
     def criar_caixa_info(self, layout_pai, titulo, nome_icone, contagem):
         """Cria uma caixa de informação com título, ícone e contagem - INTERATIVA"""
-        box_frame = QFrame()
-        box_frame.setMinimumSize(180, 150)
+        # Container wrapper para manter espaço constante durante animação
+        wrapper = QWidget()
+        wrapper.setFixedSize(200, 170)
+        wrapper.setStyleSheet("background-color: transparent;")
+        
+        box_frame = QFrame(wrapper)
+        box_frame.setFixedSize(180, 150)
+        box_frame.move(10, 10)  # Centralizar no wrapper
         box_frame.setStyleSheet("""
             QFrame {
                 background-color: #00283d;
                 border-radius: 15px;
+                border: 2px solid transparent;
             }
         """)
         
@@ -830,9 +841,12 @@ class MainWindow(QMainWindow):
         # Adicionar efeito de sombra
         sombra = QGraphicsDropShadowEffect()
         sombra.setBlurRadius(15)
-        sombra.setColor(Qt.black)
-        sombra.setOffset(0, 0)
+        sombra.setColor(QColor(0, 0, 0, 80))
+        sombra.setOffset(0, 3)
         box_frame.setGraphicsEffect(sombra)
+        
+        # Guardar referência da sombra no frame
+        box_frame.sombra = sombra
         
         box_layout = QVBoxLayout(box_frame)
         box_layout.setSpacing(10)
@@ -840,60 +854,51 @@ class MainWindow(QMainWindow):
         # Título
         label_titulo = QLabel(titulo)
         label_titulo.setFont(QFont("Arial", 16, QFont.Bold))
-        label_titulo.setStyleSheet("color: white;")
+        label_titulo.setStyleSheet("color: white; background: transparent;")
         label_titulo.setAlignment(Qt.AlignCenter)
         
         # Ícone específico para cada categoria
         label_icone = QLabel()
+        label_icone.setStyleSheet("background: transparent;")
         
         # Mapear ícones personalizados de acordo com o título
         icone_caminho = ""
         if nome_icone == "user.png":
-            # Ícone para Clientes (pessoas)
             icone_caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "user.png")
-            emoji_fallback = "👥"  # Emoji de pessoas caso o ícone não seja encontrado
+            emoji_fallback = "👥"
         elif nome_icone == "product.png":
-            # Ícone para Produtos (caixa/pacote)
             icone_caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "product.png")
-            emoji_fallback = "📦"  # Emoji de caixa/pacote caso o ícone não seja encontrado
+            emoji_fallback = "📦"
         elif nome_icone == "sales.png":
-            # Ícone para Vendas (dinheiro/gráfico)
             icone_caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "sales.png")
-            emoji_fallback = "💰"  # Emoji de dinheiro caso o ícone não seja encontrado
+            emoji_fallback = "💰"
         
         # Verificar se o ícone existe ou usar emoji como alternativa
         if os.path.exists(icone_caminho):
             pixmap_icone = QPixmap(icone_caminho)
             label_icone.setPixmap(pixmap_icone.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            # Usar emoji como fallback
             label_icone.setText(emoji_fallback)
             label_icone.setFont(QFont("Arial", 36, QFont.Bold))
-            label_icone.setStyleSheet("color: white;")
+            label_icone.setStyleSheet("color: white; background: transparent;")
         
         label_icone.setAlignment(Qt.AlignCenter)
         
         # Contagem (formatada como moeda se for Vendas)
         if titulo == "Vendas":
-            # Registrar valor recebido para depuração
-            print(f"DEBUG: Formatando valor de vendas: {contagem} (tipo: {type(contagem)})")
-            
-            # Garantir que é número antes de formatar
             try:
                 valor_numerico = float(contagem)
                 valor_formatado = f"R$ {valor_numerico:.2f}".replace('.', ',')
             except (ValueError, TypeError):
-                print(f"ERRO: Valor inválido para formatação: {contagem}")
                 valor_formatado = "R$ 0,00"
                 
             label_contagem = QLabel(valor_formatado)
             label_contagem.setFont(QFont("Arial", 20, QFont.Bold))
         else:
-            # Formato normal para contagens
             label_contagem = QLabel(str(contagem))
             label_contagem.setFont(QFont("Arial", 24, QFont.Bold))
         
-        label_contagem.setStyleSheet("color: white;")
+        label_contagem.setStyleSheet("color: white; background: transparent;")
         label_contagem.setAlignment(Qt.AlignCenter)
         
         # Adicionar ao layout
@@ -904,30 +909,26 @@ class MainWindow(QMainWindow):
         # Adicionar evento de clique baseado no título
         def on_click(event):
             if titulo == "Clientes":
-                # Abrir cadastro de pessoas/clientes
                 self.menu_action_triggered("Cadastro de Clientes")
             elif titulo == "Produtos":
-                # Abrir produtos
                 self.menu_action_triggered("Produtos")
             elif titulo == "Vendas":
-                # Abrir relatório de vendas
                 self.menu_action_triggered("Relatório de Vendas de Produtos")
         
         box_frame.mousePressEvent = on_click
         
         # Adicionar animação de hover
         def on_enter(event):
-            # Criar animação para aumentar o tamanho
-            self.animar_caixa(box_frame, 1.1)  # Aumenta 10%
+            self.animar_caixa_info(box_frame, aumentar=True)
             
         def on_leave(event):
-            # Criar animação para voltar ao tamanho normal
-            self.animar_caixa(box_frame, 1.0)
+            self.animar_caixa_info(box_frame, aumentar=False)
             
         box_frame.enterEvent = on_enter
         box_frame.leaveEvent = on_leave
         
-        layout_pai.addWidget(box_frame)
+        # Adicionar o wrapper ao layout principal
+        layout_pai.addWidget(wrapper)
         
         # Armazenar referência ao label para atualização posterior
         self.contadores_labels[titulo] = label_contagem
@@ -938,32 +939,89 @@ class MainWindow(QMainWindow):
         self.info_frames[titulo] = box_frame
         
         return label_contagem
-
-
-    def animar_caixa(self, caixa, fator_escala):
+    
+        layout_pai.addWidget(wrapper)
+    
+    def animar_caixa_info(self, caixa, aumentar=True):
         """Anima a caixa de informação para aumentar/diminuir de tamanho"""
-        # Calcular novos tamanhos
-        nova_largura = int(180 * fator_escala)
-        nova_altura = int(150 * fator_escala)
+        # Criar grupo de animações para animar múltiplas propriedades
+        if not hasattr(caixa, '_anim_group'):
+            from PyQt5.QtCore import QParallelAnimationGroup
+            caixa._anim_group = QParallelAnimationGroup()
+            
+            # Animação de geometria
+            caixa._anim_geo = QPropertyAnimation(caixa, b"geometry")
+            caixa._anim_geo.setDuration(200)
+            caixa._anim_geo.setEasingCurve(QEasingCurve.OutCubic)
+            caixa._anim_group.addAnimation(caixa._anim_geo)
         
-        # Criar animação para largura
-        anim_largura = QPropertyAnimation(caixa, b"minimumWidth")
-        anim_largura.setDuration(150)  # Mais rápido
-        anim_largura.setStartValue(caixa.minimumWidth())
-        anim_largura.setEndValue(nova_largura)
-        anim_largura.setEasingCurve(QEasingCurve.InOutQuad)
+        # Parar animações em andamento
+        caixa._anim_group.stop()
         
-        # Criar animação para altura
-        anim_altura = QPropertyAnimation(caixa, b"minimumHeight")
-        anim_altura.setDuration(150)  # Mais rápido
-        anim_altura.setStartValue(caixa.minimumHeight())
-        anim_altura.setEndValue(nova_altura)
-        anim_altura.setEasingCurve(QEasingCurve.InOutQuad)
+        # Obter geometria atual
+        geo_atual = caixa.geometry()
         
-        # Iniciar animações
-        anim_largura.start()
-        anim_altura.start()
+        if aumentar:
+            # Calcular nova geometria (aumento de 10%)
+            novo_width = int(180 * 1.1)
+            novo_height = int(150 * 1.1)
+            
+            # Calcular posição para manter centralizado
+            novo_x = geo_atual.x() - (novo_width - geo_atual.width()) // 2
+            novo_y = geo_atual.y() - (novo_height - geo_atual.height()) // 2
+            
+            # Garantir que não saia dos limites do wrapper
+            novo_x = max(0, min(novo_x, 200 - novo_width))
+            novo_y = max(0, min(novo_y, 170 - novo_height))
+            
+            nova_geo = QRect(novo_x, novo_y, novo_width, novo_height)
+            
+            # Atualizar estilo (sem borda verde)
+            caixa.setStyleSheet("""
+                QFrame {
+                    background-color: #003d5c;
+                    border-radius: 15px;
+                    border: none;
+                }
+            """)
+            
+            # Aumentar sombra
+            if hasattr(caixa, 'sombra'):
+                caixa.sombra.setBlurRadius(25)
+                caixa.sombra.setOffset(0, 8)
+                caixa.sombra.setColor(QColor(0, 0, 0, 120))
+                
+        else:
+            # Voltar ao tamanho original
+            nova_geo = QRect(10, 10, 180, 150)
+            
+            # Restaurar estilo original (sem borda)
+            caixa.setStyleSheet("""
+                QFrame {
+                    background-color: #00283d;
+                    border-radius: 15px;
+                    border: none;
+                }
+            """)
+            
+            # Restaurar sombra original
+            if hasattr(caixa, 'sombra'):
+                caixa.sombra.setBlurRadius(15)
+                caixa.sombra.setOffset(0, 3)
+                caixa.sombra.setColor(QColor(0, 0, 0, 80))
         
+        # Configurar e iniciar animação
+        caixa._anim_geo.setStartValue(geo_atual)
+        caixa._anim_geo.setEndValue(nova_geo)
+        caixa._anim_group.start()
+
+
+    # Alternativa: Método que remove o animar_caixa antigo e usa esta versão
+    def animar_caixa(self, caixa, fator_escala):
+        """Versão compatível com o código antigo"""
+        aumentar = fator_escala > 1.0
+        self.animar_caixa_info(caixa, aumentar)
+
     def atualizar_contadores(self):
         """Atualiza os contadores de todas as caixas de informação"""
         try:
