@@ -438,8 +438,7 @@ class MainWindow(QMainWindow):
         ], self)
         
         self.add_menu_actions_with_permission(btn_relatorios, [
-            "Relatório de Vendas de Produtos",
-            "Histórico de Cupons",
+            "Relatório de Vendas de Produtos"
         ], self)
         
         self.add_menu_actions_with_permission(btn_ferramentas, [
@@ -683,7 +682,6 @@ class MainWindow(QMainWindow):
             "Classes financeiras": os.path.join("financeiro", "classes_financeiras.py"),
             #"Fiscal NF-e, SAT, NFC-e": os.path.join("relatorios", "relatorio_fiscal.py"),
             "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"), 
-            "Histórico de Cupons": os.path.join("relatorios", "historico_cupom.py"), 
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
@@ -713,7 +711,6 @@ class MainWindow(QMainWindow):
             # RELATÓRIOS
             "Fiscal NF-e, SAT, NFC-e":      "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos":                      "RelatorioVendasWindow",
-            "Histórico de Cupons":          "HistoricoCuponsWindow",
             # FERRAMENTAS
             "Configuração de estação":      "ConfiguracaoImpressoraWindow",
             "Configuração do Sistema": "ConfiguracaoSistemaWindow",

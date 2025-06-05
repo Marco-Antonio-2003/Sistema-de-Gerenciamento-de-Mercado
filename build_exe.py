@@ -28,6 +28,22 @@ def main():
         print("Módulo requests não encontrado. Instalando...")
         subprocess.run([sys.executable, "-m", "pip", "install", "requests"])
     
+    # Verificar e instalar python-escpos se necessário
+    try:
+        import escpos
+        print("Módulo python-escpos encontrado!")
+    except ImportError:
+        print("Módulo python-escpos não encontrado. Instalando...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "python-escpos"])
+    
+    # Verificar e instalar pywin32 se necessário
+    try:
+        import win32api
+        print("Módulo pywin32 encontrado!")
+    except ImportError:
+        print("Módulo pywin32 não encontrado. Instalando...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "pywin32"])
+    
     # Garantir que formulario_empresa.py existe em geral/
     geral_dir = os.path.join("geral")
     if not os.path.exists(geral_dir):
@@ -197,11 +213,9 @@ class FormularioEmpresa(QWidget):
         "--hidden-import=matplotlib.figure",
         "--hidden-import=numpy",
         "--hidden-import=datetime",
-        "--hidden-import=reportlab",  # Adicione esta linha
-        "--hidden-import=reportlab.pdfgen",  # Adicione também submódulos importantes
         "--hidden-import=reportlab",
         "--hidden-import=reportlab.pdfgen",
-        "--hidden-import=reportlab.pdfgen.canvas",  # Adicione esta linha específica
+        "--hidden-import=reportlab.pdfgen.canvas",
         "--hidden-import=reportlab.lib",
         "--hidden-import=reportlab.lib.pagesizes",
         "--hidden-import=reportlab.lib.units",
@@ -209,7 +223,27 @@ class FormularioEmpresa(QWidget):
         "--hidden-import=reportlab.lib.enums",
         "--hidden-import=reportlab.lib.colors",
         "--hidden-import=reportlab.platypus",
-        "--hidden-import=reportlab.lib",
+        # Adicionar python-escpos e seus submódulos
+        "--hidden-import=escpos",
+        "--hidden-import=escpos.printer",
+        "--hidden-import=escpos.escpos",
+        "--hidden-import=escpos.constants",
+        "--hidden-import=escpos.exceptions",
+        # Adicionar pywin32 e seus submódulos
+        "--hidden-import=win32api",
+        "--hidden-import=win32con",
+        "--hidden-import=win32gui",
+        "--hidden-import=win32print",
+        "--hidden-import=win32clipboard",
+        "--hidden-import=win32file",
+        "--hidden-import=win32process",
+        "--hidden-import=win32service",
+        "--hidden-import=win32serviceutil",
+        "--hidden-import=win32event",
+        "--hidden-import=win32pipe",
+        "--hidden-import=win32security",
+        "--hidden-import=pywintypes",
+        "--hidden-import=pythoncom",
         "login.py"
     ])
     
@@ -272,11 +306,27 @@ class FormularioEmpresa(QWidget):
         print(f"AVISO: Syncthing executável não encontrado em {syncthing_exe}!")
         print("O Syncthing não será incluído no pacote final.")
 
-    # Garantir que os hiddenimports incluam requests, PyQt5.QtSvg e suas dependências
+    # Garantir que os hiddenimports incluam todas as bibliotecas necessárias
     if "hiddenimports=[]" in spec_content:
+        hidden_imports = [
+            'requests', 'urllib3', 'idna', 'chardet', 'certifi', 
+            'PyQt5', 'PyQt5.QtSvg', 
+            'reportlab', 'reportlab.pdfgen', 'reportlab.pdfgen.canvas', 
+            'reportlab.lib', 'reportlab.lib.pagesizes', 'reportlab.lib.units', 
+            'reportlab.platypus',
+            # python-escpos
+            'escpos', 'escpos.printer', 'escpos.escpos', 'escpos.constants', 
+            'escpos.exceptions',
+            # pywin32
+            'win32api', 'win32con', 'win32gui', 'win32print', 'win32clipboard',
+            'win32file', 'win32process', 'win32service', 'win32serviceutil',
+            'win32event', 'win32pipe', 'win32security', 'pywintypes', 'pythoncom'
+        ]
+        
+        hidden_imports_str = str(hidden_imports).replace("'", "'")
         spec_content = spec_content.replace(
             "hiddenimports=[]",
-            "hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'PyQt5', 'PyQt5.QtSvg', 'reportlab', 'reportlab.pdfgen', 'reportlab.pdfgen.canvas', 'reportlab.lib', 'reportlab.lib.pagesizes', 'reportlab.lib.units', 'reportlab.platypus']"
+            f"hiddenimports={hidden_imports_str}"
         )
     
     with open("MBSistema.spec", "w", encoding="utf-8") as f:
@@ -310,6 +360,7 @@ class FormularioEmpresa(QWidget):
             if os.path.exists(ico_img_dir):
                 shutil.copytree(ico_img_dir, dist_ico_img)
                 print("Pasta ico-img copiada com sucesso para o diretório dist.")
+        
         # Copiar explicitamente o syncthing.exe para a pasta dist
         if os.path.exists(syncthing_exe):
             dist_syncthing = os.path.join("dist", "syncthing.exe")
@@ -318,6 +369,18 @@ class FormularioEmpresa(QWidget):
             print("Syncthing copiado com sucesso!")
         else:
             print("\nAVISO: syncthing.exe não encontrado, não será incluído no pacote!")
+            
+        print("\n" + "="*60)
+        print("BIBLIOTECAS INCLUÍDAS NO EXECUTÁVEL:")
+        print("="*60)
+        print("✓ PyQt5 (Interface gráfica)")
+        print("✓ requests (Requisições HTTP)")
+        print("✓ reportlab (Geração de PDFs)")
+        print("✓ matplotlib (Gráficos)")
+        print("✓ numpy (Cálculos matemáticos)")
+        print("✓ python-escpos (Impressoras térmicas/cupom)")
+        print("✓ pywin32 (APIs do Windows)")
+        print("="*60)
             
     else:
         print("\nAVISO: A compilação pode não ter sido concluída corretamente.")

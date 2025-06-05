@@ -23,8 +23,6 @@ class LoadingWorker(QThread):
     def run(self):
         if self.task_type == "startup":
             self.startup_tasks()
-        elif self.task_type == "login":
-            self.login_tasks()
     
     def startup_tasks(self):
         """Tarefas de inicialização do programa"""
@@ -42,28 +40,6 @@ class LoadingWorker(QThread):
         for task_name, delay_ms in tasks:
             self.status.emit(task_name)
             self.msleep(delay_ms)  # Simula tempo de processamento
-            current_progress += progress_step
-            self.progress.emit(min(current_progress, 100))
-        
-        self.progress.emit(100)
-        self.finished.emit()
-    
-    def login_tasks(self):
-        """Tarefas após login bem-sucedido"""
-        tasks = [
-            ("Validando credenciais...", 800),
-            ("Carregando configurações do usuário...", 1200),
-            ("Sincronizando dados...", 1500),
-            ("Preparando workspace...", 1000),
-            ("Abrindo sistema...", 500)
-        ]
-        
-        progress_step = 100 // len(tasks)
-        current_progress = 0
-        
-        for task_name, delay_ms in tasks:
-            self.status.emit(task_name)
-            self.msleep(delay_ms)
             current_progress += progress_step
             self.progress.emit(min(current_progress, 100))
         
@@ -110,12 +86,8 @@ class SplashScreen(QWidget):
         title_layout.setAlignment(Qt.AlignCenter)
         
         # Título principal
-        if self.task_type == "startup":
-            main_title = "MB SISTEMA"
-            subtitle = "Iniciando Sistema..."
-        else:
-            main_title = "MB SISTEMA"
-            subtitle = "Carregando Dashboard..."
+        main_title = "MB SISTEMA"
+        subtitle = "Iniciando Sistema..."
         
         self.main_label = QLabel(main_title)
         self.main_label.setFont(QFont("Arial", 24, QFont.Bold))
@@ -162,7 +134,7 @@ class SplashScreen(QWidget):
         layout.addWidget(self.progress_bar)
         
         # Versão
-        version_label = QLabel("Versão v0.1.2.1")
+        version_label = QLabel("Versão v0.1.2.2")
         version_label.setFont(QFont("Arial", 8))
         version_label.setStyleSheet("color: #a0a0a0; background: transparent;")
         version_label.setAlignment(Qt.AlignCenter)
@@ -470,7 +442,7 @@ class LoginWindow(QMainWindow):
         
         # Rótulo de versão no canto inferior direito
         versao_layout = QHBoxLayout()
-        versao_label = QLabel("Versão: v0.1.2.1")
+        versao_label = QLabel("Versão: v0.1.2.2")
         versao_label.setStyleSheet("color: #f7f8f9; font-size: 11px;")
         versao_label.setAlignment(Qt.AlignRight)
         versao_layout.addStretch(1)
@@ -698,8 +670,8 @@ class LoginWindow(QMainWindow):
                                 self.restaurar_botao_login()
                                 return
             
-            # Login bem-sucedido! Mostrar tela de carregamento
-            self.show_loading_and_open_main(usuario, empresa, id_funcionario)
+            # Login bem-sucedido! Abrir a janela principal diretamente
+            self.open_main_window(usuario, empresa, id_funcionario)
 
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao acessar o sistema: {str(e)}")
@@ -711,41 +683,31 @@ class LoginWindow(QMainWindow):
         self.login_button.setEnabled(True)
         self.login_button.setText("LOGIN")
     
-    def show_loading_and_open_main(self, usuario, empresa, id_funcionario):
-        """Mostra tela de carregamento e abre janela principal"""
-        # Marcar que o login foi bem-sucedido
-        self.login_successful = True
-        
-        # Criar e mostrar splash screen de login
-        self.login_splash = SplashScreen("login")
-        self.login_splash.show()
-        self.login_splash.start_loading()
-        
-        # Quando o carregamento terminar, abrir a janela principal
-        def open_main_window():
+    def open_main_window(self, usuario, empresa, id_funcionario):
+        """Abre a janela principal diretamente após login bem-sucedido"""
+        try:
+            # Marcar que o login foi bem-sucedido
+            self.login_successful = True
+            
+            # Garantir que o Syncthing esteja rodando
             try:
-                # Garantir que o Syncthing esteja rodando
-                try:
-                    from base.syncthing_manager import syncthing_manager
-                    syncthing_manager.iniciar_syncthing()
-                except Exception as e:
-                    print(f"Aviso: Erro ao verificar Syncthing: {e}")
-                
-                # Abrir a janela principal
-                self.main_window = MainWindow(
-                    usuario=usuario, 
-                    empresa=empresa, 
-                    id_funcionario=id_funcionario
-                )
-                self.main_window.show()
-                self.hide()  # Esconder a tela de login
-                
+                from base.syncthing_manager import syncthing_manager
+                syncthing_manager.iniciar_syncthing()
             except Exception as e:
-                self.mostrar_mensagem("Erro", f"Erro ao abrir janela principal: {str(e)}")
-                self.restaurar_botao_login()
-        
-        # Conectar o fim do carregamento com a abertura da janela principal
-        self.login_splash.worker.finished.connect(open_main_window)
+                print(f"Aviso: Erro ao verificar Syncthing: {e}")
+            
+            # Abrir a janela principal
+            self.main_window = MainWindow(
+                usuario=usuario, 
+                empresa=empresa, 
+                id_funcionario=id_funcionario
+            )
+            self.main_window.show()
+            self.hide()  # Esconder a tela de login
+            
+        except Exception as e:
+            self.mostrar_mensagem("Erro", f"Erro ao abrir janela principal: {str(e)}")
+            self.restaurar_botao_login()
     
     def closeEvent(self, event):
         """Manipula o evento de fechamento da janela principal"""

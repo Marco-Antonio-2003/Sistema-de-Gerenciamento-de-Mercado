@@ -158,6 +158,11 @@ imports:
  &#8226;   <a href="#encodings.uu_codec">encodings.uu_codec</a>
  &#8226;   <a href="#encodings.zlib_codec">encodings.zlib_codec</a>
  &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#genericpath">genericpath</a>
  &#8226;   <a href="#heapq">heapq</a>
@@ -183,6 +188,8 @@ imports:
  &#8226;   <a href="#pyi_rth_pyqt5.py">pyi_rth_pyqt5.py</a>
  &#8226;   <a href="#pyi_rth_pythoncom.py">pyi_rth_pythoncom.py</a>
  &#8226;   <a href="#pyi_rth_pywintypes.py">pyi_rth_pywintypes.py</a>
+ &#8226;   <a href="#pythoncom">pythoncom</a>
+ &#8226;   <a href="#pywintypes">pywintypes</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#reportlab">reportlab</a>
  &#8226;   <a href="#reportlab.lib">reportlab.lib</a>
@@ -207,6 +214,18 @@ imports:
  &#8226;   <a href="#urllib3">urllib3</a>
  &#8226;   <a href="#warnings">warnings</a>
  &#8226;   <a href="#weakref">weakref</a>
+ &#8226;   <a href="#win32api">win32api</a>
+ &#8226;   <a href="#win32clipboard">win32clipboard</a>
+ &#8226;   <a href="#win32con">win32con</a>
+ &#8226;   <a href="#win32event">win32event</a>
+ &#8226;   <a href="#win32file">win32file</a>
+ &#8226;   <a href="#win32gui">win32gui</a>
+ &#8226;   <a href="#win32pipe">win32pipe</a>
+ &#8226;   <a href="#win32print">win32print</a>
+ &#8226;   <a href="#win32process">win32process</a>
+ &#8226;   <a href="#win32security">win32security</a>
+ &#8226;   <a href="#win32service">win32service</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -464,7 +483,7 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>'org.python'</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#copy">copy</a>
+    <a href="#pickle">pickle</a>
  &#8226;   <a href="#xml.sax">xml.sax</a>
 
   </div>
@@ -628,6 +647,17 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="'usb.util'"></a>
+  <a target="code" href="" type="text/plain"><tt>'usb.util'</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#escpos.printer.usb">escpos.printer.usb</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="'win32com.gen_py'"></a>
   <a target="code" href="" type="text/plain"><tt>'win32com.gen_py'</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
@@ -643,7 +673,30 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>Image</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#reportlab.graphics.renderPM">reportlab.graphics.renderPM</a>
+    <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#reportlab.graphics.renderPM">reportlab.graphics.renderPM</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="ImageDraw"></a>
+  <a target="code" href="" type="text/plain"><tt>ImageDraw</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#barcode.writer">barcode.writer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="ImageFont"></a>
+  <a target="code" href="" type="text/plain"><tt>ImageFont</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#barcode.writer">barcode.writer</a>
 
   </div>
 
@@ -675,12 +728,16 @@ imports:
  &#8226;   <a href="#PIL.ImageChops">PIL.ImageChops</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
  &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
+ &#8226;   <a href="#PIL.ImagePath">PIL.ImagePath</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageSequence">PIL.ImageSequence</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
@@ -734,12 +791,16 @@ imported by:
  &#8226;   <a href="#PIL.ImageChops">PIL.ImageChops</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
  &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
+ &#8226;   <a href="#PIL.ImagePath">PIL.ImagePath</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageSequence">PIL.ImageSequence</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
@@ -781,6 +842,7 @@ imported by:
  &#8226;   <a href="#PIL._deprecate">PIL._deprecate</a>
  &#8226;   <a href="#PIL._imaging">PIL._imaging</a>
  &#8226;   <a href="#PIL._imagingcms">PIL._imagingcms</a>
+ &#8226;   <a href="#PIL._imagingft">PIL._imagingft</a>
  &#8226;   <a href="#PIL._imagingmath">PIL._imagingmath</a>
  &#8226;   <a href="#PIL._imagingtk">PIL._imagingtk</a>
  &#8226;   <a href="#PIL._typing">PIL._typing</a>
@@ -788,8 +850,14 @@ imported by:
  &#8226;   <a href="#PIL._version">PIL._version</a>
  &#8226;   <a href="#PIL._webp">PIL._webp</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.colors">matplotlib.colors</a>
+ &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
  &#8226;   <a href="#reportlab.graphics.renderPM">reportlab.graphics.renderPM</a>
  &#8226;   <a href="#reportlab.lib.utils">reportlab.lib.utils</a>
 
@@ -1435,11 +1503,15 @@ imported by:
  &#8226;   <a href="#PIL.ImageChops">PIL.ImageChops</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
  &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
+ &#8226;   <a href="#PIL.ImagePath">PIL.ImagePath</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageSequence">PIL.ImageSequence</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
@@ -1474,10 +1546,16 @@ imported by:
  &#8226;   <a href="#PIL.XbmImagePlugin">PIL.XbmImagePlugin</a>
  &#8226;   <a href="#PIL.XpmImagePlugin">PIL.XpmImagePlugin</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
  &#8226;   <a href="#matplotlib.backends.backend_webagg_core">matplotlib.backends.backend_webagg_core</a>
  &#8226;   <a href="#matplotlib.colors">matplotlib.colors</a>
  &#8226;   <a href="#matplotlib.image">matplotlib.image</a>
  &#8226;   <a href="#matplotlib.pyplot">matplotlib.pyplot</a>
+ &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
  &#8226;   <a href="#reportlab.graphics.renderPM">reportlab.graphics.renderPM</a>
  &#8226;   <a href="#reportlab.lib.utils">reportlab.lib.utils</a>
 
@@ -1552,8 +1630,67 @@ imports:
 imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="PIL.ImageDraw"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/PIL/ImageDraw.py" type="text/plain"><tt>PIL.ImageDraw</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#PIL._deprecate">PIL._deprecate</a>
+ &#8226;   <a href="#PIL._typing">PIL._typing</a>
+ &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#collections.abc">collections.abc</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#struct">struct</a>
+ &#8226;   <a href="#types">types</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="PIL.ImageDraw2"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/PIL/ImageDraw2.py" type="text/plain"><tt>PIL.ImageDraw2</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#PIL.ImagePath">PIL.ImagePath</a>
+ &#8226;   <a href="#PIL._typing">PIL._typing</a>
+ &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
 
   </div>
 
@@ -1604,6 +1741,7 @@ imported by:
  &#8226;   <a href="#PIL.IcoImagePlugin">PIL.IcoImagePlugin</a>
  &#8226;   <a href="#PIL.ImImagePlugin">PIL.ImImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageTk">PIL.ImageTk</a>
  &#8226;   <a href="#PIL.ImtImagePlugin">PIL.ImtImagePlugin</a>
@@ -1659,6 +1797,43 @@ imports:
 imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="PIL.ImageFont"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/PIL/ImageFont.py" type="text/plain"><tt>PIL.ImageFont</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
+ &#8226;   <a href="#PIL._imaging">PIL._imaging</a>
+ &#8226;   <a href="#PIL._imagingft">PIL._imagingft</a>
+ &#8226;   <a href="#PIL._typing">PIL._typing</a>
+ &#8226;   <a href="#PIL._util">PIL._util</a>
+ &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#__future__">__future__</a>
+ &#8226;   <a href="#base64">base64</a>
+ &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#io">io</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#packaging.version">packaging.version</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#types">types</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
+ &#8226;   <a href="#PIL._imagingft">PIL._imagingft</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
 
   </div>
 
@@ -1733,6 +1908,7 @@ imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.GifImagePlugin">PIL.GifImagePlugin</a>
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
 
   </div>
 
@@ -1775,6 +1951,25 @@ imported by:
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
  &#8226;   <a href="#PIL.XVThumbImagePlugin">PIL.XVThumbImagePlugin</a>
  &#8226;   <a href="#PIL.XpmImagePlugin">PIL.XpmImagePlugin</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="PIL.ImagePath"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/PIL/ImagePath.py" type="text/plain"><tt>PIL.ImagePath</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#__future__">__future__</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
 
   </div>
 
@@ -2746,6 +2941,7 @@ imported by:
     <a href="#PIL.IcnsImagePlugin">PIL.IcnsImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
@@ -2772,7 +2968,9 @@ imported by:
  &#8226;   <a href="#PIL.GifImagePlugin">PIL.GifImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.PngImagePlugin">PIL.PngImagePlugin</a>
+ &#8226;   <a href="#PIL._imagingft">PIL._imagingft</a>
 
   </div>
 
@@ -2793,6 +2991,24 @@ imports:
 imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="PIL._imagingft"></a>
+  <tt>PIL._imagingft</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\PIL\_imagingft.cp310-win_amd64.pyd</tt></span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#PIL._imaging">PIL._imaging</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#PIL.ImageFont">PIL.ImageFont</a>
 
   </div>
 
@@ -2854,8 +3070,11 @@ imported by:
     <a href="#PIL.GifImagePlugin">PIL.GifImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageTk">PIL.ImageTk</a>
  &#8226;   <a href="#PIL.MpegImagePlugin">PIL.MpegImagePlugin</a>
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
@@ -2887,6 +3106,7 @@ imported by:
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.MpoImagePlugin">PIL.MpoImagePlugin</a>
  &#8226;   <a href="#PIL.PngImagePlugin">PIL.PngImagePlugin</a>
@@ -2952,6 +3172,7 @@ imports:
 imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.IcnsImagePlugin">PIL.IcnsImagePlugin</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.PdfImagePlugin">PIL.PdfImagePlugin</a>
 
   </div>
@@ -3201,12 +3422,16 @@ imported by:
  &#8226;   <a href="#PIL.ImageChops">PIL.ImageChops</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
  &#8226;   <a href="#PIL.ImageColor">PIL.ImageColor</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
+ &#8226;   <a href="#PIL.ImagePath">PIL.ImagePath</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageSequence">PIL.ImageSequence</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
@@ -3271,6 +3496,8 @@ imported by:
  &#8226;   <a href="#cycler">cycler</a>
  &#8226;   <a href="#dateutil.parser._parser">dateutil.parser._parser</a>
  &#8226;   <a href="#doctest">doctest</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#matplotlib._mathtext">matplotlib._mathtext</a>
  &#8226;   <a href="#matplotlib._mathtext_data">matplotlib._mathtext_data</a>
  &#8226;   <a href="#matplotlib._text_helpers">matplotlib._text_helpers</a>
@@ -4481,10 +4708,12 @@ imported by:
  &#8226;   <a href="#contextlib">contextlib</a>
  &#8226;   <a href="#dataclasses">dataclasses</a>
  &#8226;   <a href="#email._policybase">email._policybase</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#importlib._abc">importlib._abc</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#login.py">login.py</a>
@@ -4502,6 +4731,8 @@ imported by:
  &#8226;   <a href="#pkg_resources._vendor.packaging.specifiers">pkg_resources._vendor.packaging.specifiers</a>
  &#8226;   <a href="#pkg_resources._vendor.pyparsing.core">pkg_resources._vendor.pyparsing.core</a>
  &#8226;   <a href="#pyparsing.core">pyparsing.core</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
  &#8226;   <a href="#selectors">selectors</a>
  &#8226;   <a href="#typing">typing</a>
 
@@ -5513,12 +5744,401 @@ imported by:
  &#8226;   <a href="#base.banco">base.banco</a>
  &#8226;   <a href="#base.syncthing_manager">base.syncthing_manager</a>
  &#8226;   <a href="#certifi.core">certifi.core</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._pylab_helpers">matplotlib._pylab_helpers</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#pyi_rth_mplconfig.py">pyi_rth_mplconfig.py</a>
  &#8226;   <a href="#weakref">weakref</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/__init__.py" type="text/plain"><tt>barcode</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+ &#8226;   <a href="#barcode.isxn">barcode.isxn</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+ &#8226;   <a href="#barcode.version">barcode.version</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+ &#8226;   <a href="#barcode.isxn">barcode.isxn</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+ &#8226;   <a href="#barcode.version">barcode.version</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.base"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/base.py" type="text/plain"><tt>barcode.base</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/__init__.py" type="text/plain"><tt>barcode.charsets</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.charsets.codabar">barcode.charsets.codabar</a>
+ &#8226;   <a href="#barcode.charsets.code128">barcode.charsets.code128</a>
+ &#8226;   <a href="#barcode.charsets.code39">barcode.charsets.code39</a>
+ &#8226;   <a href="#barcode.charsets.ean">barcode.charsets.ean</a>
+ &#8226;   <a href="#barcode.charsets.itf">barcode.charsets.itf</a>
+ &#8226;   <a href="#barcode.charsets.upc">barcode.charsets.upc</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets.codabar">barcode.charsets.codabar</a>
+ &#8226;   <a href="#barcode.charsets.code128">barcode.charsets.code128</a>
+ &#8226;   <a href="#barcode.charsets.code39">barcode.charsets.code39</a>
+ &#8226;   <a href="#barcode.charsets.ean">barcode.charsets.ean</a>
+ &#8226;   <a href="#barcode.charsets.itf">barcode.charsets.itf</a>
+ &#8226;   <a href="#barcode.charsets.upc">barcode.charsets.upc</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.codabar"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/codabar.py" type="text/plain"><tt>barcode.charsets.codabar</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.code128"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/code128.py" type="text/plain"><tt>barcode.charsets.code128</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#string">string</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.code39"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/code39.py" type="text/plain"><tt>barcode.charsets.code39</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#string">string</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.ean"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/ean.py" type="text/plain"><tt>barcode.charsets.ean</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.itf"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/itf.py" type="text/plain"><tt>barcode.charsets.itf</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.charsets.upc"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/charsets/upc.py" type="text/plain"><tt>barcode.charsets.upc</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode.charsets">barcode.charsets</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.codabar"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/codabar.py" type="text/plain"><tt>barcode.codabar</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.charsets.codabar">barcode.charsets.codabar</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.codex"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/codex.py" type="text/plain"><tt>barcode.codex</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.charsets.code128">barcode.charsets.code128</a>
+ &#8226;   <a href="#barcode.charsets.code39">barcode.charsets.code39</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.ean"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/ean.py" type="text/plain"><tt>barcode.ean</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.charsets.ean">barcode.charsets.ean</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+ &#8226;   <a href="#functools">functools</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.isxn">barcode.isxn</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.errors"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/errors.py" type="text/plain"><tt>barcode.errors</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.codabar">barcode.codabar</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.isxn">barcode.isxn</a>
+ &#8226;   <a href="#barcode.itf">barcode.itf</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.isxn"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/isxn.py" type="text/plain"><tt>barcode.isxn</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.itf"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/itf.py" type="text/plain"><tt>barcode.itf</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.charsets.itf">barcode.charsets.itf</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.upc"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/upc.py" type="text/plain"><tt>barcode.upc</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.charsets">barcode.charsets</a>
+ &#8226;   <a href="#barcode.charsets.upc">barcode.charsets.upc</a>
+ &#8226;   <a href="#barcode.errors">barcode.errors</a>
+ &#8226;   <a href="#functools">functools</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.version"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/version.py" type="text/plain"><tt>barcode.version</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#barcode">barcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="barcode.writer"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/barcode/writer.py" type="text/plain"><tt>barcode.writer</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#Image">Image</a>
+ &#8226;   <a href="#ImageDraw">ImageDraw</a>
+ &#8226;   <a href="#ImageFont">ImageFont</a>
+ &#8226;   <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.version">barcode.version</a>
+ &#8226;   <a href="#gzip">gzip</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#xml.dom">xml.dom</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
 
   </div>
 
@@ -5617,7 +6237,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#base.banco">base.banco</a>
+    <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#base.banco">base.banco</a>
  &#8226;   <a href="#email._encoded_words">email._encoded_words</a>
  &#8226;   <a href="#email.base64mime">email.base64mime</a>
  &#8226;   <a href="#email.encoders">email.encoders</a>
@@ -5704,6 +6325,7 @@ imported by:
  &#8226;   <a href="#idna.core">idna.core</a>
  &#8226;   <a href="#idna.intranges">idna.intranges</a>
  &#8226;   <a href="#multiprocessing.heap">multiprocessing.heap</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
  &#8226;   <a href="#random">random</a>
  &#8226;   <a href="#statistics">statistics</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
@@ -5746,6 +6368,7 @@ imported by:
  &#8226;   <a href="#codecs">codecs</a>
  &#8226;   <a href="#dataclasses">dataclasses</a>
  &#8226;   <a href="#doctest">doctest</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
  &#8226;   <a href="#fdb.fbcore">fdb.fbcore</a>
  &#8226;   <a href="#gettext">gettext</a>
  &#8226;   <a href="#gzip">gzip</a>
@@ -7322,6 +7945,7 @@ imported by:
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._collections">importlib.metadata._collections</a>
  &#8226;   <a href="#importlib.readers">importlib.readers</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#login.py">login.py</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
@@ -7400,6 +8024,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
  &#8226;   <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
@@ -7413,6 +8038,7 @@ imported by:
  &#8226;   <a href="#cycler">cycler</a>
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#login.py">login.py</a>
@@ -7616,6 +8242,7 @@ imported by:
  &#8226;   <a href="#ast">ast</a>
  &#8226;   <a href="#asyncio.staggered">asyncio.staggered</a>
  &#8226;   <a href="#dateutil.tz.tz">dateutil.tz.tz</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
  &#8226;   <a href="#getpass">getpass</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#http.server">http.server</a>
@@ -7624,6 +8251,10 @@ imported by:
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._api.deprecation">matplotlib._api.deprecation</a>
  &#8226;   <a href="#matplotlib.artist">matplotlib.artist</a>
@@ -7930,8 +8561,8 @@ imported by:
   <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0/lib/copy.py" type="text/plain"><tt>copy</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#'org.python'">'org.python'</a>
- &#8226;   <a href="#copyreg">copyreg</a>
+    <a href="#copyreg">copyreg</a>
+ &#8226;   <a href="#org">org</a>
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#weakref">weakref</a>
 
@@ -8229,6 +8860,17 @@ imported by:
     <a href="#_pyi_rth_utils._win32">_pyi_rth_utils._win32</a>
  &#8226;   <a href="#ctypes">ctypes</a>
  &#8226;   <a href="#dateutil.tz.win">dateutil.tz.win</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="cups"></a>
+  <a target="code" href="" type="text/plain"><tt>cups</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#escpos.printer.cups">escpos.printer.cups</a>
 
   </div>
 
@@ -11878,6 +12520,7 @@ imported by:
  &#8226;   <a href="#PIL.GifImagePlugin">PIL.GifImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.PngImagePlugin">PIL.PngImagePlugin</a>
  &#8226;   <a href="#PyQt5.QtCore">PyQt5.QtCore</a>
  &#8226;   <a href="#ast">ast</a>
@@ -11940,6 +12583,446 @@ imported by:
  &#8226;   <a href="#tempfile">tempfile</a>
  &#8226;   <a href="#urllib3.connectionpool">urllib3.connectionpool</a>
  &#8226;   <a href="#xmlrpc.client">xmlrpc.client</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/__init__.py" type="text/plain"><tt>escpos</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#escpos.version">escpos.version</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.codepages">escpos.codepages</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#escpos.types">escpos.types</a>
+ &#8226;   <a href="#escpos.version">escpos.version</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.capabilities"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/capabilities.py" type="text/plain"><tt>escpos.capabilities</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#atexit">atexit</a>
+ &#8226;   <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#escpos">escpos</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pickle">pickle</a>
+ &#8226;   <a href="#platform">platform</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#tempfile">tempfile</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#yaml">yaml</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.codepages">escpos.codepages</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.codepages"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/codepages.py" type="text/plain"><tt>escpos.codepages</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.magicencode">escpos.magicencode</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.constants"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/constants.py" type="text/plain"><tt>escpos.constants</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.types">escpos.types</a>
+ &#8226;   <a href="#six">six</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.escpos"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/escpos.py" type="text/plain"><tt>escpos.escpos</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#abc">abc</a>
+ &#8226;   <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#six">six</a>
+ &#8226;   <a href="#textwrap">textwrap</a>
+ &#8226;   <a href="#types">types</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.dummy">escpos.printer.dummy</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.exceptions"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/exceptions.py" type="text/plain"><tt>escpos.exceptions</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.image"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/image.py" type="text/plain"><tt>escpos.image</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
+ &#8226;   <a href="#escpos">escpos</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.escpos">escpos.escpos</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.magicencode"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/magicencode.py" type="text/plain"><tt>escpos.magicencode</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#builtins">builtins</a>
+ &#8226;   <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.codepages">escpos.codepages</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#six">six</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.escpos">escpos.escpos</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/__init__.py" type="text/plain"><tt>escpos.printer</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.dummy">escpos.printer.dummy</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.dummy">escpos.printer.dummy</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.cups"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/cups.py" type="text/plain"><tt>escpos.printer.cups</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#cups">cups</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#tempfile">tempfile</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.dummy"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/dummy.py" type="text/plain"><tt>escpos.printer.dummy</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.file"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/file.py" type="text/plain"><tt>escpos.printer.file</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.lp"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/lp.py" type="text/plain"><tt>escpos.printer.lp</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#subprocess">subprocess</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.network"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/network.py" type="text/plain"><tt>escpos.printer.network</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.serial"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/serial.py" type="text/plain"><tt>escpos.printer.serial</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#serial">serial</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.usb"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/usb.py" type="text/plain"><tt>escpos.printer.usb</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#'usb.util'">'usb.util'</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#usb">usb</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.printer.win32raw"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/printer/win32raw.py" type="text/plain"><tt>escpos.printer.win32raw</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.printer">escpos.printer</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#pywintypes">pywintypes</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#win32print">win32print</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.printer">escpos.printer</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.types"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/types/__init__.py" type="text/plain"><tt>escpos.types</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.constants">escpos.constants</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="escpos.version"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/escpos/version.py" type="text/plain"><tt>escpos.version</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#escpos">escpos</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos">escpos</a>
 
   </div>
 
@@ -12366,6 +13449,8 @@ imported by:
  &#8226;   <a href="#asyncio.selector_events">asyncio.selector_events</a>
  &#8226;   <a href="#asyncio.tasks">asyncio.tasks</a>
  &#8226;   <a href="#asyncio.threads">asyncio.threads</a>
+ &#8226;   <a href="#barcode.ean">barcode.ean</a>
+ &#8226;   <a href="#barcode.upc">barcode.upc</a>
  &#8226;   <a href="#charset_normalizer.cd">charset_normalizer.cd</a>
  &#8226;   <a href="#charset_normalizer.md">charset_normalizer.md</a>
  &#8226;   <a href="#charset_normalizer.utils">charset_normalizer.utils</a>
@@ -12380,12 +13465,19 @@ imported by:
  &#8226;   <a href="#dateutil.tz._common">dateutil.tz._common</a>
  &#8226;   <a href="#email._encoded_words">email._encoded_words</a>
  &#8226;   <a href="#email.charset">email.charset</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
  &#8226;   <a href="#fnmatch">fnmatch</a>
  &#8226;   <a href="#importlib._common">importlib._common</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._functools">importlib.metadata._functools</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#ipaddress">ipaddress</a>
  &#8226;   <a href="#linecache">linecache</a>
@@ -12560,6 +13652,7 @@ imported by:
  &#8226;   <a href="#webbrowser">webbrowser</a>
  &#8226;   <a href="#win32com.client.gencache">win32com.client.gencache</a>
  &#8226;   <a href="#win32com.client.makepy">win32com.client.makepy</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -12687,6 +13780,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#PIL.FitsImagePlugin">PIL.FitsImagePlugin</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
  &#8226;   <a href="#fileinput">fileinput</a>
  &#8226;   <a href="#matplotlib.cbook">matplotlib.cbook</a>
  &#8226;   <a href="#numpy.lib._datasource">numpy.lib._datasource</a>
@@ -13176,6 +14270,7 @@ imported by:
  &#8226;   <a href="#importlib.readers">importlib.readers</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
@@ -13369,6 +14464,7 @@ imported by:
  &#8226;   <a href="#pywintypes">pywintypes</a>
  &#8226;   <a href="#reportlab">reportlab</a>
  &#8226;   <a href="#runpy">runpy</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -13624,6 +14720,250 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="importlib_resources"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/__init__.py" type="text/plain"><tt>importlib_resources</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources._functional">importlib_resources._functional</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources._functional">importlib_resources._functional</a>
+ &#8226;   <a href="#importlib_resources._itertools">importlib_resources._itertools</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.compat">importlib_resources.compat</a>
+ &#8226;   <a href="#importlib_resources.future">importlib_resources.future</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources._adapters"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/_adapters.py" type="text/plain"><tt>importlib_resources._adapters</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#io">io</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources._common"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/_common.py" type="text/plain"><tt>importlib_resources._common</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#importlib">importlib</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+ &#8226;   <a href="#inspect">inspect</a>
+ &#8226;   <a href="#itertools">itertools</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#tempfile">tempfile</a>
+ &#8226;   <a href="#types">types</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._functional">importlib_resources._functional</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources._functional"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/_functional.py" type="text/plain"><tt>importlib_resources._functional</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources">importlib_resources</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources._itertools"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/_itertools.py" type="text/plain"><tt>importlib_resources._itertools</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#importlib_resources">importlib_resources</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources.readers">importlib_resources.readers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.abc"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/abc.py" type="text/plain"><tt>importlib_resources.abc</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#abc">abc</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#itertools">itertools</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources._functional">importlib_resources._functional</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.compat"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/compat/__init__.py" type="text/plain"><tt>importlib_resources.compat</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#importlib_resources">importlib_resources</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources.compat.py39">importlib_resources.compat.py39</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.compat.py39"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/compat/py39.py" type="text/plain"><tt>importlib_resources.compat.py39</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#importlib_resources.compat">importlib_resources.compat</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#zipfile">zipfile</a>
+ &#8226;   <a href="#zipp">zipp</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources.readers">importlib_resources.readers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.future"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/future/__init__.py" type="text/plain"><tt>importlib_resources.future</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#importlib_resources">importlib_resources</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.future.adapters"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/future/adapters.py" type="text/plain"><tt>importlib_resources.future.adapters</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#functools">functools</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
+ &#8226;   <a href="#importlib_resources.future">importlib_resources.future</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#types">types</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources._common">importlib_resources._common</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="importlib_resources.readers"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/importlib_resources/readers.py" type="text/plain"><tt>importlib_resources.readers</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#collections">collections</a>
+ &#8226;   <a href="#collections.abc">collections.abc</a>
+ &#8226;   <a href="#contextlib">contextlib</a>
+ &#8226;   <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources._itertools">importlib_resources._itertools</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.compat.py39">importlib_resources.compat.py39</a>
+ &#8226;   <a href="#itertools">itertools</a>
+ &#8226;   <a href="#operator">operator</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#importlib_resources">importlib_resources</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="inspect"></a>
   <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0/lib/inspect.py" type="text/plain"><tt>inspect</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -13660,6 +15000,7 @@ imported by:
  &#8226;   <a href="#bdb">bdb</a>
  &#8226;   <a href="#dataclasses">dataclasses</a>
  &#8226;   <a href="#doctest">doctest</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._api.deprecation">matplotlib._api.deprecation</a>
  &#8226;   <a href="#matplotlib._docstring">matplotlib._docstring</a>
@@ -13716,6 +15057,7 @@ imported by:
  &#8226;   <a href="#PIL.IcoImagePlugin">PIL.IcoImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageTk">PIL.ImageTk</a>
  &#8226;   <a href="#PIL.IptcImagePlugin">PIL.IptcImagePlugin</a>
@@ -13751,6 +15093,7 @@ imported by:
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
+ &#8226;   <a href="#importlib_resources._adapters">importlib_resources._adapters</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#login.py">login.py</a>
  &#8226;   <a href="#lzma">lzma</a>
@@ -13874,6 +15217,9 @@ imported by:
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._itertools">importlib.metadata._itertools</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#matplotlib._api">matplotlib._api</a>
  &#8226;   <a href="#matplotlib._layoutgrid">matplotlib._layoutgrid</a>
@@ -13924,6 +15270,7 @@ imported by:
  &#8226;   <a href="#pyparsing.diagram">pyparsing.diagram</a>
  &#8226;   <a href="#pyparsing.unicode">pyparsing.unicode</a>
  &#8226;   <a href="#pyparsing.util">pyparsing.util</a>
+ &#8226;   <a href="#qrcode.image.pure">qrcode.image.pure</a>
  &#8226;   <a href="#random">random</a>
  &#8226;   <a href="#reportlab.lib.utils">reportlab.lib.utils</a>
  &#8226;   <a href="#reportlab.pdfgen.textobject">reportlab.pdfgen.textobject</a>
@@ -14228,6 +15575,7 @@ imported by:
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
  &#8226;   <a href="#asyncio.futures">asyncio.futures</a>
  &#8226;   <a href="#asyncio.log">asyncio.log</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
  &#8226;   <a href="#chardet.charsetprober">chardet.charsetprober</a>
  &#8226;   <a href="#chardet.codingstatemachine">chardet.codingstatemachine</a>
  &#8226;   <a href="#chardet.universaldetector">chardet.universaldetector</a>
@@ -14236,6 +15584,14 @@ imported by:
  &#8226;   <a href="#charset_normalizer.md">charset_normalizer.md</a>
  &#8226;   <a href="#charset_normalizer.utils">charset_normalizer.utils</a>
  &#8226;   <a href="#concurrent.futures._base">concurrent.futures._base</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
  &#8226;   <a href="#hashlib">hashlib</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
@@ -14360,6 +15716,7 @@ imported by:
  &#8226;   <a href="#PIL.GimpGradientFile">PIL.GimpGradientFile</a>
  &#8226;   <a href="#PIL.IcoImagePlugin">PIL.IcoImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
  &#8226;   <a href="#PIL.JpegImagePlugin">PIL.JpegImagePlugin</a>
  &#8226;   <a href="#PIL.PdfImagePlugin">PIL.PdfImagePlugin</a>
  &#8226;   <a href="#PIL.PpmImagePlugin">PIL.PpmImagePlugin</a>
@@ -14370,6 +15727,7 @@ imported by:
  &#8226;   <a href="#datetime">datetime</a>
  &#8226;   <a href="#dateutil.relativedelta">dateutil.relativedelta</a>
  &#8226;   <a href="#dateutil.rrule">dateutil.rrule</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
  &#8226;   <a href="#fractions">fractions</a>
  &#8226;   <a href="#matplotlib._api.deprecation">matplotlib._api.deprecation</a>
  &#8226;   <a href="#matplotlib.axes._axes">matplotlib.axes._axes</a>
@@ -14394,6 +15752,8 @@ imported by:
  &#8226;   <a href="#numpy.lib">numpy.lib</a>
  &#8226;   <a href="#numpy.lib._index_tricks_impl">numpy.lib._index_tricks_impl</a>
  &#8226;   <a href="#pkg_resources._vendor.more_itertools.more">pkg_resources._vendor.more_itertools.more</a>
+ &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
  &#8226;   <a href="#random">random</a>
  &#8226;   <a href="#reportlab.graphics.charts.piecharts">reportlab.graphics.charts.piecharts</a>
  &#8226;   <a href="#reportlab.graphics.charts.utils">reportlab.graphics.charts.utils</a>
@@ -25868,6 +27228,7 @@ imported by:
  &#8226;   <a href="#fdb.utils">fdb.utils</a>
  &#8226;   <a href="#fractions">fractions</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#login.py">login.py</a>
  &#8226;   <a href="#matplotlib.artist">matplotlib.artist</a>
@@ -25936,7 +27297,7 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>org</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#pickle">pickle</a>
+    <a href="#copy">copy</a>
 
   </div>
 
@@ -25976,6 +27337,7 @@ imported by:
  &#8226;   <a href="#PIL.ImImagePlugin">PIL.ImImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
  &#8226;   <a href="#PIL.Jpeg2KImagePlugin">PIL.Jpeg2KImagePlugin</a>
  &#8226;   <a href="#PIL.JpegImagePlugin">PIL.JpegImagePlugin</a>
@@ -26002,6 +27364,8 @@ imported by:
  &#8226;   <a href="#asyncio.proactor_events">asyncio.proactor_events</a>
  &#8226;   <a href="#asyncio.unix_events">asyncio.unix_events</a>
  &#8226;   <a href="#asyncio.windows_utils">asyncio.windows_utils</a>
+ &#8226;   <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
  &#8226;   <a href="#base.banco">base.banco</a>
  &#8226;   <a href="#base.syncthing_manager">base.syncthing_manager</a>
  &#8226;   <a href="#bdb">bdb</a>
@@ -26017,6 +27381,7 @@ imported by:
  &#8226;   <a href="#dateutil.tz.tz">dateutil.tz.tz</a>
  &#8226;   <a href="#doctest">doctest</a>
  &#8226;   <a href="#email.utils">email.utils</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
  &#8226;   <a href="#fdb.fbcore">fdb.fbcore</a>
  &#8226;   <a href="#fdb.ibase">fdb.ibase</a>
  &#8226;   <a href="#fdb.services">fdb.services</a>
@@ -26034,6 +27399,8 @@ imported by:
  &#8226;   <a href="#importlib._common">importlib._common</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
@@ -26181,6 +27548,7 @@ imported by:
  &#8226;   <a href="#win32com.client.gencache">win32com.client.gencache</a>
  &#8226;   <a href="#win32com.client.genpy">win32com.client.genpy</a>
  &#8226;   <a href="#win32com.client.makepy">win32com.client.makepy</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
  &#8226;   <a href="#xml.dom.domreg">xml.dom.domreg</a>
  &#8226;   <a href="#xml.sax">xml.sax</a>
  &#8226;   <a href="#xml.sax.saxutils">xml.sax.saxutils</a>
@@ -26612,7 +27980,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#matplotlib">matplotlib</a>
+    <a href="#PIL.ImageFont">PIL.ImageFont</a>
+ &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._mathtext">matplotlib._mathtext</a>
  &#8226;   <a href="#matplotlib.backends.qt_compat">matplotlib.backends.qt_compat</a>
  &#8226;   <a href="#packaging.metadata">packaging.metadata</a>
@@ -26654,6 +28023,10 @@ imported by:
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.readers">importlib.readers</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib._api">matplotlib._api</a>
  &#8226;   <a href="#matplotlib.backend_bases">matplotlib.backend_bases</a>
@@ -26738,18 +28111,28 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="perfmon"></a>
+  <tt>perfmon</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\perfmon.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#win32serviceutil">win32serviceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="pickle"></a>
   <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0/lib/pickle.py" type="text/plain"><tt>pickle</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#_compat_pickle">_compat_pickle</a>
+    <a href="#'org.python'">'org.python'</a>
+ &#8226;   <a href="#_compat_pickle">_compat_pickle</a>
  &#8226;   <a href="#_pickle">_pickle</a>
  &#8226;   <a href="#codecs">codecs</a>
  &#8226;   <a href="#copyreg">copyreg</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#itertools">itertools</a>
- &#8226;   <a href="#org">org</a>
  &#8226;   <a href="#pprint">pprint</a>
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#struct">struct</a>
@@ -26759,7 +28142,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#logging">logging</a>
+    <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#multiprocessing.reduction">multiprocessing.reduction</a>
  &#8226;   <a href="#numpy._core._methods">numpy._core._methods</a>
  &#8226;   <a href="#numpy.lib._npyio_impl">numpy.lib._npyio_impl</a>
@@ -26767,6 +28151,7 @@ imported by:
  &#8226;   <a href="#reportlab.lib.utils">reportlab.lib.utils</a>
  &#8226;   <a href="#tracemalloc">tracemalloc</a>
  &#8226;   <a href="#win32com.client.gencache">win32com.client.gencache</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -27989,7 +29374,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#fdb.ibase">fdb.ibase</a>
+    <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#fdb.ibase">fdb.ibase</a>
  &#8226;   <a href="#matplotlib.backends.qt_compat">matplotlib.backends.qt_compat</a>
  &#8226;   <a href="#numpy.f2py.crackfortran">numpy.f2py.crackfortran</a>
  &#8226;   <a href="#numpy.lib._utils_impl">numpy.lib._utils_impl</a>
@@ -28029,6 +29415,17 @@ imports:
 imported by:
     <a href="#matplotlib.font_manager">matplotlib.font_manager</a>
  &#8226;   <a href="#pkg_resources">pkg_resources</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="png"></a>
+  <a target="code" href="" type="text/plain"><tt>png</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#qrcode.compat.png">qrcode.compat.png</a>
 
   </div>
 
@@ -28671,7 +30068,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#win32com">win32com</a>
+    <a href="#login.py">login.py</a>
+ &#8226;   <a href="#win32com">win32com</a>
  &#8226;   <a href="#win32com.client">win32com.client</a>
  &#8226;   <a href="#win32com.client.build">win32com.client.build</a>
  &#8226;   <a href="#win32com.client.dynamic">win32com.client.dynamic</a>
@@ -28900,12 +30298,405 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pythoncom">pythoncom</a>
+    <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#login.py">login.py</a>
+ &#8226;   <a href="#pythoncom">pythoncom</a>
  &#8226;   <a href="#win32com.client">win32com.client</a>
  &#8226;   <a href="#win32com.client.build">win32com.client.build</a>
  &#8226;   <a href="#win32com.client.dynamic">win32com.client.dynamic</a>
  &#8226;   <a href="#win32com.client.gencache">win32com.client.gencache</a>
  &#8226;   <a href="#win32com.server.policy">win32com.server.policy</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/__init__.py" type="text/plain"><tt>qrcode</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.LUT">qrcode.LUT</a>
+ &#8226;   <a href="#qrcode.base">qrcode.base</a>
+ &#8226;   <a href="#qrcode.constants">qrcode.constants</a>
+ &#8226;   <a href="#qrcode.exceptions">qrcode.exceptions</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+ &#8226;   <a href="#sys">sys</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.LUT">qrcode.LUT</a>
+ &#8226;   <a href="#qrcode.base">qrcode.base</a>
+ &#8226;   <a href="#qrcode.compat">qrcode.compat</a>
+ &#8226;   <a href="#qrcode.constants">qrcode.constants</a>
+ &#8226;   <a href="#qrcode.exceptions">qrcode.exceptions</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.LUT"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/LUT.py" type="text/plain"><tt>qrcode.LUT</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.base"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/base.py" type="text/plain"><tt>qrcode.base</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.constants">qrcode.constants</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.compat"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/compat/__init__.py" type="text/plain"><tt>qrcode.compat</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.compat.png">qrcode.compat.png</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.compat.png"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/compat/png.py" type="text/plain"><tt>qrcode.compat.png</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#png">png</a>
+ &#8226;   <a href="#qrcode.compat">qrcode.compat</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.pure">qrcode.image.pure</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.constants"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/constants.py" type="text/plain"><tt>qrcode.constants</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.base">qrcode.base</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.exceptions"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/exceptions.py" type="text/plain"><tt>qrcode.exceptions</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/__init__.py" type="text/plain"><tt>qrcode.image</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#qrcode">qrcode</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.pure">qrcode.image.pure</a>
+ &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles">qrcode.image.styles</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.base"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/base.py" type="text/plain"><tt>qrcode.image.base</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#abc">abc</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.pure">qrcode.image.pure</a>
+ &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.pil"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/pil.py" type="text/plain"><tt>qrcode.image.pil</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.main">qrcode.main</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.pure"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/pure.py" type="text/plain"><tt>qrcode.image.pure</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#itertools">itertools</a>
+ &#8226;   <a href="#qrcode.compat.png">qrcode.compat.png</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.main">qrcode.main</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styledpil"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styledpil.py" type="text/plain"><tt>qrcode.image.styledpil</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#qrcode.image">qrcode.image</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers">qrcode.image.styles.moduledrawers</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styles"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styles/__init__.py" type="text/plain"><tt>qrcode.image.styles</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#qrcode.image">qrcode.image</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.styles.colormasks">qrcode.image.styles.colormasks</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers">qrcode.image.styles.moduledrawers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styles.colormasks"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styles/colormasks.py" type="text/plain"><tt>qrcode.image.styles.colormasks</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#qrcode.image.styles">qrcode.image.styles</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styles.moduledrawers"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styles/moduledrawers/__init__.py" type="text/plain"><tt>qrcode.image.styles.moduledrawers</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#qrcode.image.styles">qrcode.image.styles</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styles.moduledrawers.base"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styles/moduledrawers/base.py" type="text/plain"><tt>qrcode.image.styles.moduledrawers.base</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#abc">abc</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers">qrcode.image.styles.moduledrawers</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.image.styles.moduledrawers.pil"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/image/styles/moduledrawers/pil.py" type="text/plain"><tt>qrcode.image.styles.moduledrawers.pil</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#qrcode.image.styledpil">qrcode.image.styledpil</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers">qrcode.image.styles.moduledrawers</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode.image.styles.moduledrawers">qrcode.image.styles.moduledrawers</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.main"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/main.py" type="text/plain"><tt>qrcode.main</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#bisect">bisect</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.constants">qrcode.constants</a>
+ &#8226;   <a href="#qrcode.exceptions">qrcode.exceptions</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.pil">qrcode.image.pil</a>
+ &#8226;   <a href="#qrcode.image.pure">qrcode.image.pure</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="qrcode.util"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/qrcode/util.py" type="text/plain"><tt>qrcode.util</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#math">math</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.LUT">qrcode.LUT</a>
+ &#8226;   <a href="#qrcode.base">qrcode.base</a>
+ &#8226;   <a href="#qrcode.exceptions">qrcode.exceptions</a>
+ &#8226;   <a href="#re">re</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
 
   </div>
 
@@ -29074,6 +30865,9 @@ imported by:
  &#8226;   <a href="#email.quoprimime">email.quoprimime</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#encodings.idna">encodings.idna</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
  &#8226;   <a href="#fnmatch">fnmatch</a>
  &#8226;   <a href="#fractions">fractions</a>
  &#8226;   <a href="#ftplib">ftplib</a>
@@ -29088,6 +30882,7 @@ imported by:
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._adapters">importlib.metadata._adapters</a>
  &#8226;   <a href="#importlib.metadata._text">importlib.metadata._text</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#ipaddress">ipaddress</a>
  &#8226;   <a href="#json.decoder">json.decoder</a>
@@ -29159,6 +30954,7 @@ imported by:
  &#8226;   <a href="#pyparsing.helpers">pyparsing.helpers</a>
  &#8226;   <a href="#pyparsing.testing">pyparsing.testing</a>
  &#8226;   <a href="#pyparsing.util">pyparsing.util</a>
+ &#8226;   <a href="#qrcode.util">qrcode.util</a>
  &#8226;   <a href="#reportlab.lib.PyFontify">reportlab.lib.PyFontify</a>
  &#8226;   <a href="#reportlab.lib.colors">reportlab.lib.colors</a>
  &#8226;   <a href="#reportlab.lib.formatters">reportlab.lib.formatters</a>
@@ -32506,6 +34302,27 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="serial"></a>
+  <a target="code" href="" type="text/plain"><tt>serial</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#escpos.printer.serial">escpos.printer.serial</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="servicemanager"></a>
+  <tt>servicemanager</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\servicemanager.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#win32serviceutil">win32serviceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="sets"></a>
   <a target="code" href="" type="text/plain"><tt>sets</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
@@ -32739,6 +34556,9 @@ imported by:
  &#8226;   <a href="#dateutil.tz._common">dateutil.tz._common</a>
  &#8226;   <a href="#dateutil.tz.tz">dateutil.tz.tz</a>
  &#8226;   <a href="#dateutil.tz.win">dateutil.tz.win</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.magicencode">escpos.magicencode</a>
  &#8226;   <a href="#six.moves">six.moves</a>
 
   </div>
@@ -32843,6 +34663,7 @@ imported by:
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
  &#8226;   <a href="#base.banco">base.banco</a>
  &#8226;   <a href="#email.utils">email.utils</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
  &#8226;   <a href="#ftplib">ftplib</a>
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#http.server">http.server</a>
@@ -33137,7 +34958,9 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#base.banco">base.banco</a>
+    <a href="#barcode.charsets.code128">barcode.charsets.code128</a>
+ &#8226;   <a href="#barcode.charsets.code39">barcode.charsets.code39</a>
+ &#8226;   <a href="#base.banco">base.banco</a>
  &#8226;   <a href="#cmd">cmd</a>
  &#8226;   <a href="#dateutil.parser._parser">dateutil.parser._parser</a>
  &#8226;   <a href="#email._encoded_words">email._encoded_words</a>
@@ -33195,6 +35018,7 @@ imported by:
  &#8226;   <a href="#PIL.FtexImagePlugin">PIL.FtexImagePlugin</a>
  &#8226;   <a href="#PIL.IcnsImagePlugin">PIL.IcnsImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.Jpeg2KImagePlugin">PIL.Jpeg2KImagePlugin</a>
  &#8226;   <a href="#PIL.JpegImagePlugin">PIL.JpegImagePlugin</a>
@@ -33285,6 +35109,7 @@ imported by:
  &#8226;   <a href="#base.syncthing_manager">base.syncthing_manager</a>
  &#8226;   <a href="#ctypes._aix">ctypes._aix</a>
  &#8226;   <a href="#ctypes.util">ctypes.util</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib.cbook">matplotlib.cbook</a>
@@ -33321,6 +35146,7 @@ imported by:
  &#8226;   <a href="#PIL.IcnsImagePlugin">PIL.IcnsImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
  &#8226;   <a href="#PIL.ImageQt">PIL.ImageQt</a>
  &#8226;   <a href="#PIL.ImageShow">PIL.ImageShow</a>
@@ -33381,6 +35207,7 @@ imported by:
  &#8226;   <a href="#encodings.utf_16">encodings.utf_16</a>
  &#8226;   <a href="#encodings.utf_32">encodings.utf_32</a>
  &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
  &#8226;   <a href="#fdb.fbcore">fdb.fbcore</a>
  &#8226;   <a href="#fdb.gstat">fdb.gstat</a>
  &#8226;   <a href="#fdb.ibase">fdb.ibase</a>
@@ -33402,6 +35229,7 @@ imported by:
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources.compat.py39">importlib_resources.compat.py39</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
@@ -33504,6 +35332,8 @@ imported by:
  &#8226;   <a href="#pyparsing.helpers">pyparsing.helpers</a>
  &#8226;   <a href="#pyparsing.unicode">pyparsing.unicode</a>
  &#8226;   <a href="#pywintypes">pywintypes</a>
+ &#8226;   <a href="#qrcode">qrcode</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
  &#8226;   <a href="#quopri">quopri</a>
  &#8226;   <a href="#reportlab">reportlab</a>
  &#8226;   <a href="#reportlab.graphics.charts.piecharts">reportlab.graphics.charts.piecharts</a>
@@ -33579,6 +35409,7 @@ imported by:
  &#8226;   <a href="#win32com.client.makepy">win32com.client.makepy</a>
  &#8226;   <a href="#win32com.server.exception">win32com.server.exception</a>
  &#8226;   <a href="#win32com.server.policy">win32com.server.policy</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
  &#8226;   <a href="#win32traceutil">win32traceutil</a>
  &#8226;   <a href="#xml.dom.domreg">xml.dom.domreg</a>
  &#8226;   <a href="#xml.etree.ElementTree">xml.etree.ElementTree</a>
@@ -33688,7 +35519,10 @@ imported by:
  &#8226;   <a href="#_pyi_rth_utils.tempfile">_pyi_rth_utils.tempfile</a>
  &#8226;   <a href="#asyncio.windows_utils">asyncio.windows_utils</a>
  &#8226;   <a href="#ctypes.util">ctypes.util</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
  &#8226;   <a href="#importlib._common">importlib._common</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
  &#8226;   <a href="#matplotlib">matplotlib</a>
  &#8226;   <a href="#matplotlib.texmanager">matplotlib.texmanager</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
@@ -33748,6 +35582,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#argparse">argparse</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._adapters">importlib.metadata._adapters</a>
  &#8226;   <a href="#matplotlib.patches">matplotlib.patches</a>
@@ -33877,6 +35712,7 @@ imported by:
  &#8226;   <a href="#email._parseaddr">email._parseaddr</a>
  &#8226;   <a href="#email.generator">email.generator</a>
  &#8226;   <a href="#email.utils">email.utils</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
  &#8226;   <a href="#fdb.fbcore">fdb.fbcore</a>
  &#8226;   <a href="#gc">gc</a>
  &#8226;   <a href="#gzip">gzip</a>
@@ -34096,7 +35932,9 @@ imports:
   <div class="import">
 imported by:
     <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL._typing">PIL._typing</a>
  &#8226;   <a href="#_weakrefset">_weakrefset</a>
@@ -34115,6 +35953,7 @@ imported by:
  &#8226;   <a href="#dis">dis</a>
  &#8226;   <a href="#email.headerregistry">email.headerregistry</a>
  &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
  &#8226;   <a href="#fdb.ibase">fdb.ibase</a>
  &#8226;   <a href="#fdb.services">fdb.services</a>
  &#8226;   <a href="#fileinput">fileinput</a>
@@ -34125,6 +35964,8 @@ imported by:
  &#8226;   <a href="#importlib.metadata._functools">importlib.metadata._functools</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.future.adapters">importlib_resources.future.adapters</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#login.py">login.py</a>
  &#8226;   <a href="#matplotlib._mathtext">matplotlib._mathtext</a>
@@ -34221,8 +36062,11 @@ imported by:
  &#8226;   <a href="#PIL.ImImagePlugin">PIL.ImImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
  &#8226;   <a href="#PIL.ImageCms">PIL.ImageCms</a>
+ &#8226;   <a href="#PIL.ImageDraw">PIL.ImageDraw</a>
+ &#8226;   <a href="#PIL.ImageDraw2">PIL.ImageDraw2</a>
  &#8226;   <a href="#PIL.ImageFile">PIL.ImageFile</a>
  &#8226;   <a href="#PIL.ImageFilter">PIL.ImageFilter</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.ImageMath">PIL.ImageMath</a>
  &#8226;   <a href="#PIL.ImageMode">PIL.ImageMode</a>
  &#8226;   <a href="#PIL.ImageOps">PIL.ImageOps</a>
@@ -34254,6 +36098,7 @@ imported by:
  &#8226;   <a href="#PIL.XbmImagePlugin">PIL.XbmImagePlugin</a>
  &#8226;   <a href="#PIL._imaging">PIL._imaging</a>
  &#8226;   <a href="#PIL._imagingcms">PIL._imagingcms</a>
+ &#8226;   <a href="#PIL._imagingft">PIL._imagingft</a>
  &#8226;   <a href="#PIL._imagingmath">PIL._imagingmath</a>
  &#8226;   <a href="#PIL._imagingtk">PIL._imagingtk</a>
  &#8226;   <a href="#PIL._typing">PIL._typing</a>
@@ -34267,6 +36112,10 @@ imported by:
  &#8226;   <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
  &#8226;   <a href="#PyQt5.sip">PyQt5.sip</a>
  &#8226;   <a href="#asyncio.staggered">asyncio.staggered</a>
+ &#8226;   <a href="#barcode">barcode</a>
+ &#8226;   <a href="#barcode.base">barcode.base</a>
+ &#8226;   <a href="#barcode.codex">barcode.codex</a>
+ &#8226;   <a href="#barcode.writer">barcode.writer</a>
  &#8226;   <a href="#certifi.core">certifi.core</a>
  &#8226;   <a href="#chardet">chardet</a>
  &#8226;   <a href="#chardet.chardistribution">chardet.chardistribution</a>
@@ -34298,6 +36147,20 @@ imported by:
  &#8226;   <a href="#contourpy.dechunk">contourpy.dechunk</a>
  &#8226;   <a href="#contourpy.typecheck">contourpy.typecheck</a>
  &#8226;   <a href="#cycler">cycler</a>
+ &#8226;   <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#escpos.constants">escpos.constants</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
+ &#8226;   <a href="#escpos.exceptions">escpos.exceptions</a>
+ &#8226;   <a href="#escpos.image">escpos.image</a>
+ &#8226;   <a href="#escpos.printer.cups">escpos.printer.cups</a>
+ &#8226;   <a href="#escpos.printer.dummy">escpos.printer.dummy</a>
+ &#8226;   <a href="#escpos.printer.file">escpos.printer.file</a>
+ &#8226;   <a href="#escpos.printer.lp">escpos.printer.lp</a>
+ &#8226;   <a href="#escpos.printer.network">escpos.printer.network</a>
+ &#8226;   <a href="#escpos.printer.serial">escpos.printer.serial</a>
+ &#8226;   <a href="#escpos.printer.usb">escpos.printer.usb</a>
+ &#8226;   <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#escpos.types">escpos.types</a>
  &#8226;   <a href="#functools">functools</a>
  &#8226;   <a href="#idna.core">idna.core</a>
  &#8226;   <a href="#idna.intranges">idna.intranges</a>
@@ -34307,6 +36170,8 @@ imported by:
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._meta">importlib.metadata._meta</a>
  &#8226;   <a href="#importlib.resources">importlib.resources</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources.abc">importlib_resources.abc</a>
  &#8226;   <a href="#kiwisolver._cext">kiwisolver._cext</a>
  &#8226;   <a href="#matplotlib._mathtext">matplotlib._mathtext</a>
  &#8226;   <a href="#matplotlib._mathtext_data">matplotlib._mathtext_data</a>
@@ -34382,6 +36247,11 @@ imported by:
  &#8226;   <a href="#pyparsing.testing">pyparsing.testing</a>
  &#8226;   <a href="#pyparsing.unicode">pyparsing.unicode</a>
  &#8226;   <a href="#pyparsing.util">pyparsing.util</a>
+ &#8226;   <a href="#qrcode.base">qrcode.base</a>
+ &#8226;   <a href="#qrcode.image.base">qrcode.image.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.base">qrcode.image.styles.moduledrawers.base</a>
+ &#8226;   <a href="#qrcode.image.styles.moduledrawers.pil">qrcode.image.styles.moduledrawers.pil</a>
+ &#8226;   <a href="#qrcode.main">qrcode.main</a>
  &#8226;   <a href="#requests.adapters">requests.adapters</a>
  &#8226;   <a href="#shiboken2">shiboken2</a>
  &#8226;   <a href="#urllib3">urllib3</a>
@@ -35980,6 +37850,17 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="usb"></a>
+  <a target="code" href="" type="text/plain"><tt>usb</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#escpos.printer.usb">escpos.printer.usb</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="uu"></a>
   <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0/lib/uu.py" type="text/plain"><tt>uu</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -36054,6 +37935,7 @@ imports:
 imported by:
     <a href="#PIL.IcoImagePlugin">PIL.IcoImagePlugin</a>
  &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageFont">PIL.ImageFont</a>
  &#8226;   <a href="#PIL.JpegImagePlugin">PIL.JpegImagePlugin</a>
  &#8226;   <a href="#PIL.PngImagePlugin">PIL.PngImagePlugin</a>
  &#8226;   <a href="#PIL.TgaImagePlugin">PIL.TgaImagePlugin</a>
@@ -36082,6 +37964,7 @@ imported by:
  &#8226;   <a href="#dateutil.tz.tz">dateutil.tz.tz</a>
  &#8226;   <a href="#dateutil.zoneinfo">dateutil.zoneinfo</a>
  &#8226;   <a href="#enum">enum</a>
+ &#8226;   <a href="#escpos.escpos">escpos.escpos</a>
  &#8226;   <a href="#fdb.services">fdb.services</a>
  &#8226;   <a href="#fileinput">fileinput</a>
  &#8226;   <a href="#ftplib">ftplib</a>
@@ -36098,6 +37981,9 @@ imported by:
  &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
+ &#8226;   <a href="#importlib_resources._common">importlib_resources._common</a>
+ &#8226;   <a href="#importlib_resources._functional">importlib_resources._functional</a>
+ &#8226;   <a href="#importlib_resources.readers">importlib_resources.readers</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#locale">locale</a>
@@ -36202,6 +38088,7 @@ imported by:
  &#8226;   <a href="#urllib3.poolmanager">urllib3.poolmanager</a>
  &#8226;   <a href="#urllib3.response">urllib3.response</a>
  &#8226;   <a href="#urllib3.util.ssl_">urllib3.util.ssl_</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
  &#8226;   <a href="#winerror">winerror</a>
  &#8226;   <a href="#xml.dom.pulldom">xml.dom.pulldom</a>
  &#8226;   <a href="#xml.etree.ElementTree">xml.etree.ElementTree</a>
@@ -36306,7 +38193,8 @@ imported by:
   <a name="win32api"></a>
   <tt>win32api</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32api.pyd</tt></span>  <div class="import">
 imported by:
-    <a href="#pkg_resources._vendor.appdirs">pkg_resources._vendor.appdirs</a>
+    <a href="#login.py">login.py</a>
+ &#8226;   <a href="#pkg_resources._vendor.appdirs">pkg_resources._vendor.appdirs</a>
  &#8226;   <a href="#pywin.dialogs.list">pywin.dialogs.list</a>
  &#8226;   <a href="#pywin.dialogs.status">pywin.dialogs.status</a>
  &#8226;   <a href="#win32com">win32com</a>
@@ -36314,7 +38202,19 @@ imported by:
  &#8226;   <a href="#win32com.server.dispatcher">win32com.server.dispatcher</a>
  &#8226;   <a href="#win32com.server.policy">win32com.server.policy</a>
  &#8226;   <a href="#win32com.util">win32com.util</a>
+ &#8226;   <a href="#win32evtlogutil">win32evtlogutil</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
  &#8226;   <a href="#win32traceutil">win32traceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32clipboard"></a>
+  <tt>win32clipboard</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32clipboard.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
 
   </div>
 
@@ -36812,13 +38712,16 @@ imported by:
   <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/win32/lib/win32con.py" type="text/plain"><tt>win32con</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imported by:
-    <a href="#pywin.dialogs.list">pywin.dialogs.list</a>
+    <a href="#login.py">login.py</a>
+ &#8226;   <a href="#pywin.dialogs.list">pywin.dialogs.list</a>
  &#8226;   <a href="#pywin.dialogs.status">pywin.dialogs.status</a>
  &#8226;   <a href="#pywin.mfc.dialog">pywin.mfc.dialog</a>
  &#8226;   <a href="#pywin.mfc.window">pywin.mfc.window</a>
  &#8226;   <a href="#win32com.client.selecttlb">win32com.client.selecttlb</a>
  &#8226;   <a href="#win32com.server.policy">win32com.server.policy</a>
  &#8226;   <a href="#win32com.util">win32com.util</a>
+ &#8226;   <a href="#win32evtlogutil">win32evtlogutil</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -36828,7 +38731,57 @@ imported by:
   <a name="win32event"></a>
   <tt>win32event</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32event.pyd</tt></span>  <div class="import">
 imported by:
-    <a href="#win32com.client.gencache">win32com.client.gencache</a>
+    <a href="#login.py">login.py</a>
+ &#8226;   <a href="#win32com.client.gencache">win32com.client.gencache</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32evtlog"></a>
+  <tt>win32evtlog</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32evtlog.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#win32evtlogutil">win32evtlogutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32evtlogutil"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/win32/lib/win32evtlogutil.py" type="text/plain"><tt>win32evtlogutil</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#win32api">win32api</a>
+ &#8226;   <a href="#win32con">win32con</a>
+ &#8226;   <a href="#win32evtlog">win32evtlog</a>
+ &#8226;   <a href="#winerror">winerror</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#win32serviceutil">win32serviceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32file"></a>
+  <tt>win32file</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32file.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32gui"></a>
+  <tt>win32gui</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32gui.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
 
   </div>
 
@@ -36839,6 +38792,87 @@ imported by:
   <tt>win32pdh</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32pdh.pyd</tt></span>  <div class="import">
 imported by:
     <a href="#numpy.testing._private.utils">numpy.testing._private.utils</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32pipe"></a>
+  <tt>win32pipe</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32pipe.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32print"></a>
+  <tt>win32print</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32print.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#escpos.printer.win32raw">escpos.printer.win32raw</a>
+ &#8226;   <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32process"></a>
+  <tt>win32process</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32process.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32security"></a>
+  <tt>win32security</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32security.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32service"></a>
+  <tt>win32service</tt> <span class="moduletype"><tt>C:\Users\Marco-Note\Desktop\PythonProject\Sistema\.venv\lib\site-packages\win32\win32service.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="win32serviceutil"></a>
+  <a target="code" href="///C:/Users/Marco-Note/Desktop/PythonProject/Sistema/.venv/lib/site-packages/win32/lib/win32serviceutil.py" type="text/plain"><tt>win32serviceutil</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#getopt">getopt</a>
+ &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#perfmon">perfmon</a>
+ &#8226;   <a href="#pickle">pickle</a>
+ &#8226;   <a href="#pywintypes">pywintypes</a>
+ &#8226;   <a href="#servicemanager">servicemanager</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#warnings">warnings</a>
+ &#8226;   <a href="#win32api">win32api</a>
+ &#8226;   <a href="#win32con">win32con</a>
+ &#8226;   <a href="#win32evtlogutil">win32evtlogutil</a>
+ &#8226;   <a href="#win32service">win32service</a>
+ &#8226;   <a href="#winerror">winerror</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#login.py">login.py</a>
 
   </div>
 
@@ -36904,6 +38938,8 @@ imported by:
  &#8226;   <a href="#win32com.client.dynamic">win32com.client.dynamic</a>
  &#8226;   <a href="#win32com.server.policy">win32com.server.policy</a>
  &#8226;   <a href="#win32com.server.util">win32com.server.util</a>
+ &#8226;   <a href="#win32evtlogutil">win32evtlogutil</a>
+ &#8226;   <a href="#win32serviceutil">win32serviceutil</a>
 
   </div>
 
@@ -36962,7 +38998,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#reportlab.graphics.renderSVG">reportlab.graphics.renderSVG</a>
+    <a href="#barcode.writer">barcode.writer</a>
+ &#8226;   <a href="#reportlab.graphics.renderSVG">reportlab.graphics.renderSVG</a>
  &#8226;   <a href="#xml.dom.NodeFilter">xml.dom.NodeFilter</a>
  &#8226;   <a href="#xml.dom.domreg">xml.dom.domreg</a>
  &#8226;   <a href="#xml.dom.expatbuilder">xml.dom.expatbuilder</a>
@@ -37481,7 +39518,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#numpy.__config__">numpy.__config__</a>
+    <a href="#escpos.capabilities">escpos.capabilities</a>
+ &#8226;   <a href="#numpy.__config__">numpy.__config__</a>
  &#8226;   <a href="#yaml._yaml">yaml._yaml</a>
  &#8226;   <a href="#yaml.composer">yaml.composer</a>
  &#8226;   <a href="#yaml.constructor">yaml.constructor</a>
@@ -37883,6 +39921,7 @@ imports:
 imported by:
     <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.readers">importlib.readers</a>
+ &#8226;   <a href="#importlib_resources.compat.py39">importlib_resources.compat.py39</a>
  &#8226;   <a href="#numpy.lib._npyio_impl">numpy.lib._npyio_impl</a>
  &#8226;   <a href="#pkg_resources">pkg_resources</a>
  &#8226;   <a href="#pkg_resources._vendor.importlib_resources._compat">pkg_resources._vendor.importlib_resources._compat</a>
@@ -37920,6 +39959,17 @@ imported by:
     <a href="#pkg_resources">pkg_resources</a>
  &#8226;   <a href="#pkgutil">pkgutil</a>
  &#8226;   <a href="#reportlab.lib.utils">reportlab.lib.utils</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="zipp"></a>
+  <a target="code" href="" type="text/plain"><tt>zipp</tt></a>
+<span class="moduletype">MissingModule</span>  <div class="import">
+imported by:
+    <a href="#importlib_resources.compat.py39">importlib_resources.compat.py39</a>
 
   </div>
 

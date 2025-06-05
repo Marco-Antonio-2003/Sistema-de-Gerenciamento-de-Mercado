@@ -953,12 +953,72 @@ class ChatWidget(QWidget):
 
     def limpar_historico(self):
         """Limpeza otimizada do histórico"""
-        resposta = QMessageBox.question(
-            self, "Limpar Conversa", 
-            "Deseja limpar o histórico da conversa?",
-            QMessageBox.Yes | QMessageBox.No, 
-            QMessageBox.No
-        )
+        # Criar QMessageBox personalizado
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Limpar Conversa")
+        msg_box.setText("Deseja limpar o histórico da conversa?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+        
+        # Traduzir botões para português
+        msg_box.button(QMessageBox.Yes).setText("Sim")
+        msg_box.button(QMessageBox.No).setText("Não")
+        
+        # Aplicar estilo na janela principal
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+                color: black;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+            }
+            
+            QMessageBox QLabel {
+                background-color: white;
+                color: black;
+                padding: 10px;
+                font-size: 13px;
+            }
+        """)
+        
+        # FORÇAR ESTILO DOS BOTÕES DIRETAMENTE
+        # Aplicar estilo depois que os botões são criados
+        msg_box.show()  # Mostrar para que os botões sejam criados
+        
+        # Encontrar e estilizar cada botão individualmente
+        buttons = msg_box.findChildren(QPushButton)
+        
+        botao_style = """
+            QPushButton {
+                background-color: white;
+                color: black;
+                border: 2px solid #cccccc;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: bold;
+                min-width: 80px;
+                font-family: Arial, sans-serif;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                border-color: #999999;
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+                border-color: #666666;
+            }
+        """
+        
+        for button in buttons:
+            button.setStyleSheet(botao_style)
+            # Forçar atualização visual
+            button.update()
+        
+        msg_box.hide()  # Esconder temporariamente
+        
+        # Executar o dialog e obter resposta
+        resposta = msg_box.exec_()
         
         if resposta == QMessageBox.Yes:
             # Limpar widgets

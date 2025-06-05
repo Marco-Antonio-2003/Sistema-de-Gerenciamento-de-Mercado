@@ -11,3 +11,7 @@ Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\
 Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
 Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI83202']
 ERRO AO OBTER VENDAS: ('Error while preparing SQL statement:\n- SQLCODE: -104\n- Dynamic SQL Error\n- SQL error code = -104\n- Token unknown - line 9, column 35\n- LIMIT', -104, 335544569)
+
+--- Iniciando módulo de relatórios em 2025-06-05 07:45:11.987426 ---
+Diretório da aplicação: C:\Users\Marco-Note\Desktop\PythonProject\Sistema\dist
+Caminhos no sys.path: ['C:\\Users\\Marco-Note\\Desktop\\PythonProject\\Sistema\\dist', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682\\base_library.zip', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682\\lib-dynload', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682\\win32', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682\\pythonwin', 'C:\\Users\\MARCO-~1\\AppData\\Local\\Temp\\_MEI63682\\pywin32_system32']
