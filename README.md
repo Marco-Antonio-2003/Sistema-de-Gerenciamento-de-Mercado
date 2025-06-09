@@ -1,6 +1,6 @@
-# 🏢 MB Sistema - Sistema de Gerenciamento Empresarial
+# 🏢 MB Sistema - Sistema de Gerenciamento 
 
-Um sistema completo de gerenciamento empresarial desenvolvido em Python com PyQt5, incluindo PDV (Ponto de Venda), controle de estoque, gestão financeira e muito mais.
+Um sistema completo de gerenciamento desenvolvido em Python com PyQt5, incluindo PDV (Ponto de Venda), controle de estoque, gestão financeira e muito mais.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.7+-blue.svg)
@@ -8,7 +8,7 @@ Um sistema completo de gerenciamento empresarial desenvolvido em Python com PyQt
 ![Status](https://img.shields.io/badge/status-Em%20Desenvolvimento-yellow.svg)
 
 
-O **MB Sistema** é uma solução completa para gestão empresarial, desenvolvida para pequenas e médias empresas que precisam de um sistema integrado para controlar vendas, estoque, financeiro e relacionamento com clientes.
+O **MB Sistema** é uma solução completa para gestão, desenvolvida para pequenas e médias empresas que precisam de um sistema integrado para controlar vendas, estoque, financeiro e relacionamento com clientes.
 
 ### ✨ Principais Diferenciais
 
