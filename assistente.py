@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import sys
 import re
+from dotenv import load_dotenv  
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
                             QLineEdit, QPushButton, QLabel, QApplication,
                             QDockWidget, QMainWindow, QMessageBox, QFrame, 
@@ -25,6 +26,7 @@ except ImportError:
     print("Erro ao importar funções do banco de dados")
     execute_query = None
 
+load_dotenv()
 
 class BancoDadosAssistente:
     """Classe para consultar dados do banco e responder perguntas"""
@@ -369,7 +371,9 @@ class AssistenteAPI(QThread):
     
     def __init__(self):
         super().__init__()
-        self.api_key = "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"
+        self.api_key = os.getenv('API_KEY')
+        if not self.api_key:
+            raise ValueError("❌ API_KEY não encontrada no arquivo .env. Verifique se o arquivo .env está na pasta correta e contém a variável API_KEY.")
         self.mensagem = ""
         self.historico_conversa = []
         self.use_streaming = True  # Ativar streaming
