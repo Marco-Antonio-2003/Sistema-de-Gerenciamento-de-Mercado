@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
+Versao = "Versão: v0.1.3"
 
 class LoadingWorker(QThread):
     """Thread para executar tarefas de inicialização em background"""
@@ -134,7 +135,7 @@ class SplashScreen(QWidget):
         layout.addWidget(self.progress_bar)
         
         # Versão
-        version_label = QLabel("Versão v0.1.2.2")
+        version_label = QLabel(Versao)
         version_label.setFont(QFont("Arial", 8))
         version_label.setStyleSheet("color: #a0a0a0; background: transparent;")
         version_label.setAlignment(Qt.AlignCenter)
@@ -442,7 +443,7 @@ class LoginWindow(QMainWindow):
         
         # Rótulo de versão no canto inferior direito
         versao_layout = QHBoxLayout()
-        versao_label = QLabel("Versão: v0.1.2.2")
+        versao_label = QLabel(Versao)
         versao_label.setStyleSheet("color: #f7f8f9; font-size: 11px;")
         versao_label.setAlignment(Qt.AlignRight)
         versao_layout.addStretch(1)

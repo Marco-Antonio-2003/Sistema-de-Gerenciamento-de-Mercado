@@ -221,13 +221,29 @@ def conectar_impressora(nome_impressora):
 
 def gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, itens, total, 
                              forma_pagamento, nome_empresa="MB SISTEMA", 
-                             cnpj="00.000.000/0001-00"):
+                             cnpj="00.000.000/0001-00", valor_recebido=None, troco=None):
     """
     Versão mais segura da função de impressão com tratamento robusto de erros e com
-    **todos** os textos centralizados via ESC a 1.
+    **todos** os textos centralizados via ESC a 1. AGORA COM SUPORTE A TROCO.
     """
     try:
         print("🖨️ [PASSO 1] Iniciando impressão do cupom...")
+        
+        # Calcular troco se necessário
+        if valor_recebido is not None and troco is None:
+            troco = valor_recebido - float(total)
+        
+        # Se não tiver valor recebido, definir como igual ao total (pagamento exato)
+        if valor_recebido is None:
+            valor_recebido = float(total)
+            troco = 0.0
+        
+        # Se troco não estiver definido, calcular
+        if troco is None:
+            troco = 0.0
+        
+        print(f"💰 Valores calculados: Total={total}, Valor Recebido={valor_recebido}, Troco={troco}")
+        
         # Reset e selecionar alinhamento central para todo o cupom
         printer._raw(b'\x1B\x40')  # ESC @ - Reset
         time.sleep(0.2)
@@ -242,9 +258,6 @@ def gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, it
         printer.text("EMILIO FERRARI, 110\n")
         printer.text("ITAPEVA - SP\n\n")
         printer.text(f"CUPOM {tipo_cupom.replace('_', ' ')}\n")
-        if tipo_cupom == "NAO_FISCAL":
-            printer.text("Nao permite aproveitamento\n")
-            printer.text("de credito de ICMS\n")
         printer.text("\n" + "=" * 32 + "\n")
         print("✅ [PASSO 2] Cabeçalho OK")
 
@@ -256,7 +269,7 @@ def gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, it
             printer.text(f"CPF: {cpf}\n")
         else:
             printer.text("CONSUMIDOR NAO IDENTIFICADO\n")
-        printer.text(f"Pagamento: {forma_pagamento}\n")
+        
         printer.text("\n" + "-" * 32 + "\n")
         print("✅ [PASSO 3] Informações da venda OK")
 
@@ -276,16 +289,31 @@ def gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, it
             print(f"✅ [PASSO 4.{i}] Item {nome_produto} OK")
         print("✅ [PASSO 4] Todos os itens OK")
 
-        # ---------- TOTAIS ----------
+        # ---------- TOTAIS (AGORA COM TROCO REAL) ----------
         print("📝 [PASSO 5] Imprimindo totais...")
         total_float = float(total)
+        valor_recebido_float = float(valor_recebido)
+        troco_float = float(troco)
+        
+        # Subtotal e outros valores
         printer.text(f"Subtotal: R$ {total_float:6.2f}\n".replace('.', ','))
         printer.text(f"Desconto: R$   0,00\n")
         printer.text(f"Acrescimo: R$   0,00\n")
         printer.text("=" * 32 + "\n")
         printer.text(f"TOTAL: R$ {total_float:6.2f}\n".replace('.', ','))
         printer.text("=" * 32 + "\n")
-        print("✅ [PASSO 5] Totais OK")
+        
+        # Informações de pagamento (só mostrar se for dinheiro ou se houver valor recebido diferente do total)
+        printer.text(f"Pagamento: {forma_pagamento}\n")
+        if "dinheiro" in forma_pagamento.lower() or valor_recebido_float != total_float:
+            printer.text(f"Valor Recebido: R$ {valor_recebido_float:6.2f}\n".replace('.', ','))
+            printer.text(f"Troco: R$ {troco_float:6.2f}\n".replace('.', ','))
+            printer.text("-" * 32 + "\n")
+        else:
+            # Para outras formas de pagamento, mostrar apenas que não há troco
+            printer.text(f"Troco: R$   0,00\n")
+        
+        print(f"✅ [PASSO 5] Totais OK - Valor Recebido: {valor_recebido_float}, Troco: {troco_float}")
 
         # ---------- RODAPÉ ----------
         print("📝 [PASSO 6] Imprimindo rodapé...")
@@ -320,18 +348,19 @@ def gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, it
 
 def gerar_cupom_escpos(printer, id_venda, tipo_cupom, cpf, data_venda, itens, total, 
                       forma_pagamento, nome_empresa="MB SISTEMA", 
-                      cnpj="00.000.000/0001-00"):
+                      cnpj="00.000.000/0001-00", valor_recebido=None, troco=None):
     """
     Função principal que chama a versão segura
     """
     return gerar_cupom_escpos_seguro(printer, id_venda, tipo_cupom, cpf, data_venda, itens, total, 
-                                   forma_pagamento, nome_empresa, cnpj)
+                                   forma_pagamento, nome_empresa, cnpj, valor_recebido, troco)
 
 def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, forma_pagamento, 
                           nome_empresa="MB SISTEMA", cnpj="00.000.000/0001-00", 
-                          imprimir_automaticamente=True):
+                          imprimir_automaticamente=True, valor_recebido=None, troco=None):
     """
     Gera e imprime cupom diretamente na impressora térmica usando ESC/POS
+    AGORA COM SUPORTE A TROCO!
     
     Args:
         id_venda: ID da venda
@@ -344,6 +373,8 @@ def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, 
         nome_empresa: Nome da empresa
         cnpj: CNPJ da empresa
         imprimir_automaticamente: Se True, imprime automaticamente
+        valor_recebido: Valor recebido do cliente (NOVO!)
+        troco: Valor do troco (NOVO! - será calculado se não fornecido)
         
     Returns:
         dict: Dicionário com informações sobre o resultado
@@ -358,7 +389,7 @@ def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, 
     
     try:
         print("\n" + "="*60)
-        print("🖨️ INICIANDO PROCESSO DE IMPRESSÃO DE CUPOM")
+        print("🖨️ INICIANDO PROCESSO DE IMPRESSÃO DE CUPOM COM TROCO")
         print("="*60)
         
         if not imprimir_automaticamente:
@@ -379,6 +410,12 @@ def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, 
         if not isinstance(data_venda, datetime.datetime):
             resultado['mensagem'] = 'Data da venda deve ser um objeto datetime'
             return resultado
+        
+        # Log dos valores de troco
+        if valor_recebido is not None:
+            print(f"💰 Valor recebido informado: R$ {valor_recebido:.2f}")
+        if troco is not None:
+            print(f"💰 Troco informado: R$ {troco:.2f}")
         
         print(f"✅ Dados validados - Venda #{id_venda}, {len(itens)} itens, Total: R$ {total}")
         
@@ -406,11 +443,11 @@ def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, 
         
         print("✅ Impressora conectada com sucesso!")
         
-        # Gerar e imprimir o cupom
+        # Gerar e imprimir o cupom (AGORA COM TROCO!)
         print("\n📄 Gerando cupom...")
         impressao_ok = gerar_cupom_escpos(
             printer, id_venda, tipo_cupom, cpf, data_venda, itens, 
-            total, forma_pagamento, nome_empresa, cnpj
+            total, forma_pagamento, nome_empresa, cnpj, valor_recebido, troco
         )
         
         if impressao_ok:
@@ -418,6 +455,8 @@ def gerar_e_imprimir_cupom(id_venda, tipo_cupom, cpf, data_venda, itens, total, 
             resultado['impressao_sucesso'] = True
             resultado['impressora_utilizada'] = impressora_pdv
             resultado['mensagem'] = f'Cupom impresso com sucesso em {impressora_pdv}'
+            if troco and float(troco) > 0:
+                resultado['mensagem'] += f' (Troco: R$ {float(troco):.2f})'
             print(f"\n🎉 {resultado['mensagem']}")
         else:
             resultado['mensagem'] = 'Falha ao gerar/imprimir o conteúdo do cupom'
@@ -601,8 +640,8 @@ def debug_sistema_impressao():
 
 # Exemplo de uso
 if __name__ == "__main__":
-    print("🖨️ SISTEMA DE IMPRESSÃO TÉRMICA ESC/POS")
-    print("="*50)
+    print("🖨️ SISTEMA DE IMPRESSÃO TÉRMICA ESC/POS COM TROCO")
+    print("="*60)
     
     # Debug completo se solicitado
     if len(sys.argv) > 1 and sys.argv[1] == "--debug":
@@ -628,9 +667,9 @@ if __name__ == "__main__":
         print("   python seu_script.py --debug")
         sys.exit(1)
     
-    print("\n3️⃣ Gerando cupom de exemplo...")
+    print("\n3️⃣ Gerando cupom de exemplo COM TROCO...")
     
-    # Dados de exemplo para teste
+    # Dados de exemplo para teste COM TROCO
     itens_exemplo = [
         {'produto': 'Herbissimo', 'quantidade': 1, 'valor_unitario': 7.00},
         {'produto': 'Cafe Premium', 'quantidade': 2, 'valor_unitario': 15.50},
@@ -639,7 +678,16 @@ if __name__ == "__main__":
     
     total_exemplo = sum(item['quantidade'] * item['valor_unitario'] for item in itens_exemplo)
     
-    # Chamar a função para gerar e imprimir automaticamente
+    # Exemplo: Cliente pagou R$ 50,00 para uma compra de R$ 42,20
+    valor_recebido_exemplo = 50.00
+    troco_exemplo = valor_recebido_exemplo - total_exemplo
+    
+    print(f"💰 Exemplo de venda:")
+    print(f"   Total da compra: R$ {total_exemplo:.2f}")
+    print(f"   Valor recebido: R$ {valor_recebido_exemplo:.2f}")
+    print(f"   Troco: R$ {troco_exemplo:.2f}")
+    
+    # Chamar a função para gerar e imprimir automaticamente COM TROCO
     resultado = gerar_e_imprimir_cupom(
         id_venda=37,
         tipo_cupom="NAO_FISCAL",
@@ -650,7 +698,9 @@ if __name__ == "__main__":
         forma_pagamento="01 - Dinheiro",
         nome_empresa="MB SISTEMA",
         cnpj="00.000.000/0001-00",
-        imprimir_automaticamente=True
+        imprimir_automaticamente=True,
+        valor_recebido=valor_recebido_exemplo,  # NOVO!
+        troco=troco_exemplo  # NOVO!
     )
     
     print(f"\n" + "="*50)
@@ -664,7 +714,7 @@ if __name__ == "__main__":
         print(f"🔍 Erro Detalhado: {resultado['erro_detalhado']}")
     
     if resultado['impressao_sucesso']:
-        print("\n🎉 CUPOM IMPRESSO COM SUCESSO!")
+        print("\n🎉 CUPOM COM TROCO IMPRESSO COM SUCESSO!")
     else:
         print(f"\n❌ FALHA NA IMPRESSÃO")
         print(f"💬 {resultado['mensagem']}")

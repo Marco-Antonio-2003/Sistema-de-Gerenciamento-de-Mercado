@@ -1,5 +1,5 @@
 {
-  "ultima_atualizacao": "2025-06-05T07:59:11.291713",
+  "ultima_atualizacao": "2025-06-09T14:17:02.939146",
   "conversas": [
     {
       "role": "user",
@@ -8,6 +8,22 @@
     {
       "role": "assistant",
       "content": "O NCM (Nomenclatura Comum do Mercosul) para notebooks é:\n\n**8471.30.10** - Máquinas automáticas para processamento de dados, portáteis, de peso não superior a 10 kg, constituídas por, no mínimo, uma unidade central de processamento, um teclado e uma tela.\n\n📦 Para cadastrar ou consultar produtos com esse NCM, acesse: **Menu Produtos e Serviços → Produtos**."
+    },
+    {
+      "role": "user",
+      "content": "Produtos estoque baixo"
+    },
+    {
+      "role": "assistant",
+      "content": "⚠️ **1 produtos** com estoque baixo:\n\n• **Herbissimo** - Estoque: 4\n"
+    },
+    {
+      "role": "user",
+      "content": "Quantos clientes tenho?"
+    },
+    {
+      "role": "assistant",
+      "content": "📊 Você tem **3 clientes** cadastrados no sistema."
     }
   ]
 }

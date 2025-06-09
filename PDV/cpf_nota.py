@@ -31,7 +31,9 @@ class CpfNotaDialog(QDialog):
         lbl_cpf = QLabel("CPF")
         lbl_cpf.setFixedWidth(80)
         self.cpf_input = QLineEdit()
-        self.cpf_input.setPlaceholderText("Digite o CPF (somente números)")
+        self.cpf_input.setPlaceholderText("000.000.000-00")
+        self.cpf_input.setMaxLength(14)  # Máximo com formatação
+        self.cpf_input.textChanged.connect(self.formatar_cpf)
         cpf_layout.addWidget(lbl_cpf)
         cpf_layout.addWidget(self.cpf_input)
         layout.addLayout(cpf_layout)
@@ -66,16 +68,50 @@ class CpfNotaDialog(QDialog):
         btn_emitir.clicked.connect(self.emitir_cupom)
         layout.addWidget(btn_emitir)
     
+    def formatar_cpf(self, texto):
+        """Formata o CPF automaticamente enquanto o usuário digita"""
+        # Remove tudo que não é número
+        numeros = ''.join(filter(str.isdigit, texto))
+        
+        # Limita a 11 dígitos
+        numeros = numeros[:11]
+        
+        # Aplica a formatação
+        if len(numeros) <= 3:
+            formatado = numeros
+        elif len(numeros) <= 6:
+            formatado = f"{numeros[:3]}.{numeros[3:]}"
+        elif len(numeros) <= 9:
+            formatado = f"{numeros[:3]}.{numeros[3:6]}.{numeros[6:]}"
+        else:
+            formatado = f"{numeros[:3]}.{numeros[3:6]}.{numeros[6:9]}-{numeros[9:]}"
+        
+        # Evita loop infinito ao atualizar o texto
+        if formatado != texto:
+            posicao_cursor = self.cpf_input.cursorPosition()
+            self.cpf_input.setText(formatado)
+            
+            # Ajusta a posição do cursor
+            nova_posicao = posicao_cursor
+            if len(formatado) > len(texto):
+                nova_posicao += 1
+            elif len(formatado) < len(texto):
+                nova_posicao -= 1
+            
+            nova_posicao = max(0, min(nova_posicao, len(formatado)))
+            self.cpf_input.setCursorPosition(nova_posicao)
+    
     def emitir_cupom(self):
-        cpf = self.cpf_input.text().strip()
+        cpf_formatado = self.cpf_input.text().strip()
         nome = self.nome_input.text().strip()
         
-        if not cpf:
+        if not cpf_formatado:
             QMessageBox.warning(self, "Campo obrigatório", "Por favor, digite o CPF.")
             return
         
-        # Validar CPF
-        cpf_limpo = ''.join(filter(str.isdigit, cpf))
+        # Remove a formatação para validar
+        cpf_limpo = ''.join(filter(str.isdigit, cpf_formatado))
+        
         if len(cpf_limpo) != 11:
             QMessageBox.warning(
                 self, "CPF inválido", "O CPF deve conter 11 dígitos numéricos."
@@ -86,8 +122,8 @@ class CpfNotaDialog(QDialog):
         self.accept()
 
 class CupomDialogSimples(QDialog):
-    # sinal: tipo_cupom ('COM_CPF' ou 'SEM_CPF'), cpf opcional, nome opcional
-    cupom_selecionado = pyqtSignal(str, str, str)
+    # sinal: tipo_cupom ('COM_CPF' ou 'SEM_CPF'), cpf opcional
+    cupom_selecionado = pyqtSignal(str, str)
 
     def __init__(self, total_venda=0.0, parent=None):
         super().__init__(parent)
@@ -158,7 +194,8 @@ class CupomDialogSimples(QDialog):
         dialog_cpf = CpfNotaDialog(self)
         
         def handle_cpf_dados(cpf, nome):
-            self.cupom_selecionado.emit('COM_CPF', cpf, nome)
+            # Mantém compatibilidade: emite apenas tipo e CPF
+            self.cupom_selecionado.emit('COM_CPF', cpf)
         
         dialog_cpf.cpf_dados_inseridos.connect(handle_cpf_dados)
         
@@ -167,31 +204,30 @@ class CupomDialogSimples(QDialog):
 
     def opcao_sem(self):
         """Vai direto para a próxima página sem CPF"""
-        self.cupom_selecionado.emit('SEM_CPF', '', '')
+        self.cupom_selecionado.emit('SEM_CPF', '')
         self.accept()
 
 
 def solicitar_tipo_cupom(total_venda=0.0, parent=None):
     dialog = CupomDialogSimples(total_venda, parent)
-    resultado = [None, None, None]
+    resultado = [None, None]
     
-    def handler(tipo, cpf, nome):
-        resultado[0], resultado[1], resultado[2] = tipo, cpf, nome
+    def handler(tipo, cpf):
+        resultado[0], resultado[1] = tipo, cpf
     
     dialog.cupom_selecionado.connect(handler)
     
     if dialog.exec_() == QDialog.Accepted:
         return tuple(resultado)
-    return None, None, None
+    return None, None
 
 # Exemplo de uso
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    tipo, cpf, nome = solicitar_tipo_cupom(123.45)
+    tipo, cpf = solicitar_tipo_cupom(123.45)
     if tipo:
         print('Tipo:', tipo)
         print('CPF:', cpf or 'Não informado')
-        print('Nome:', nome or 'Não informado')
     else:
         print('Cancelado')
     sys.exit(0)
