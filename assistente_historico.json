@@ -1,5 +1,5 @@
 {
-  "ultima_atualizacao": "2025-06-09T14:17:02.939146",
+  "ultima_atualizacao": "2025-06-09T15:27:58.784417",
   "conversas": [
     {
       "role": "user",
@@ -24,6 +24,30 @@
     {
       "role": "assistant",
       "content": "📊 Você tem **3 clientes** cadastrados no sistema."
+    },
+    {
+      "role": "user",
+      "content": "quantos produtos eu tenho"
+    },
+    {
+      "role": "assistant",
+      "content": "📦 Você tem **3 produtos** cadastrados no sistema."
+    },
+    {
+      "role": "user",
+      "content": "NCM de sabao em po"
+    },
+    {
+      "role": "assistant",
+      "content": "O NCM (Nomenclatura Comum do Mercosul) para **sabão em pó** é:  \n**3402.20.00**  \n\nEsse código é utilizado para classificação fiscal em documentos como NF-e. 😊"
+    },
+    {
+      "role": "user",
+      "content": "como cadastrar um produto"
+    },
+    {
+      "role": "assistant",
+      "content": "Para cadastrar um produto, siga os passos:  \n\n1. Acesse: **Menu Produtos e Serviços → Produtos**.  \n2. Clique em **\"Novo\"** no canto superior direito.  \n3. Preencha os campos obrigatórios, como:  \n   - Descrição do produto  \n   - Código de barras (opcional)  \n   - NCM (se necessário)  \n   - Unidade de medida  \n   - Preço de venda  \n4. Clique em **\"Salvar\"** para finalizar.  \n\nPronto! Seu produto estará cadastrado. 🛒"
     }
   ]
 }
