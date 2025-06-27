@@ -6286,6 +6286,117 @@ def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, o
         print(f"Erro ao fechar caixa: {e}")
         raise Exception(f"Erro ao fechar caixa: {str(e)}")
 
+def obter_turno_ativo():
+    """Retorna o turno ativo (sem data de fechamento)"""
+    try:
+        query = """
+        SELECT ID, CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+               ESTACAO, USUARIO, ID_USUARIO
+        FROM CAIXA_CONTROLE 
+        WHERE DATA_FECHAMENTO IS NULL 
+        ORDER BY ID DESC 
+        LIMIT 1
+        """
+        
+        result = execute_query(query)
+        
+        if result and len(result) > 0:
+            turno = result[0]
+            return {
+                'id': turno[0],
+                'codigo': turno[1],
+                'data_abertura': turno[2],
+                'hora_abertura': turno[3],
+                'valor_abertura': float(turno[4]) if turno[4] else 0.0,
+                'estacao': turno[5],
+                'usuario': turno[6],
+                'usuario_id': turno[7]
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f"Erro ao obter turno ativo: {e}")
+        return None
+
+def registrar_venda_caixa(turno_id, numero_venda, valor_total, forma_pagamento, operador_id=None):
+    """Registra uma venda no controle de caixa"""
+    try:
+        if not operador_id:
+            usuario = get_usuario_logado()
+            operador_id = usuario.get("id") if usuario else None
+            
+        if not operador_id:
+            operador_id = 1  # ID padrão se não conseguir obter
+        
+        # Data e hora atuais
+        from datetime import datetime
+        agora = datetime.now()
+        data_venda = agora.strftime("%d/%m/%Y")
+        hora_venda = agora.strftime("%H:%M")
+        
+        # Registrar venda na tabela CAIXA_VENDAS (se existir)
+        try:
+            query_venda = """
+            INSERT INTO CAIXA_VENDAS 
+            (TURNO_ID, NUMERO_VENDA, VALOR_TOTAL, FORMA_PAGAMENTO, 
+             DATA_VENDA, HORA_VENDA, OPERADOR_ID)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            params_venda = (
+                turno_id, numero_venda, valor_total, forma_pagamento,
+                data_venda, hora_venda, operador_id
+            )
+            
+            execute_query(query_venda, params_venda)
+            print(f"✅ Venda registrada na tabela CAIXA_VENDAS")
+            
+        except Exception as e:
+            print(f"⚠️ Tabela CAIXA_VENDAS não existe ou erro: {e}")
+        
+        # Registrar como movimentação na tabela CAIXA_MOVIMENTACOES (se existir)
+        try:
+            query_mov = """
+            INSERT INTO CAIXA_MOVIMENTACOES 
+            (TURNO_ID, TIPO, FORMA_PAGAMENTO, VALOR, MOTIVO, OBSERVACAO, 
+             DATA_MOVIMENTO, HORA_MOVIMENTO, USUARIO_ID)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            params_mov = (
+                turno_id, "venda", forma_pagamento, valor_total,
+                f"Venda Nº {numero_venda}", None,
+                data_venda, hora_venda, operador_id
+            )
+            
+            execute_query(query_mov, params_mov)
+            print(f"✅ Movimentação registrada na tabela CAIXA_MOVIMENTACOES")
+            
+        except Exception as e:
+            print(f"⚠️ Tabela CAIXA_MOVIMENTACOES não existe ou erro: {e}")
+        
+        print(f"✅ Venda {numero_venda} registrada no controle de caixa - Turno {turno_id}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao registrar venda no caixa: {e}")
+        # NÃO propagar o erro - não quebrar a venda
+        return False
+
+# Função auxiliar se não existir
+def get_usuario_logado():
+    """Retorna o usuário logado ou dados padrão"""
+    try:
+        # Se você tem uma variável global para usuário logado
+        if hasattr(get_usuario_logado, 'usuario_atual'):
+            return get_usuario_logado.usuario_atual
+        
+        # Retornar dados padrão
+        return {"id": 1, "nome": "Operador PDV"}
+        
+    except:
+        return {"id": 1, "nome": "Operador PDV"}
 
 def registrar_movimento(id_caixa, tipo, data, hora, valor, motivo, observacao=None):
     """
@@ -7970,16 +8081,19 @@ def autenticar_por_funcionario(nome_usuario, senha):
         print(f"Erro na autenticação por funcionário: {e}")
         return None
 
-def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=None):
+
+def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=None, acesso_ecommerce='N'):
     """
-    Cria um novo usuário no banco de dados
+    Cria um novo usuário no banco de dados, incluindo a permissão de e-commerce.
     
     Args:
         usuario (str): Nome de usuário
-        senha (str): Senha do usuário
+        senha (str): Senha do usuário (IMPORTANTE: o código original não fazia hash,
+                     isso deve ser considerado por segurança)
         empresa (str): Nome da empresa
         usuario_master (int, optional): ID do usuário master/principal
         data_expiracao (date, optional): Data de expiração do acesso
+        acesso_ecommerce (str, optional): 'S' para sim, 'N' para não.
     
     Returns:
         int: ID do usuário criado ou None em caso de erro
@@ -8001,19 +8115,78 @@ def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=N
         """
         next_id = execute_query(query_nextid)[0][0]
         
-        # Inserir novo usuário com ID explícito
+        # --- ALTERAÇÃO PRINCIPAL AQUI ---
+        # Adicionamos a coluna ACESSO_ECOMMERCE na query de inserção
         query_insert = """
         INSERT INTO USUARIOS (
-            ID, USUARIO, SENHA, EMPRESA, BLOQUEADO, USUARIO_MASTER, DATA_EXPIRACAO
-        ) VALUES (?, ?, ?, ?, 'N', ?, ?)
+            ID, USUARIO, SENHA, EMPRESA, BLOQUEADO, USUARIO_MASTER, DATA_EXPIRACAO, ACESSO_ECOMMERCE
+        ) VALUES (?, ?, ?, ?, 'N', ?, ?, ?)
         """
-        execute_query(query_insert, (next_id, usuario, senha, empresa, usuario_master, data_expiracao))
+        # Adicionamos o parâmetro 'acesso_ecommerce' no final da tupla
+        execute_query(query_insert, (next_id, usuario, senha, empresa, usuario_master, data_expiracao, acesso_ecommerce))
         
         return next_id
     except Exception as e:
         print(f"Erro ao criar usuário: {e}")
         raise Exception(f"Erro ao criar usuário: {str(e)}")
 
+
+
+def modificar_acesso_ecommerce(usuario_master_id, novo_status):
+    """
+    Modifica o status de acesso ao e-commerce para um usuário master e todos os seus funcionários.
+    Args:
+        usuario_master_id: ID do usuário master.
+        novo_status: 'S' para liberar, 'N' para bloquear.
+    """
+    if novo_status not in ['S', 'N']:
+        raise ValueError("Status inválido. Use 'S' ou 'N'.")
+
+    # Atualiza tanto o usuário master quanto todos os funcionários vinculados a ele
+    query = "UPDATE USUARIOS SET ACESSO_ECOMMERCE = ? WHERE ID = ? OR USUARIO_MASTER = ?"
+    params = (novo_status, usuario_master_id, usuario_master_id)
+    
+    execute_query(query, params, commit=True)
+    print(f"Acesso e-commerce para o usuário master {usuario_master_id} e seus funcionários foi definido como '{novo_status}'.")
+
+
+def verificar_acesso_ecommerce(usuario_id):
+    """
+    Verifica se a conta do usuário (ou de seu master) tem acesso ao e-commerce.
+    Retorna True se tiver acesso, False caso contrário.
+    """
+    if not usuario_id:
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Primeiro, verifica o próprio usuário
+    cur.execute("SELECT ACESSO_ECOMMERCE, USUARIO_MASTER FROM USUARIOS WHERE ID = ?", (usuario_id,))
+    resultado = cur.fetchone()
+
+    if not resultado:
+        conn.close()
+        return False
+
+    acesso, master_id = resultado
+    
+    # Se o próprio usuário tem a flag 'S', ele tem acesso (caso do master)
+    if acesso and acesso.strip() == 'S':
+        conn.close()
+        return True
+    
+    # Se ele é um funcionário (tem um master_id), verifica o acesso do master
+    if master_id is not None:
+        cur.execute("SELECT ACESSO_ECOMMERCE FROM USUARIOS WHERE ID = ?", (master_id,))
+        resultado_master = cur.fetchone()
+        conn.close()
+        if resultado_master and resultado_master[0] and resultado_master[0].strip() == 'S':
+            return True
+
+    conn.close()
+    return False
+    
 def buscar_funcionario_por_usuario(nome_usuario):
     """
     Busca um funcionário pelo nome de usuário

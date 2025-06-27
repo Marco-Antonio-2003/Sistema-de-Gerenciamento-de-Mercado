@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import sys
 import re
+import base64
 from dotenv import load_dotenv  
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
                             QLineEdit, QPushButton, QLabel, QApplication,
@@ -371,9 +372,23 @@ class AssistenteAPI(QThread):
     
     def __init__(self):
         super().__init__()
-        self.api_key = os.getenv('API_KEY')
-        if not self.api_key:
-            raise ValueError("❌ API_KEY não encontrada no arquivo .env. Verifique se o arquivo .env está na pasta correta e contém a variável API_KEY.")
+        # --- Alteração Principal: Usar a chave codificada ---
+        try:
+            # Chave que você gerou, embutida diretamente no código
+            chave_codificada = "c2stb3ItdjEtNDU5ZjhkYjhjMTFkMzZmY2ZjOGZkNmNkZDAwZDY4YzcyZjkwNDNkMWQxZDMxNWIxNmNhYmYzZTU2NDg4M2FiNg=="
+            
+            # Decodifica a chave de Base64 para a string original
+            chave_decodificada_bytes = base64.b64decode(chave_codificada)
+            self.api_key = chave_decodificada_bytes.decode('utf-8')
+            
+            if not self.api_key:
+                # Este erro agora é muito menos provável, mas é uma boa prática manter a verificação
+                raise ValueError("❌ Chave de API interna está vazia após a decodificação.")
+                
+        except Exception as e:
+            # Captura qualquer erro durante a decodificação
+            raise ValueError(f"❌ Falha ao processar a chave de API interna: {e}")
+        
         self.mensagem = ""
         self.historico_conversa = []
         self.use_streaming = True  # Ativar streaming
@@ -486,8 +501,8 @@ class AssistenteAPI(QThread):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
+                    'Authorization': f'Bearer {self.api_key}', 
+                    'Content-Type': 'application/json',
                     "HTTP-Referer": "https://mbsistema.com.br",
                     "X-Title": "MB Sistema - Assistente Virtual",
                 },

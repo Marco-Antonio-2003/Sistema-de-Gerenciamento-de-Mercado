@@ -163,10 +163,9 @@ class BarcodeSuggestionWidget(QWidget):
             self.hide()
     
     def item_selecionado(self, item):
-        """VERSÃO CORRIGIDA - Chamado quando um item da sugestão é selecionado"""
-        print("🖱️ === ITEM SELECIONADO (ANTI-DUPLICAÇÃO MELHORADA) ===")
+        """VERSÃO SEM CONFIRMAÇÃO - Adiciona produto direto"""
+        print("🖱️ === ITEM SELECIONADO (SEM CONFIRMAÇÃO) ===")
         try:
-            # Obter o índice do item selecionado
             row = self.lista_sugestoes.currentRow()
             print(f"🎯 Linha selecionada: {row}")
             
@@ -174,12 +173,11 @@ class BarcodeSuggestionWidget(QWidget):
                 produto = self.produtos_data[row]
                 print(f"📦 Produto selecionado: {produto}")
                 
-                # Verificar se tem PDV principal
                 if not self.parent_pdv:
                     print("❌ Referência ao PDV principal não encontrada")
                     return
                 
-                # 🔧 NOVA VERIFICAÇÃO: Verificar se já foi processado via Enter
+                # Verificações de processamento (manter igual)
                 if hasattr(self.parent_pdv, 'codigo_em_processamento') and self.parent_pdv.codigo_em_processamento:
                     if self.parent_pdv.quantidade_ja_processada:
                         print("⚠️ Produto já foi processado via Enter, ignorando clique na sugestão")
@@ -188,42 +186,14 @@ class BarcodeSuggestionWidget(QWidget):
                         self.hide()
                         return
                 
-                # 🔧 MARCAR que será processado via sugestão
                 self.parent_pdv.quantidade_ja_processada = True
                 
-                # Obter quantidade detectada
                 quantidade_para_adicionar = getattr(self, 'quantidade_selecionada', 1)
                 print(f"🔢 Quantidade para adicionar: {quantidade_para_adicionar}")
                 
-                # 🔧 CONFIRMAÇÃO APENAS PARA QUANTIDADE > 1
-                if quantidade_para_adicionar > 1:
-                    from PyQt5.QtWidgets import QMessageBox
-                    nome_produto = produto.get('nome', 'Produto')
-                    preco = produto.get('preco_venda', 0)
-                    total_item = preco * quantidade_para_adicionar
-                    
-                    resposta = QMessageBox.question(
-                        self.parent_pdv,
-                        "Confirmar Quantidade",
-                        f"Adicionar {quantidade_para_adicionar} unidades de:\n{nome_produto}\n\n"
-                        f"Preço unitário: R$ {preco:.2f}\n"
-                        f"Total do item: R$ {total_item:.2f}",
-                        QMessageBox.Yes | QMessageBox.No,
-                        QMessageBox.Yes
-                    )
-                    
-                    if resposta == QMessageBox.No:
-                        print("❌ Usuário cancelou")
-                        # Resetar estados
-                        self.parent_pdv.quantidade_ja_processada = False
-                        self.parent_pdv.codigo_em_processamento = ""
-                        self.quantidade_selecionada = 1
-                        self.hide()
-                        self.parent_pdv.entry_cod_barras.clear()
-                        self.parent_pdv.entry_cod_barras.setFocus()
-                        return
+                # 🆕 REMOVER TODA A CONFIRMAÇÃO - ADICIONAR DIRETO
+                print(f"➕ Adicionando {quantidade_para_adicionar} unidades diretamente...")
                 
-                # 🔧 ADICIONAR PRODUTO (apenas uma vez)
                 codigo_produto = produto.get('codigo', '')
                 produto_existe = False
                 
@@ -232,7 +202,6 @@ class BarcodeSuggestionWidget(QWidget):
                     id_produto_tabela = self.parent_pdv.table_itens.item(row_tabela, 1).text()
                     
                     if id_produto_tabela == codigo_produto:
-                        # Produto já existe, aumentar a quantidade
                         produto_existe = True
                         print(f"🔄 Produto já existe na tabela, atualizando quantidade...")
                         
@@ -241,14 +210,16 @@ class BarcodeSuggestionWidget(QWidget):
                             nova_quantidade = quantity_widget.value + quantidade_para_adicionar
                             quantity_widget.value = nova_quantidade
                             
-                            # Atualizar o label da quantidade
-                            if hasattr(quantity_widget, 'label'):
-                                quantity_widget.label.setText(str(nova_quantidade))
+                            # Atualizar campo editável
+                            if hasattr(quantity_widget, 'edit_field'):
+                                quantity_widget.edit_field.setText(str(nova_quantidade))
+                                print(f"✅ Campo editável atualizado para: {nova_quantidade}")
                             else:
-                                for child in quantity_widget.children():
-                                    if hasattr(child, 'setText'):
-                                        child.setText(str(nova_quantidade))
-                                        break
+                                from PyQt5.QtWidgets import QLineEdit
+                                for child in quantity_widget.findChildren(QLineEdit):
+                                    child.setText(str(nova_quantidade))
+                                    print(f"✅ Campo editável encontrado e atualizado para: {nova_quantidade}")
+                                    break
                             
                             # Recalcular o total da linha
                             try:
@@ -258,7 +229,7 @@ class BarcodeSuggestionWidget(QWidget):
                                 valor_total_item = QTableWidgetItem(novo_total_str)
                                 valor_total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                                 self.parent_pdv.table_itens.setItem(row_tabela, 5, valor_total_item)
-                                print(f"✅ Quantidade atualizada para {nova_quantidade} na linha existente")
+                                print(f"💰 Total atualizado: {novo_total_str}")
                             except Exception as e:
                                 print(f"❌ Erro ao recalcular total: {e}")
                         break
@@ -274,12 +245,12 @@ class BarcodeSuggestionWidget(QWidget):
                 # Atualizar o total geral
                 self.parent_pdv.atualizar_total()
                 
-                # 🔧 RESETAR TODOS OS ESTADOS após sucesso
+                # Resetar estados
                 self.parent_pdv.quantidade_ja_processada = False
                 self.parent_pdv.codigo_em_processamento = ""
                 self.quantidade_selecionada = 1
                 
-                print(f"✅ {quantidade_para_adicionar} unidades adicionadas com sucesso!")
+                print(f"✅ {quantidade_para_adicionar} unidades adicionadas diretamente!")
                 
                 # Limpar e focar no campo
                 self.parent_pdv.entry_cod_barras.clear()
@@ -288,7 +259,7 @@ class BarcodeSuggestionWidget(QWidget):
                 # Esconder widget
                 self.hide()
                 
-                print("✅ Processo concluído com sucesso!")
+                print("✅ Processo concluído sem confirmação!")
                 
             else:
                 print(f"❌ Linha inválida: {row}")
@@ -303,6 +274,7 @@ class BarcodeSuggestionWidget(QWidget):
                 self.parent_pdv.quantidade_ja_processada = False
                 self.parent_pdv.codigo_em_processamento = ""
                 self.quantidade_selecionada = 1
+
     
     def keyPressEvent(self, event):
         """Trata eventos de teclado no widget de sugestões"""
@@ -2197,21 +2169,20 @@ class PDVWindow(QMainWindow):
             self.buscar_produto_por_codigo_barras(codigo)
 
     def buscar_produto_por_codigo_barras(self, codigo_barras):
-        """VERSÃO CORRIGIDA - Processa código apenas quando necessário"""
+        """VERSÃO SEM CONFIRMAÇÃO - Processa código apenas quando necessário"""
         try:
-            print(f"🔍 === PROCESSANDO CÓDIGO (ANTI-DUPLICAÇÃO FINAL) ===")
+            print(f"🔍 === PROCESSANDO CÓDIGO (SEM CONFIRMAÇÃO) ===")
             print(f"Código original: '{codigo_barras}'")
             
-            # 🔧 VERIFICAÇÃO IMPORTANTE: Se widget de sugestões estiver visível, não processar
+            # Verificação de widget de sugestões (manter igual)
             if hasattr(self, 'widget_sugestoes') and self.widget_sugestoes.isVisible():
                 print("⚠️ Widget de sugestões visível - delegando processamento para seleção")
                 return False
             
-            # === DETECÇÃO DE QUANTIDADE (manter igual) ===
+            # Detecção de quantidade (manter igual)
             quantidade_final = 1
             codigo_final = codigo_barras.strip()
             
-            # Detectar padrões de quantidade com asterisco
             if "*" in codigo_barras:
                 try:
                     if codigo_barras.startswith("*"):
@@ -2229,7 +2200,6 @@ class PDVWindow(QMainWindow):
                             if quantidade_str.isdigit():
                                 quantidade_final = int(quantidade_str)
                     
-                    # Validações de quantidade
                     if quantidade_final <= 0 or quantidade_final > 9999:
                         from PyQt5.QtWidgets import QMessageBox
                         QMessageBox.warning(self, "Quantidade Inválida", 
@@ -2243,7 +2213,7 @@ class PDVWindow(QMainWindow):
             
             print(f"📋 Resultado: Código='{codigo_final}', Quantidade={quantidade_final}")
             
-            # === BUSCA DO PRODUTO (manter igual) ===
+            # Busca do produto (manter igual)
             codigo_limpo = ''.join(c for c in codigo_final if c.isdigit())
             print(f"🔍 Buscando produto: {codigo_final} (limpo: {codigo_limpo})")
             
@@ -2254,7 +2224,6 @@ class PDVWindow(QMainWindow):
                 def buscar_produto_por_barras(codigo): return None
                 def buscar_produto_por_codigo(codigo): return None
             
-            # Buscar produto
             produto = buscar_produto_por_barras(codigo_limpo)
             
             if not produto:
@@ -2275,14 +2244,13 @@ class PDVWindow(QMainWindow):
                         "estoque": result[8]
                     }
             
-            # === ADICIONAR PRODUTO (apenas se encontrado) ===
+            # 🆕 ADICIONAR PRODUTO SEM CONFIRMAÇÃO
             if produto:
-                print(f"✅ Produto encontrado! Adicionando {quantidade_final} unidades...")
+                print(f"✅ Produto encontrado! Adicionando {quantidade_final} unidades SEM CONFIRMAÇÃO...")
                 
-                # 🔧 MARCAR que foi processado para evitar duplicação
                 self.quantidade_ja_processada = True
                 
-                # Verificar se produto já existe na tabela
+                # Verificação para produto existente
                 produto_existe = False
                 codigo_produto = str(produto.get("codigo", ""))
                 
@@ -2293,23 +2261,24 @@ class PDVWindow(QMainWindow):
                         print(f"🔄 Produto já existe na linha {row_tabela}, atualizando quantidade...")
                         produto_existe = True
                         
-                        # Obter widget de quantidade
                         quantity_widget = self.table_itens.cellWidget(row_tabela, 3)
                         if quantity_widget and hasattr(quantity_widget, 'value'):
                             quantidade_atual = quantity_widget.value
                             nova_quantidade = quantidade_atual + quantidade_final
                             
-                            # Atualizar valor no widget
+                            # Atualizar o valor no widget
                             quantity_widget.value = nova_quantidade
                             
-                            # Atualizar o label de exibição
-                            if hasattr(quantity_widget, 'label'):
-                                quantity_widget.label.setText(str(nova_quantidade))
+                            # Atualizar o campo editável
+                            if hasattr(quantity_widget, 'edit_field'):
+                                quantity_widget.edit_field.setText(str(nova_quantidade))
+                                print(f"✅ Campo editável atualizado para: {nova_quantidade}")
                             else:
-                                for child in quantity_widget.children():
-                                    if hasattr(child, 'setText') and hasattr(child, 'text'):
-                                        child.setText(str(nova_quantidade))
-                                        break
+                                from PyQt5.QtWidgets import QLineEdit
+                                for child in quantity_widget.findChildren(QLineEdit):
+                                    child.setText(str(nova_quantidade))
+                                    print(f"✅ Campo editável encontrado e atualizado para: {nova_quantidade}")
+                                    break
                             
                             # Recalcular o total da linha
                             try:
@@ -2319,6 +2288,7 @@ class PDVWindow(QMainWindow):
                                 valor_total_item = QTableWidgetItem(novo_total_str)
                                 valor_total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                                 self.table_itens.setItem(row_tabela, 5, valor_total_item)
+                                print(f"💰 Total da linha atualizado para: {novo_total_str}")
                             except Exception as e:
                                 print(f"❌ Erro ao recalcular total: {e}")
                             
@@ -2337,7 +2307,7 @@ class PDVWindow(QMainWindow):
                 # Atualizar total geral
                 self.atualizar_total()
                 
-                # 🔧 RESETAR estados após sucesso
+                # Resetar estados
                 self.quantidade_ja_processada = False
                 self.codigo_em_processamento = ""
                 
@@ -2345,10 +2315,10 @@ class PDVWindow(QMainWindow):
                 self.entry_cod_barras.clear()
                 self.entry_cod_barras.setFocus()
                 
-                print(f"✅ Processo concluído com sucesso!")
+                print(f"✅ {quantidade_final} unidades adicionadas diretamente sem confirmação!")
                 return True
             else:
-                # Produto não encontrado
+                # Produto não encontrado (manter lógica igual)
                 from PyQt5.QtWidgets import QMessageBox
                 msg = QMessageBox()
                 msg.setWindowTitle("Produto não encontrado")
@@ -2361,7 +2331,6 @@ class PDVWindow(QMainWindow):
                 if resposta == QMessageBox.Yes:
                     self.abrir_cadastro_produto(codigo_final)
                 
-                # Resetar estados
                 self.quantidade_ja_processada = False
                 self.codigo_em_processamento = ""
                 
@@ -2374,7 +2343,6 @@ class PDVWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             
-            # Resetar estados mesmo em caso de erro
             self.quantidade_ja_processada = False
             self.codigo_em_processamento = ""
             
@@ -2862,28 +2830,28 @@ class PDVWindow(QMainWindow):
         print(f"💰 Valor total: {valor} × {qtd} = {valor_total}")
         print(f"✅ Item adicionado na linha {row_position} com {qtd} unidades")
 
-    # MÉTODO ADICIONAL: Para adicionar aos métodos da classe PDVWindow
-    def adicionar_produto_ao_carrinho_com_quantidade(self, produto, quantidade):
-        """Adiciona o produto encontrado à tabela de itens com quantidade específica"""
-        # Obter o próximo número de item
-        proximo_item = self.table_itens.rowCount() + 1
+    # # MÉTODO ADICIONAL: Para adicionar aos métodos da classe PDVWindow
+    # def adicionar_produto_ao_carrinho_com_quantidade(self, produto, quantidade):
+    #     """Adiciona o produto encontrado à tabela de itens com quantidade específica"""
+    #     # Obter o próximo número de item
+    #     proximo_item = self.table_itens.rowCount() + 1
         
-        # Obter informações do produto
-        id_produto = produto.get("codigo", "")
-        nome = produto.get("nome", "")
-        preco = float(produto.get("preco_venda", 0))
+    #     # Obter informações do produto
+    #     id_produto = produto.get("codigo", "")
+    #     nome = produto.get("nome", "")
+    #     preco = float(produto.get("preco_venda", 0))
         
-        # Formatar nome do produto (código + nome)
-        nome_formatado = f"{id_produto} - {nome}"
+    #     # Formatar nome do produto (código + nome)
+    #     nome_formatado = f"{id_produto} - {nome}"
         
-        # Adicionar à tabela com a quantidade especificada
-        self.add_item_tabela_com_quantidade(proximo_item, id_produto, nome_formatado, quantidade, preco)
+    #     # Adicionar à tabela com a quantidade especificada
+    #     self.add_item_tabela_com_quantidade(proximo_item, id_produto, nome_formatado, quantidade, preco)
         
-        # Atualizar o total
-        self.atualizar_total()
+    #     # Atualizar o total
+    #     self.atualizar_total()
         
-        # Focar novamente no campo de código de barras para o próximo produto
-        self.entry_cod_barras.setFocus()
+    #     # Focar novamente no campo de código de barras para o próximo produto
+    #     self.entry_cod_barras.setFocus()
 
     def mostrar_sugestoes_melhorado(self, codigo_parcial, produtos):
         """Versão melhorada do mostrar_sugestoes que exibe a quantidade"""
@@ -3175,25 +3143,52 @@ class PDVWindow(QMainWindow):
             QMessageBox.critical(self, "Erro", f"Erro ao abrir cadastro de produto: {str(e)}")
 
     def adicionar_produto_ao_carrinho(self, produto):
-        """Adiciona o produto encontrado à tabela de itens"""
-        # Obter o próximo número de item
-        proximo_item = self.table_itens.rowCount() + 1
+        """Adiciona o produto encontrado à tabela de itens - VERSÃO CORRIGIDA"""
+        # Verificar se produto já existe na tabela ANTES de adicionar
+        codigo_produto = str(produto.get("codigo", ""))
         
-        # Obter informações do produto
+        for row in range(self.table_itens.rowCount()):
+            id_produto_tabela = self.table_itens.item(row, 1).text()
+            
+            if id_produto_tabela == codigo_produto:
+                print(f"🔄 Produto {codigo_produto} já existe, atualizando quantidade...")
+                
+                quantity_widget = self.table_itens.cellWidget(row, 3)
+                if quantity_widget and hasattr(quantity_widget, 'value'):
+                    nova_quantidade = quantity_widget.value + 1
+                    quantity_widget.value = nova_quantidade
+                    
+                    # 🆕 ATUALIZAR CAMPO EDITÁVEL
+                    if hasattr(quantity_widget, 'edit_field'):
+                        quantity_widget.edit_field.setText(str(nova_quantidade))
+                        print(f"✅ Campo editável atualizado para: {nova_quantidade}")
+                    
+                    # Recalcular total da linha
+                    preco = float(produto.get("preco_venda", 0))
+                    novo_total = preco * nova_quantidade
+                    novo_total_str = f"R$ {novo_total:.2f}".replace('.', ',')
+                    valor_total_item = QTableWidgetItem(novo_total_str)
+                    valor_total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.table_itens.setItem(row, 5, valor_total_item)
+                    
+                    # Atualizar o total geral
+                    self.atualizar_total()
+                    
+                    # Focar no campo de código de barras
+                    self.entry_cod_barras.setFocus()
+                    return
+        
+        # Se chegou aqui, o produto não existe, então adicionar novo
+        proximo_item = self.table_itens.rowCount() + 1
         id_produto = produto.get("codigo", "")
         nome = produto.get("nome", "")
         preco = float(produto.get("preco_venda", 0))
-        
-        # Formatar nome do produto (código + nome)
         nome_formatado = f"{id_produto} - {nome}"
         
-        # Adicionar à tabela
-        self.add_item_tabela(proximo_item, id_produto, nome_formatado, 1, preco)
+        # Usar a função corrigida para adicionar
+        self.add_item_tabela_correto(produto, 1)
         
-        # Atualizar o total
-        self.atualizar_total()
-        
-        # Focar novamente no campo de código de barras para o próximo produto
+        # Focar novamente no campo de código de barras
         self.entry_cod_barras.setFocus()
 
     def add_item_tabela(self, item, id_prod, produto, qtd, valor):
@@ -3764,7 +3759,7 @@ class PDVWindow(QMainWindow):
     def finalizar_venda_simples(self):
         """
         Finaliza a venda: registra no banco, pergunta sobre CPF na nota e imprime o cupom fiscal.
-        AGORA COM SUPORTE A TROCO!
+        AGORA COM SUPORTE A TROCO E INTEGRAÇÃO COM CONTROLE DE CAIXA!
         """
         try:
             # 1️⃣ Testa conexão com o banco
@@ -3792,7 +3787,7 @@ class PDVWindow(QMainWindow):
                 return
             forma_pagamento = self.combo_pagamento.currentText()
 
-            # 4️⃣ NOVO: Calcular valor recebido e troco
+            # 4️⃣ Calcular valor recebido e troco
             valor_recebido = None
             troco = None
             
@@ -3854,6 +3849,7 @@ class PDVWindow(QMainWindow):
                         escolha = QMessageBox.question(self, "Estoque Insuficiente", msg, QMessageBox.Yes|QMessageBox.No, QMessageBox.No)
                         if escolha == QMessageBox.No:
                             return
+            
             except Exception as e:
                 print(f"Erro ao verificar estoque: {e}")
 
@@ -3883,7 +3879,7 @@ class PDVWindow(QMainWindow):
                 cpf if tipo=='COM_CPF' else None
             )
 
-            # 8️⃣ MODIFICADO: Gerar e imprimir cupom fiscal COM TROCO
+            # 8️⃣ Gerar e imprimir cupom fiscal COM TROCO
             from gerador_cupom import gerar_e_imprimir_cupom
             from datetime import datetime
             
@@ -3902,15 +3898,46 @@ class PDVWindow(QMainWindow):
                 total=total,
                 forma_pagamento=forma_pagamento,
                 imprimir_automaticamente=True,
-                valor_recebido=valor_recebido,  # 🆕 NOVO PARÂMETRO!
-                troco=troco                     # 🆕 NOVO PARÂMETRO!
+                valor_recebido=valor_recebido,  # NOVO PARÂMETRO!
+                troco=troco                     # NOVO PARÂMETRO!
             )
             
             if not resultado['sucesso']:
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "Impressão", f"Falha ao imprimir cupom:\n{resultado['mensagem']}")
 
-            # 9️⃣ Confirmação e limpeza
+            # 🆕 9️⃣ NOVO: REGISTRAR NO CONTROLE DE CAIXA (POSIÇÃO CORRETA!)
+            print("🏦 Registrando venda no controle de caixa...")
+            try:
+                # Importar aqui para evitar problemas de dependência circular
+                import base.banco as banco
+                
+                # Obter turno ativo
+                turno_ativo = banco.obter_turno_ativo()
+                
+                if turno_ativo:
+                    # Registrar venda no controle de caixa
+                    banco.registrar_venda_caixa(
+                        turno_id=turno_ativo['id'],
+                        numero_venda=id_venda,  # Usar o ID da venda como número
+                        valor_total=total,
+                        forma_pagamento=forma_pagamento
+                    )
+                    print(f"✅ Venda {id_venda} registrada no turno {turno_ativo['codigo']}")
+                else:
+                    print("⚠️ Aviso: Nenhum turno ativo para registrar venda")
+                    
+            except ImportError:
+                print("⚠️ Módulo banco não disponível para controle de caixa")
+            except AttributeError as e:
+                print(f"⚠️ Função de controle de caixa não encontrada: {e}")
+            except Exception as e:
+                # IMPORTANTE: NÃO propagar o erro - não quebrar a venda
+                print(f"⚠️ Erro ao registrar venda no controle de caixa: {e}")
+                import traceback
+                traceback.print_exc()
+
+            # 🔟 Confirmação e limpeza (POSIÇÃO CORRETA - DEPOIS DO REGISTRO)
             from PyQt5.QtWidgets import QMessageBox
             
             # Mensagem de confirmação mais informativa
@@ -3921,9 +3948,11 @@ class PDVWindow(QMainWindow):
                 mensagem_sucesso += f"\n\n✅ Pagamento exato (sem troco)"
             
             QMessageBox.information(self, "Venda Finalizada", mensagem_sucesso)
+            
+            # LIMPAR E RETURN NO FINAL
             self.limpar_venda()
-            return
-
+            return  # ✅ AGORA O RETURN ESTÁ NO LUGAR CERTO!
+            
         except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
             print(f"ERRO NA FINALIZAÇÃO: {e}")

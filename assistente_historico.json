@@ -1,5 +1,5 @@
 {
-  "ultima_atualizacao": "2025-06-09T15:27:58.784417",
+  "ultima_atualizacao": "2025-06-11T15:52:07.102396",
   "conversas": [
     {
       "role": "user",
@@ -48,6 +48,14 @@
     {
       "role": "assistant",
       "content": "Para cadastrar um produto, siga os passos:  \n\n1. Acesse: **Menu Produtos e Serviços → Produtos**.  \n2. Clique em **\"Novo\"** no canto superior direito.  \n3. Preencha os campos obrigatórios, como:  \n   - Descrição do produto  \n   - Código de barras (opcional)  \n   - NCM (se necessário)  \n   - Unidade de medida  \n   - Preço de venda  \n4. Clique em **\"Salvar\"** para finalizar.  \n\nPronto! Seu produto estará cadastrado. 🛒"
+    },
+    {
+      "role": "user",
+      "content": "Quantos clientes tenho?"
+    },
+    {
+      "role": "assistant",
+      "content": "📊 Você tem **3 clientes** cadastrados no sistema."
     }
   ]
 }

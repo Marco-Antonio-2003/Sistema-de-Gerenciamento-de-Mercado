@@ -24,6 +24,7 @@ wheels/
 *.egg
 MANIFEST
 
+
 # PyQt
 *.qm
 *.pro.user

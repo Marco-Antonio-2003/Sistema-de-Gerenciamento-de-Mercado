@@ -294,16 +294,22 @@ class MenuButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, usuario=None, empresa=None, id_funcionario=None):
+    def __init__(self, usuario=None, empresa=None, id_usuario=None, id_funcionario=None): # <<< MUDANÇA: Adicionado id_usuario
         super().__init__()
         self.usuario = usuario if usuario else "Usuário"
         self.empresa = empresa if empresa else "Empresa"
-        self.id_funcionario = id_funcionario
-        self.permissoes = {}  # Dicionário para armazenar permissões
-        self.opened_windows = []
-        self.contadores_labels = {}  # Armazenar referências aos labels de contagem
+        self.id_usuario = id_usuario # <<< NOVO: ID do usuário (master ou funcionário)
+        self.id_funcionario = id_funcionario # ID do funcionário (se for um)
         
-        # Carregar permissões do funcionário (se aplicável)
+        self.permissoes = {}
+        self.opened_windows = []
+        self.contadores_labels = {}
+        
+        # <<< NOVA LÓGICA DE PERMISSÃO >>>
+        self.tem_acesso_ecommerce = False # Inicia como falso
+        self.verificar_acesso_geral_modulos() # Verifica a permissão de e-commerce
+        
+        # Carrega permissões de módulos específicos (PDV, etc.)
         self.carregar_permissoes()
         
         self.initUI()
@@ -323,6 +329,23 @@ class MainWindow(QMainWindow):
         
         # Definir janela para maximizada (não tela cheia)
         self.showMaximized()
+
+    
+
+    def verificar_acesso_geral_modulos(self):
+        """Verifica permissões de alto nível, como o acesso ao e-commerce."""
+        if not self.id_usuario:
+            print("Aviso: Nenhum ID de usuário fornecido. Acesso ao e-commerce negado.")
+            return
+
+        try:
+            # Importa a função que criamos no banco.py
+            from base.banco import verificar_acesso_ecommerce 
+            self.tem_acesso_ecommerce = verificar_acesso_ecommerce(self.id_usuario)
+            print(f"Verificação de acesso E-commerce para usuário ID {self.id_usuario}: {self.tem_acesso_ecommerce}")
+        except Exception as e:
+            print(f"Erro ao verificar acesso ao e-commerce: {e}")
+            self.tem_acesso_ecommerce = False
     
     def verificar_syncthing(self):
         """Verifica se o Syncthing está rodando e o reinicia se necessário"""
@@ -414,6 +437,7 @@ class MainWindow(QMainWindow):
         btn_financeiro = MenuButton("FINANCEIRO")
         btn_relatorios = MenuButton("RELATÓRIOS")
         btn_ferramentas = MenuButton("FERRAMENTAS")
+        self.btn_mercado_livre = MenuButton("MERCADO LIVRE")
         
         # Uso do novo método para adicionar ações com verificação de permissão
         self.add_menu_actions_with_permission(btn_geral, [
@@ -445,11 +469,17 @@ class MainWindow(QMainWindow):
             "Configuração de estação", 
             "Configuração do Sistema"
         ], self)
+
+        self.add_menu_actions_with_permission(self.btn_mercado_livre, [
+            "Ver Dashboard do Mercado livre"
+        ], self)
         
         for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas,
-                    btn_financeiro, btn_relatorios, btn_ferramentas):
+                    btn_financeiro, btn_relatorios, btn_ferramentas, self.btn_mercado_livre):
             menu_layout.addWidget(btn)
         main_layout.addWidget(menu_frame)
+
+        self.atualizar_visibilidade_modulos()
         
         # Área de conteúdo com tela inicial
         home_screen = QWidget()
@@ -684,6 +714,7 @@ class MainWindow(QMainWindow):
             "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"), 
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
+            "Ver Dashboard do Mercado livre": os.path.join("mercado_livre", "main_final.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
         }
         # casos especiais de nome de classe
@@ -714,9 +745,19 @@ class MainWindow(QMainWindow):
             # FERRAMENTAS
             "Configuração de estação":      "ConfiguracaoImpressoraWindow",
             "Configuração do Sistema": "ConfiguracaoSistemaWindow",
+            # MERCADO LIVRE
+            "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
             # PDV
             "PDV - Ponto de Venda":         "PDVWindow"
         }
+
+    def atualizar_visibilidade_modulos(self):
+        """Mostra ou esconde módulos com base nas permissões de alto nível."""
+        if hasattr(self, 'btn_mercado_livre'):
+            self.btn_mercado_livre.setVisible(self.tem_acesso_ecommerce)
+        
+        # Chama a atualização de outros módulos aqui também
+        self.atualizar_visibilidade_pdv()
 
     def abrir_janela_contatos(self):
         """Abre a janela de contatos do WhatsApp"""
@@ -1577,8 +1618,8 @@ class MainWindow(QMainWindow):
         # Aceitar o evento para fechar a janela principal
         event.accept()
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow(usuario="Marco", empresa="MB Sistemas")
-    window.show()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     window = MainWindow(usuario="Marco", empresa="MB Sistemas")
+#     window.show()
+#     sys.exit(app.exec_())

@@ -210,9 +210,24 @@ class CriarUsuarioApp:
             variable=self.usuario_master_var,
             font=self.label_font,
             bg="#f0f0f0",
-            command=self.toggle_mensalidade_fields
+            command=self.toggle_master_fields # <-- CORREÇÃO: Chamar a função com o nome novo
         )
         self.usuario_master_check.grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
+        self.usuario_master_check.config(command=self.toggle_master_fields)
+        row += 1
+
+        # <<< ADICIONE ESTE NOVO CHECKBOX AQUI >>>
+        self.acesso_ecommerce_var = tk.BooleanVar()
+        self.acesso_ecommerce_check = tk.Checkbutton(
+            form_frame,
+            text="Liberar acesso ao E-commerce (Módulo Mercado Livre)",
+            variable=self.acesso_ecommerce_var,
+            font=self.label_font,
+            bg="#f0f0f0"
+        )
+        self.acesso_ecommerce_check.grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
+        # Esconde por padrão, só aparece para usuários master
+        self.acesso_ecommerce_check.grid_remove() 
         row += 1
         
         # Frame para Mensalidades (inicialmente escondido)
@@ -330,11 +345,10 @@ class CriarUsuarioApp:
         main_frame = tk.Frame(self.manage_tab, bg="#f0f0f0", padx=20, pady=10)
         main_frame.pack(fill="both", expand=True)
         
-        # Frame para controles
+        # Frame para controles (botão de atualizar)
         control_frame = tk.Frame(main_frame, bg="#f0f0f0", pady=10)
         control_frame.pack(fill="x")
         
-        # Botão para atualizar lista
         self.atualizar_button = tk.Button(
             control_frame,
             text="Atualizar Lista",
@@ -347,12 +361,12 @@ class CriarUsuarioApp:
         )
         self.atualizar_button.pack(side=tk.LEFT, padx=10)
         
-        # Frame para tabela
+        # Frame para a tabela
         table_frame = tk.Frame(main_frame, bg="#f0f0f0")
         table_frame.pack(fill="both", expand=True, pady=10)
         
         # Tabela de usuários master
-        columns = ("ID", "Usuário", "Empresa", "Status", "Data Expiração", "Funcionários")
+        columns = ("ID", "Usuário", "Empresa", "Status", "E-commerce", "Data Expiração", "Funcionários")
         self.usuarios_table = ttk.Treeview(
             table_frame,
             columns=columns,
@@ -377,12 +391,13 @@ class CriarUsuarioApp:
         xscrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.usuarios_table.xview)
         self.usuarios_table.configure(xscrollcommand=xscrollbar.set)
         
-        # Layout
+        # Layout da tabela e scrollbars
         self.usuarios_table.pack(side="left", fill="both", expand=True)
         yscrollbar.pack(side="right", fill="y")
         xscrollbar.pack(side="bottom", fill="x")
         
-        # Frame para botões de ação
+        # --- CORREÇÃO AQUI: Criar o action_frame ANTES de usá-lo ---
+        # Frame para botões de ação, posicionado ABAIXO da tabela
         action_frame = tk.Frame(main_frame, bg="#f0f0f0", pady=10)
         action_frame.pack(fill="x")
         
@@ -424,6 +439,45 @@ class CriarUsuarioApp:
             command=self.renovar_mensalidade
         )
         self.renovar_button.pack(side=tk.LEFT, padx=10)
+
+        # Adicionando o NOVO botão ao action_frame que agora existe
+        self.gerenciar_ecommerce_button = tk.Button(
+            action_frame,
+            text="Gerenciar E-commerce",
+            font=self.button_font,
+            bg="#3F51B5",
+            fg="white",
+            padx=15,
+            pady=5,
+            command=self.gerenciar_acesso_ecommerce
+        )
+        self.gerenciar_ecommerce_button.pack(side=tk.LEFT, padx=10)
+
+    def gerenciar_acesso_ecommerce(self):
+        selected_item = self.usuarios_table.selection()
+        if not selected_item:
+            messagebox.showwarning("Seleção necessária", "Selecione um usuário master para gerenciar o acesso.")
+            return
+
+        user_id = self.usuarios_table.item(selected_item[0])["values"][0]
+        username = self.usuarios_table.item(selected_item[0])["values"][1]
+
+        # Pergunta ao admin o que ele quer fazer
+        resposta = messagebox.askquestion("Gerenciar Acesso E-commerce", 
+            f"Deseja LIBERAR o acesso ao módulo de e-commerce para {username} e seus funcionários?\n\n"
+            "Clique em 'Não' para BLOQUEAR o acesso.",
+            icon='question')
+
+        novo_status = 'S' if resposta == 'yes' else 'N'
+        
+        try:
+            from banco import modificar_acesso_ecommerce
+            modificar_acesso_ecommerce(user_id, novo_status)
+            status_texto = "LIBERADO" if novo_status == 'S' else "BLOQUEADO"
+            messagebox.showinfo("Sucesso", f"Acesso ao e-commerce foi definido como {status_texto} para {username} e seus funcionários.")
+            self.carregar_usuarios_master()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao modificar o acesso: {e}")
     
     def init_license_tab(self):
         """Inicializa a aba de gerenciamento de licenças"""
@@ -888,16 +942,12 @@ class CriarUsuarioApp:
             # Buscar usuários master
             query = """
             SELECT 
-                U.ID, 
-                U.USUARIO, 
-                U.EMPRESA, 
-                U.BLOQUEADO, 
-                U.DATA_EXPIRACAO,
-                (SELECT COUNT(*) FROM USUARIOS WHERE USUARIO_MASTER = U.ID) AS QTD_FUNCIONARIOS
+                U.ID, U.USUARIO, U.EMPRESA, U.BLOQUEADO, U.DATA_EXPIRACAO,
+                (SELECT COUNT(*) FROM USUARIOS WHERE USUARIO_MASTER = U.ID) AS QTD_FUNCIONARIOS,
+                U.ACESSO_ECOMMERCE
             FROM USUARIOS U
-            WHERE U.USUARIO_MASTER IS NULL
-            ORDER BY U.EMPRESA, U.USUARIO
-            """
+            WHERE U.USUARIO_MASTER IS NULL ORDER BY U.EMPRESA, U.USUARIO
+        """
             from banco import execute_query
             usuarios = execute_query(query)
             
@@ -907,7 +957,7 @@ class CriarUsuarioApp:
                 
             # Preencher tabela
             for user in usuarios:
-                user_id, username, empresa, bloqueado, data_expiracao, qtd_func = user
+                user_id, username, empresa, bloqueado, data_expiracao, qtd_func, acesso_ecom = user
                 
                 # Formatação do status
                 status = "Bloqueado" if bloqueado and bloqueado.upper() == 'S' else "Ativo"
@@ -926,9 +976,11 @@ class CriarUsuarioApp:
                             status = "Vencido"
                     except:
                         data_str = str(data_expiracao)
+
+                status_ecom = "Sim" if acesso_ecom and acesso_ecom.strip() == 'S' else "Não"
                 
                 # Inserir na tabela
-                self.usuarios_table.insert("", "end", values=(user_id, username, empresa, status, data_str, qtd_func))
+                self.usuarios_table.insert("", "end", values=(user_id, username, empresa, status, status_ecom, data_str, qtd_func))
                 
             self.status_var.set(f"{len(usuarios)} usuários master encontrados")
             
@@ -1008,13 +1060,15 @@ class CriarUsuarioApp:
             self.senha_entry.config(show="*")
             self.conf_senha_entry.config(show="*")
     
-    def toggle_mensalidade_fields(self):
-        """Mostra ou esconde os campos de mensalidade"""
+    def toggle_master_fields(self):
+        """Mostra ou esconde os campos específicos para usuários master."""
         if self.usuario_master_var.get():
             self.mensalidade_frame.grid()
+            self.acesso_ecommerce_check.grid() # Mostra o checkbox de e-commerce
             self.atualizar_data_expiracao()
         else:
             self.mensalidade_frame.grid_remove()
+            self.acesso_ecommerce_check.grid_remove() # Esconde o checkbox de e-commerce
     
     def atualizar_data_expiracao(self):
         """Atualiza a data de expiração padrão (hoje + X meses)"""
@@ -1053,6 +1107,9 @@ class CriarUsuarioApp:
         senha = self.senha_var.get().strip()
         conf_senha = self.conf_senha_var.get().strip()
         empresa = self.empresa_var.get().strip()
+
+        # ... (após pegar os dados do formulário)
+        acesso_ecommerce_val = 'S' if self.acesso_ecommerce_var.get() else 'N'
         
         # Verificar se é usuário master
         is_master = self.usuario_master_var.get()
@@ -1099,8 +1156,9 @@ class CriarUsuarioApp:
                 usuario, 
                 senha, 
                 empresa, 
-                usuario_master=None,  # Sempre None pois este é um usuário master ou normal
-                data_expiracao=data_expiracao if is_master else None
+                usuario_master=None,
+                data_expiracao=data_expiracao if is_master else None,
+                acesso_ecommerce=acesso_ecommerce_val if is_master else 'N' # Passa o novo valor
             )
             
             if resultado:

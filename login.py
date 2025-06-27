@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.3"
+Versao = "Versão: v0.1.3-ecommerce"
 
 class LoadingWorker(QThread):
     """Thread para executar tarefas de inicialização em background"""
@@ -670,9 +670,18 @@ class LoginWindow(QMainWindow):
                                                 "Mensalidade da conta principal vencida. Entre em contato com o suporte.")
                                 self.restaurar_botao_login()
                                 return
+                
+            # --- LÓGICA PARA OBTER O ID CORRETO ---
+            id_para_passar = None
+            if id_funcionario:
+                # Se logou como funcionário, o id que importa para permissões é o do funcionário
+                id_para_passar = id_funcionario
+            elif usuario_id:
+                # Se logou como master, usamos o id do master
+                id_para_passar = usuario_id
             
             # Login bem-sucedido! Abrir a janela principal diretamente
-            self.open_main_window(usuario, empresa, id_funcionario)
+            self.open_main_window(usuario, empresa, id_para_passar, id_funcionario)
 
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao acessar o sistema: {str(e)}")
@@ -684,7 +693,7 @@ class LoginWindow(QMainWindow):
         self.login_button.setEnabled(True)
         self.login_button.setText("LOGIN")
     
-    def open_main_window(self, usuario, empresa, id_funcionario):
+    def open_main_window(self, usuario, empresa, id_usuario, id_funcionario):
         """Abre a janela principal diretamente após login bem-sucedido"""
         try:
             # Marcar que o login foi bem-sucedido
@@ -703,8 +712,16 @@ class LoginWindow(QMainWindow):
                 empresa=empresa, 
                 id_funcionario=id_funcionario
             )
+
+            # Abrir a janela principal, passando o ID do usuário
+            self.main_window = MainWindow(
+                usuario=usuario, 
+                empresa=empresa,
+                id_usuario=id_usuario, # <<< NOVO PARÂMETRO
+                id_funcionario=id_funcionario
+            )
             self.main_window.show()
-            self.hide()  # Esconder a tela de login
+            self.hide()
             
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao abrir janela principal: {str(e)}")
