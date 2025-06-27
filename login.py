@@ -706,18 +706,11 @@ class LoginWindow(QMainWindow):
             except Exception as e:
                 print(f"Aviso: Erro ao verificar Syncthing: {e}")
             
-            # Abrir a janela principal
-            self.main_window = MainWindow(
-                usuario=usuario, 
-                empresa=empresa, 
-                id_funcionario=id_funcionario
-            )
-
-            # Abrir a janela principal, passando o ID do usuário
+            # Abrir a janela principal - APENAS UMA VEZ
             self.main_window = MainWindow(
                 usuario=usuario, 
                 empresa=empresa,
-                id_usuario=id_usuario, # <<< NOVO PARÂMETRO
+                id_usuario=id_usuario,
                 id_funcionario=id_funcionario
             )
             self.main_window.show()
