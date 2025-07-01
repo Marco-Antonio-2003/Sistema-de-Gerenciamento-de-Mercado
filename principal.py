@@ -1,4 +1,3 @@
-#principal.py
 import sys
 import os
 import importlib.util
@@ -7,7 +6,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog)
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect
+from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal ### MODIFICADO ###
 from PyQt5.QtGui import QDesktopServices
 from assistente import adicionar_assistente_ao_sistema
 
@@ -294,6 +293,8 @@ class MenuButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
+    logout_signal = pyqtSignal() ### NOVO ###
+    
     def __init__(self, usuario=None, empresa=None, id_usuario=None, id_funcionario=None): # <<< MUDANÇA: Adicionado id_usuario
         super().__init__()
         self.usuario = usuario if usuario else "Usuário"
@@ -329,8 +330,6 @@ class MainWindow(QMainWindow):
         
         # Definir janela para maximizada (não tela cheia)
         self.showMaximized()
-
-    
 
     def verificar_acesso_geral_modulos(self):
         """Verifica permissões de alto nível, como o acesso ao e-commerce."""
@@ -678,20 +677,70 @@ class MainWindow(QMainWindow):
         self.pdv_button.move(30, 90)  # Mantida a mesma posição vertical
         self.pdv_button.raise_()
         
-        # Método para reposicionar o botão PDV quando a janela for redimensionada
-        def pdv_resize_event(event):
+        ### NOVO: Botão de Deslogar ###
+        self.logout_button = QPushButton("Deslogar", self)
+        self.logout_button.setFixedSize(180, 80)
+        self.logout_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.logout_button.setStyleSheet("""
+            QPushButton {
+                background-color: #c0392b; /* Vermelho escuro */
+                color: white;
+                border-radius: 10px;
+                font-weight: bold;
+                text-align: center;
+                padding: 5px;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #a93226;
+            }
+            QPushButton:pressed {
+                background-color: #922b21;
+            }
+        """)
+        
+        # Adicionar ícone de logout (se existir)
+        logout_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "logout.png")
+        if os.path.exists(logout_icon_path):
+            self.logout_button.setIcon(QIcon(logout_icon_path))
+            self.logout_button.setIconSize(QSize(30, 30))
+        else:
+            # Fallback com texto e emoji se o ícone não for encontrado
+            self.logout_button.setText("⏻\nDeslogar")
+            print(f"AVISO: Ícone de logout não encontrado em: {logout_icon_path}")
+
+        # Adicionar sombra
+        logout_shadow = QGraphicsDropShadowEffect(self.logout_button)
+        logout_shadow.setBlurRadius(15)
+        logout_shadow.setColor(Qt.black)
+        logout_shadow.setOffset(0, 0)
+        self.logout_button.setGraphicsEffect(logout_shadow)
+
+        # Conectar ao método que vai lidar com o logout
+        self.logout_button.clicked.connect(self.handle_logout)
+        
+        # Posicionar no canto direito (a posição exata será ajustada no resizeEvent)
+        self.logout_button.move(self.width() - self.logout_button.width() - 30, 90)
+        self.logout_button.raise_()
+        ### FIM DO NOVO BLOCO ###
+        
+        # Método para reposicionar os botões quando a janela for redimensionada
+        def final_resize_event(event):
             # Chamar o método original de redimensionamento
             if hasattr(self, '_resize_original_pdv'):
                 self._resize_original_pdv(event)
             else:
                 novo_resize_event(event)
             
-            # Manter o botão PDV na posição correta (abaixo do menu GERAL)
-            self.pdv_button.move(30, 90)  # Ajustado para a nova posição
+            # Manter o botão PDV na posição correta
+            self.pdv_button.move(30, 90)
+            
+            # ### MODIFICADO: Reposicionar o botão de logout também ###
+            self.logout_button.move(self.width() - self.logout_button.width() - 30, 90)
         
         # Salvar o método anterior e substituir
         self._resize_original_pdv = self.resizeEvent
-        self.resizeEvent = pdv_resize_event
+        self.resizeEvent = final_resize_event
         
         # mapeamentos
         self.action_to_py_file = {
@@ -750,6 +799,46 @@ class MainWindow(QMainWindow):
             # PDV
             "PDV - Ponto de Venda":         "PDVWindow"
         }
+
+    # Dentro da classe MainWindow, substitua o método handle_logout inteiro por este:
+
+    def handle_logout(self):
+        """Mostra uma caixa de diálogo de confirmação limpa, sem herdar o estilo da janela principal."""
+        
+        # ### A CORREÇÃO CRÍTICA ESTÁ AQUI ###
+        # Criamos a QMessageBox SEM o 'self' como pai.
+        # Isso impede que o estilo escuro da MainWindow "vaze" para o diálogo.
+        msg_box = QMessageBox() 
+        
+        msg_box.setWindowTitle('Confirmação de Logout')
+        msg_box.setText('Você tem certeza que deseja deslogar?')
+        msg_box.setInformativeText('Isso fechará a tela principal e voltará para a tela de login.')
+        
+        # Usamos os ícones e botões padrão do sistema, que são sempre limpos.
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        
+        # Traduzimos os botões padrão para português.
+        btn_sim = msg_box.button(QMessageBox.Yes)
+        btn_sim.setText('Sim')
+        
+        btn_nao = msg_box.button(QMessageBox.No)
+        btn_nao.setText('Não')
+        
+        # Define "Não" como o botão padrão.
+        msg_box.setDefaultButton(btn_nao)
+
+        # Exibe a caixa de diálogo e espera a resposta.
+        # .exec_() retorna qual botão padrão foi clicado.
+        resposta = msg_box.exec_()
+
+        # Verifica a resposta.
+        if resposta == QMessageBox.Yes:
+            print("Logout confirmado pelo usuário.")
+            self.logout_signal.emit() # Emite o sinal de logout
+            self.close()              # Fecha a janela principal
+        else:
+            print("Logout cancelado.")
 
     def atualizar_visibilidade_modulos(self):
         """Mostra ou esconde módulos com base nas permissões de alto nível."""
@@ -1618,8 +1707,9 @@ class MainWindow(QMainWindow):
         # Aceitar o evento para fechar a janela principal
         event.accept()
 
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     window = MainWindow(usuario="Marco", empresa="MB Sistemas")
-#     window.show()
-#     sys.exit(app.exec_())
+if __name__ == "__main__":
+
+     app = QApplication(sys.argv)
+     window = MainWindow(usuario="Marco", empresa="MB Sistemas")
+     window.show()
+     sys.exit(app.exec_())

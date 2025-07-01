@@ -48,7 +48,7 @@ def main():
     data_to_add = [
         "ico-img", "base", "PDV", "geral", "vendas", "produtos_e_servicos",
         "compras", "financeiro", "relatorios", "notas_fiscais", "ferramentas",
-        "ecommerce" # Adiciona a pasta de ecommerce explicitamente
+        "mercado_livre" # Adiciona a pasta de ecommerce explicitamente
     ]
     for data in data_to_add:
         if os.path.exists(data):
@@ -67,9 +67,8 @@ def main():
         'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print',
         'dotenv', 'webbrowser',
         # <<< ADICIONADO >>> Força a inclusão dos módulos do seu novo pacote
-        'ecommerce.mercado_livre',
-        'ecommerce.mercado_livre_backend',
-        'ecommerce.configuracoes'
+        'mercado_livre.main_final',
+        'mercado_livre.gerar_tokens',
     ]
     for hi in hidden_imports:
         pyinstaller_params.extend(["--hidden-import", hi])

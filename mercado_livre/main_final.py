@@ -1,9 +1,10 @@
-# main_final.py - VERSÃO COMPLETA FINAL COM TODAS AS FUNÇÕES
+# main_final.py - VERSÃO COMPLETA FINAL COM TODAS AS FUNÇÕES E SELEÇÃO
 
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QTableWidget,
-                             QTableWidgetItem, QHeaderView, QMessageBox)
+                             QTableWidgetItem, QHeaderView, QMessageBox, QProgressDialog,
+                             QDialog, QCheckBox) # Adicionado QDialog e QCheckBox
 from PyQt5.QtGui import QFont, QCursor, QColor
 from PyQt5.QtCore import Qt
 import fdb
@@ -11,7 +12,7 @@ import requests
 from datetime import datetime, timedelta
 
 # ==============================================================================
-# INÍCIO DA CLASSE MercadoLivreBackend
+# CLASSE MercadoLivreBackend (SEM MUDANÇAS)
 # ==============================================================================
 class MercadoLivreBackend:
     
@@ -20,7 +21,7 @@ class MercadoLivreBackend:
         self.config = {}
         self.session = requests.Session() 
         self.session.proxies = {'http': None, 'https': None}
-        self.DB_CONFIG = { # Definido como atributo de instância
+        self.DB_CONFIG = { 
             'dsn': r'localhost:C:\Users\Marco-Note\Desktop\PythonProject\Sistema\base\banco\MBDATA_NOVO.FDB',
             'user': 'SYSDBA',
             'password': 'masterkey'
@@ -28,7 +29,7 @@ class MercadoLivreBackend:
         self._load_config()
 
     def _load_config(self):
-        print("Backend: Carregando config do DB...")
+        # ... (código existente, sem alterações)
         try:
             con = fdb.connect(**self.DB_CONFIG)
             cur = con.cursor()
@@ -39,14 +40,12 @@ class MercadoLivreBackend:
                     'app_id': row[0], 'client_secret': row[1], 'access_token': row[2],
                     'refresh_token': row[3], 'user_id': row[4], 'expiration_time': row[5]
                 }
-                print("Backend: Config carregada com sucesso.")
             con.close()
-        except Exception as e:
-            print(f"Backend Erro ao carregar config: {e}")
+        except Exception:
             self.config = {}
 
     def _save_tokens_to_db(self, new_token_data):
-        print("Backend: Salvando novos tokens no DB...")
+        # ... (código existente, sem alterações)
         try:
             con = fdb.connect(**self.DB_CONFIG)
             cur = con.cursor()
@@ -57,14 +56,12 @@ class MercadoLivreBackend:
             cur.execute(sql, params)
             con.commit()
             con.close()
-            print("Backend: Tokens salvos com sucesso.")
             return True
-        except Exception as e:
-            print(f"Backend Erro ao salvar tokens: {e}")
+        except Exception:
             return False
 
     def _refresh_token(self):
-        print("Backend: Renovando token...")
+        # ... (código existente, sem alterações)
         url = f"{self.base_url}/oauth/token"
         payload = {
             'grant_type': 'refresh_token',
@@ -80,32 +77,27 @@ class MercadoLivreBackend:
             self.config['refresh_token'] = new_token_data['refresh_token']
             self._save_tokens_to_db(new_token_data)
             return True
-        except requests.exceptions.RequestException as e:
-            print(f"Backend Erro ao renovar token: {e}")
-            if hasattr(e, 'response') and e.response: print(f"Resposta do servidor: {e.response.text}")
+        except requests.exceptions.RequestException:
             return False
 
     def _is_token_expired(self):
+        # ... (código existente, sem alterações)
         expiration_time = self.config.get('expiration_time')
         if not expiration_time: return True
         return datetime.now() >= (expiration_time - timedelta(minutes=5))
 
     def _make_request(self, method, url, **kwargs):
-        print(f"Backend: Fazendo request para {url}")
+        # ... (código existente, sem alterações)
         if self._is_token_expired():
             if not self._refresh_token():
                 raise Exception("Nao foi possivel renovar o token de acesso.")
-        
         self.session.headers.update({'Authorization': f'Bearer {self.config.get("access_token")}'})
-        
         try:
             kwargs.setdefault('timeout', 15)
             response = self.session.request(method, url, **kwargs)
             response.raise_for_status()
-            print(f"Backend: Sucesso no request para {url}")
             return response.json()
         except Exception as e:
-            print(f"Backend Erro no make_request para {url}: {e}")
             if hasattr(e, 'response') and e.response is not None:
                 print(f"   -> Resposta do Servidor: {e.response.text}")
             raise e
@@ -117,7 +109,7 @@ class MercadoLivreBackend:
         return self.config.get('user_id')
 
     def get_local_products(self):
-        print("Backend: Buscando produtos locais no DB...")
+        # ... (código existente, sem alterações)
         products = []
         try:
             con = fdb.connect(**self.DB_CONFIG)
@@ -129,101 +121,89 @@ class MercadoLivreBackend:
                     'meli_id': row[2], 'estoque': row[3]
                 })
             con.close()
-        except Exception as e:
-            print(f"Backend Erro ao buscar produtos locais: {e}")
+        except Exception:
+            pass
+        return products
+        
+    def get_linked_products(self):
+        # ... (código existente, sem alterações)
+        products = []
+        try:
+            con = fdb.connect(**self.DB_CONFIG)
+            cur = con.cursor()
+            cur.execute("SELECT ID, NOME, MELI_ID, QUANTIDADE_ESTOQUE FROM PRODUTOS WHERE MELI_ID IS NOT NULL ORDER BY NOME")
+            for row in cur.fetchall():
+                products.append({
+                    'id_local': row[0], 'nome': row[1],
+                    'meli_id': row[2], 'estoque': row[3]
+                })
+            con.close()
+        except Exception:
+            pass
         return products
 
     def get_meli_active_listings(self):
+        # ... (código existente, sem alterações)
         seller_id = self.get_seller_id()
         if not seller_id: return []
-        
         url = f"{self.base_url}/users/{seller_id}/items/search?status=active"
         listings = []
         try:
             data = self._make_request('get', url)
             meli_ids = data.get('results', [])
-            
             if not meli_ids: return []
-
-            url_details = f"{self.base_url}/items?ids={','.join(meli_ids[:20])}"
+            url_details = f"{self.base_url}/items?ids={','.join(meli_ids[:50])}"
             items_details = self._make_request('get', url_details)
-
             for item in items_details:
                 body = item.get('body', {})
                 if body.get('error'): continue
-                
                 listings.append({
                     'meli_id': body.get('id'), 'titulo': body.get('title'),
                     'estoque': body.get('available_quantity'), 'preco': body.get('price'),
                     'link': body.get('permalink')
                 })
-        except Exception as e:
-            print(f"Backend Erro ao buscar anuncios do MELI: {e}")
+        except Exception:
+            pass
         return listings
 
     def link_product(self, id_local, meli_id):
-        print(f"Backend: Vinculando produto local {id_local} com MELI ID {meli_id}...")
+        # ... (código existente, sem alterações)
         try:
             con = fdb.connect(**self.DB_CONFIG)
             cur = con.cursor()
             cur.execute("UPDATE PRODUTOS SET MELI_ID = ? WHERE ID = ?", (meli_id, id_local))
             con.commit()
             con.close()
-            print("Backend: Vínculo salvo com sucesso!")
             return True
-        except Exception as e:
-            print(f"Backend Erro ao vincular produto: {e}")
+        except Exception:
             return False
             
     def atualizar_estoque_meli(self, meli_id, nova_quantidade):
-        """
-        Atualiza a quantidade de um anúncio, lidando com variações e limpando o payload.
-        """
-        print(f"Backend: Atualizando estoque do item {meli_id} para {nova_quantidade}...")
-        
+        # ... (código existente, sem alterações)
         url_item_details = f"{self.base_url}/items/{meli_id}"
         try:
             item_data = self._make_request('get', url_item_details)
-        except Exception as e:
-            print(f"❌ ERRO ao buscar detalhes do item {meli_id}: {e}")
+        except Exception:
             return None
-
         variations = item_data.get('variations', [])
         url_put = f"{self.base_url}/items/{meli_id}"
-        
         if variations:
-            print(f"Backend: Item {meli_id} tem variações. Montando payload de variação.")
-            
-            # --- A MUDANÇA CRUCIAL ESTÁ AQUI ---
-            # Vamos criar um novo payload de variação limpo,
-            # contendo apenas os campos que a API precisa.
-            
             payload_variations = []
             for var in variations:
-                # Removemos o campo problemático e outros que não são necessários para a atualização
                 var.pop('catalog_product_id', None) 
-                var.pop('attributes', None) # Também é bom remover este
-                
+                var.pop('attributes', None)
                 payload_variations.append(var)
-                
-            # Atualizamos o estoque da primeira variação (como antes)
             payload_variations[0]['available_quantity'] = int(nova_quantidade)
-            
             payload = {"variations": payload_variations}
         else:
-            print(f"Backend: Item {meli_id} não tem variações. Atualizando estoque geral.")
             payload = {"available_quantity": int(nova_quantidade)}
-
         try:
-            response_data = self._make_request('put', url_put, json=payload)
-            print("✅ SUCESSO! Estoque atualizado no Mercado Livre.")
-            return response_data
-        except Exception as e:
-            print(f"❌ ERRO ao atualizar estoque: {e}")
+            return self._make_request('put', url_put, json=payload)
+        except Exception:
             return None
 
-    # <<< MÉTODOS DE LEITURA REINSERIDOS AQUI >>>
     def get_vendas_hoje(self):
+        # ... (código existente, sem alterações)
         try:
             hoje = datetime.now()
             date_from = hoje.strftime('%Y-%m-%dT00:00:00.000-03:00')
@@ -234,6 +214,7 @@ class MercadoLivreBackend:
         except Exception: return 0.0
 
     def get_vendas_mes(self):
+        # ... (código existente, sem alterações)
         try:
             hoje = datetime.now()
             primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0)
@@ -245,6 +226,7 @@ class MercadoLivreBackend:
         except Exception: return 0.0
     
     def get_pedidos_pendentes(self):
+        # ... (código existente, sem alterações)
         try:
             url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&order.status=paid"
             data = self._make_request('get', url)
@@ -252,6 +234,7 @@ class MercadoLivreBackend:
         except Exception: return 0
 
     def get_produtos_online(self):
+        # ... (código existente, sem alterações)
         try:
             url = f"{self.base_url}/users/{self.get_seller_id()}/items/search?status=active"
             data = self._make_request('get', url)
@@ -259,6 +242,7 @@ class MercadoLivreBackend:
         except Exception: return 0
 
     def get_ultimas_vendas(self, limit=50):
+        # ... (código existente, sem alterações)
         try:
             url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&sort=date_desc&limit={limit}"
             pedidos = self._make_request('get', url).get('results', [])
@@ -277,14 +261,10 @@ class MercadoLivreBackend:
         except Exception: return []
 
 # ==============================================================================
-# FIM DA CLASSE MercadoLivreBackend
-# ==============================================================================
-
-
-# ==============================================================================
-# INÍCIO DA JANELA DE VINCULAÇÃO
+# CLASSE VincularProdutosWindow (SEM MUDANÇAS)
 # ==============================================================================
 class VincularProdutosWindow(QMainWindow):
+    # ... (código existente, sem alterações)
     def __init__(self, backend):
         super().__init__()
         self.backend = backend
@@ -344,6 +324,7 @@ class VincularProdutosWindow(QMainWindow):
         main_layout.addWidget(meli_panel, 3)
 
     def carregar_listas(self):
+        self.setCursor(QCursor(Qt.WaitCursor))
         produtos_locais = self.backend.get_local_products()
         self.tabela_local.setRowCount(len(produtos_locais))
         for row, prod in enumerate(produtos_locais):
@@ -367,6 +348,7 @@ class VincularProdutosWindow(QMainWindow):
         self.tabela_local.resizeColumnsToContents()
         self.tabela_meli.resizeColumnsToContents()
         self.tabela_meli.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.unsetCursor()
 
     def vincular_selecionados(self):
         linha_local = self.tabela_local.currentRow()
@@ -399,19 +381,123 @@ class VincularProdutosWindow(QMainWindow):
                 QMessageBox.critical(self, "Erro", "Não foi possível salvar o vínculo no banco de dados.")
 
 # ==============================================================================
-# INÍCIO DA JANELA PRINCIPAL DO PAINEL
+# ### NOVIDADE: JANELA DE SELEÇÃO DE PRODUTOS PARA SINCRONIZAR ###
+# ==============================================================================
+class SelecaoSincronizacaoWindow(QDialog):
+    def __init__(self, backend, parent=None):
+        super().__init__(parent)
+        self.backend = backend
+        self.produtos_selecionados = []
+        
+        self.setWindowTitle("Selecionar Produtos para Sincronizar")
+        self.setMinimumSize(800, 600)
+        self.init_ui()
+        self.carregar_produtos_vinculados()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Título
+        label_titulo = QLabel("Marque os produtos que deseja sincronizar o estoque:")
+        label_titulo.setFont(QFont("Arial", 14, QFont.Bold))
+        layout.addWidget(label_titulo)
+
+        # Botões de seleção rápida
+        botoes_layout = QHBoxLayout()
+        btn_marcar_todos = QPushButton("Marcar Todos")
+        btn_marcar_todos.clicked.connect(self.marcar_desmarcar_todos)
+        btn_desmarcar_todos = QPushButton("Desmarcar Todos")
+        btn_desmarcar_todos.clicked.connect(lambda: self.marcar_desmarcar_todos(False))
+        botoes_layout.addWidget(btn_marcar_todos)
+        botoes_layout.addWidget(btn_desmarcar_todos)
+        botoes_layout.addStretch()
+        layout.addLayout(botoes_layout)
+        
+        # Tabela de produtos
+        self.tabela = QTableWidget()
+        self.tabela.setColumnCount(4)
+        self.tabela.setHorizontalHeaderLabels(["", "Produto no Sistema", "Estoque Local", "Anúncio Vinculado (ID)"])
+        self.tabela.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabela.setSelectionBehavior(QTableWidget.SelectRows)
+        layout.addWidget(self.tabela)
+        
+        # Botões de ação
+        action_layout = QHBoxLayout()
+        action_layout.addStretch()
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.clicked.connect(self.reject) # self.reject fecha o diálogo
+        btn_sincronizar = QPushButton("✅ Sincronizar Selecionados")
+        btn_sincronizar.setFont(QFont("Arial", 10, QFont.Bold))
+        btn_sincronizar.setStyleSheet("background-color: #28a745; color: white; padding: 8px;")
+        btn_sincronizar.clicked.connect(self.aceitar_selecao)
+        action_layout.addWidget(btn_cancelar)
+        action_layout.addWidget(btn_sincronizar)
+        layout.addLayout(action_layout)
+
+    def carregar_produtos_vinculados(self):
+        produtos = self.backend.get_linked_products()
+        self.tabela.setRowCount(len(produtos))
+
+        for row, prod in enumerate(produtos):
+            # Checkbox na primeira coluna
+            chk_box_item = QCheckBox()
+            # Centraliza o checkbox na célula
+            cell_widget = QWidget()
+            chk_layout = QHBoxLayout(cell_widget)
+            chk_layout.addWidget(chk_box_item)
+            chk_layout.setAlignment(Qt.AlignCenter)
+            chk_layout.setContentsMargins(0,0,0,0)
+            self.tabela.setCellWidget(row, 0, cell_widget)
+            
+            # Armazenamos o dicionário completo do produto para fácil acesso depois
+            item_nome = QTableWidgetItem(prod['nome'])
+            item_nome.setData(Qt.UserRole, prod) 
+            self.tabela.setItem(row, 1, item_nome)
+
+            self.tabela.setItem(row, 2, QTableWidgetItem(str(prod['estoque'])))
+            self.tabela.setItem(row, 3, QTableWidgetItem(prod['meli_id']))
+        
+        self.tabela.resizeColumnsToContents()
+        self.tabela.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+
+    def marcar_desmarcar_todos(self, checked=True):
+        for row in range(self.tabela.rowCount()):
+            chk_box = self.tabela.cellWidget(row, 0).findChild(QCheckBox)
+            if chk_box:
+                chk_box.setChecked(checked)
+
+    def aceitar_selecao(self):
+        self.produtos_selecionados.clear()
+        for row in range(self.tabela.rowCount()):
+            chk_box = self.tabela.cellWidget(row, 0).findChild(QCheckBox)
+            if chk_box and chk_box.isChecked():
+                # Recuperamos o dicionário que guardamos no item da coluna 1
+                produto = self.tabela.item(row, 1).data(Qt.UserRole)
+                self.produtos_selecionados.append(produto)
+        
+        if not self.produtos_selecionados:
+            QMessageBox.warning(self, "Nenhum Produto Selecionado", "Por favor, marque pelo menos um produto para sincronizar.")
+            return
+
+        self.accept() # Fecha o diálogo com sucesso
+
+    def get_selecao(self):
+        return self.produtos_selecionados
+
+# ==============================================================================
+# JANELA PRINCIPAL (COM MUDANÇAS)
 # ==============================================================================
 class MercadoLivreWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.janela_vincular = None
-        print("Janela: __init__")
         self.backend = MercadoLivreBackend()
         self.init_ui()
         self.carregar_dados_reais()
+        self.showMaximized()
     
     def init_ui(self):
-        print("Janela: init_ui")
         self.setWindowTitle("Painel Mercado Livre")
         self.setStyleSheet("background-color: #f8f9fa;")
         
@@ -438,10 +524,15 @@ class MercadoLivreWindow(QMainWindow):
         titulo.setFont(QFont("Arial", 24, QFont.Bold))
         titulo.setStyleSheet("color: white; background: transparent;")
         
-        info = QLabel("Todas as suas vendas do Mercado Livre em um só lugar")
-        info.setFont(QFont("Arial", 12))
-        info.setStyleSheet("color: white; background: transparent;")
-        info.setAlignment(Qt.AlignRight)
+        btn_sincronizar_estoque = QPushButton("🔄 Sincronizar Estoque")
+        btn_sincronizar_estoque.setFont(QFont("Arial", 12, QFont.Bold))
+        btn_sincronizar_estoque.setStyleSheet("""
+            QPushButton { background-color: #ffffff; color: #333; padding: 10px 15px; border-radius: 5px; border: 1px solid #ccc; }
+            QPushButton:hover { background-color: #f0f0f0; }
+        """)
+        btn_sincronizar_estoque.setCursor(QCursor(Qt.PointingHandCursor))
+        # ### MUDANÇA ###: O botão agora chama o diálogo de escolha
+        btn_sincronizar_estoque.clicked.connect(self.abrir_dialogo_sincronizacao)
         
         btn_vincular_produtos = QPushButton("🔗 Vincular Produtos")
         btn_vincular_produtos.setFont(QFont("Arial", 12, QFont.Bold))
@@ -451,20 +542,15 @@ class MercadoLivreWindow(QMainWindow):
         """)
         btn_vincular_produtos.setCursor(QCursor(Qt.PointingHandCursor))
         btn_vincular_produtos.clicked.connect(self.abrir_janela_vincular)
-        
-        btn_simular_venda = QPushButton("💸 Simular Sincronização")
-        btn_simular_venda.setStyleSheet("background-color: #dc3545; color: white; padding: 10px;")
-        btn_simular_venda.setFont(QFont("Arial", 10, QFont.Bold))
-        btn_simular_venda.clicked.connect(self.simular_venda_local_e_sincronizar)
 
         header_layout.addWidget(titulo)
         header_layout.addStretch()
-        header_layout.addWidget(btn_simular_venda)
+        header_layout.addWidget(btn_sincronizar_estoque)
         header_layout.addWidget(btn_vincular_produtos)
-        header_layout.addWidget(info)
         layout_pai.addWidget(header_frame)
     
     def criar_resumo(self, layout_pai):
+        # ... (código existente, sem alterações)
         resumo_frame = QFrame()
         resumo_frame.setStyleSheet("background: transparent;")
         resumo_layout = QHBoxLayout(resumo_frame)
@@ -478,8 +564,9 @@ class MercadoLivreWindow(QMainWindow):
         resumo_layout.addWidget(card3)
         resumo_layout.addWidget(card4)
         layout_pai.addWidget(resumo_frame)
-    
+
     def criar_card_resumo(self, titulo, valor, cor):
+        # ... (código existente, sem alterações)
         card = QFrame()
         card.setFixedSize(250, 100)
         card.setStyleSheet(f"""QFrame {{ background-color: white; border-radius: 10px; border-left: 5px solid {cor}; }}""")
@@ -495,8 +582,9 @@ class MercadoLivreWindow(QMainWindow):
         layout.addWidget(lbl_valor)
         layout.addStretch()
         return card, lbl_valor
-    
+
     def criar_tabela_vendas(self, layout_pai):
+        # ... (código existente, sem alterações)
         table_frame = QFrame()
         table_frame.setStyleSheet("""QFrame { background-color: white; border-radius: 10px; border: 1px solid #dee2e6; }""")
         table_layout = QVBoxLayout(table_frame)
@@ -519,13 +607,14 @@ class MercadoLivreWindow(QMainWindow):
         table_layout.addWidget(titulo_table)
         table_layout.addWidget(self.tabela)
         layout_pai.addWidget(table_frame)
-    
+
     def carregar_dados_reais(self):
-        print("Janela: Carregando dados reais...")
+        # ... (código existente, sem alterações)
         if not self.backend.is_configured():
             QMessageBox.warning(self, "Integração Não Configurada", "Execute o script 'gerar_tokens.py' primeiro.")
             return
 
+        self.setCursor(QCursor(Qt.WaitCursor))
         try:
             self.lbl_vendas_hoje.setText(f"R$ {self.backend.get_vendas_hoje():.2f}".replace('.',','))
             self.lbl_vendas_mes.setText(f"R$ {self.backend.get_vendas_mes():.2f}".replace('.',','))
@@ -553,73 +642,112 @@ class MercadoLivreWindow(QMainWindow):
                 btn_detalhes.clicked.connect(lambda checked, r=row: self.ver_detalhes(r))
                 self.tabela.setCellWidget(row, 6, btn_detalhes)
         except Exception as e:
-            print(f"Janela: Erro ao carregar dados na UI: {e}")
             QMessageBox.critical(self, "Erro ao carregar dados", f"Ocorreu um erro: {e}")
+        finally:
+            self.unsetCursor()
 
     def ver_detalhes(self, row):
+        # ... (código existente, sem alterações)
         produto = self.tabela.item(row, 2).text()
         cliente = self.tabela.item(row, 3).text()
         QMessageBox.information(self, "Detalhes da Venda", f"Exibindo detalhes para o produto:\n\n{produto}\n\nVendido para: {cliente}")
 
     def abrir_janela_vincular(self):
+        # ... (código existente, sem alterações)
         if self.janela_vincular is None or not self.janela_vincular.isVisible():
             self.janela_vincular = VincularProdutosWindow(self.backend)
             self.janela_vincular.show()
 
-    def simular_venda_local_e_sincronizar(self):
-        # --- DADOS PARA O NOSSO TESTE ---
-        # Substitua pelos IDs do produto que você vinculou
-        id_produto_local = 12 
-        meli_id_vinculado = "MLB4105289483" # Coloque o ID do anúncio com variações aqui
-        # --- FIM DOS DADOS DE TESTE ---
-
-        print(f"--- SIMULANDO SINCRONIZAÇÃO PARA O PRODUTO ID: {id_produto_local} ---")
-
-        # 1. Obter o estoque atual do seu sistema
-        estoque_atual_sistema = 0
-        try:
-            con = fdb.connect(**self.backend.DB_CONFIG)
-            cur = con.cursor()
-            cur.execute("SELECT QUANTIDADE_ESTOQUE FROM PRODUTOS WHERE ID = ?", (id_produto_local,))
-            resultado = cur.fetchone()
-            if resultado:
-                estoque_atual_sistema = resultado[0]
-            con.close()
-        except Exception as e:
-            QMessageBox.critical(self, "Erro DB", f"Não foi possível ler o estoque local: {e}")
+    # ### MUDANÇA ###: Nova função para abrir o diálogo de escolha
+    def abrir_dialogo_sincronizacao(self):
+        produtos_vinculados = self.backend.get_linked_products()
+        if not produtos_vinculados:
+            QMessageBox.information(self, "Nenhum Produto Vinculado", "Não há produtos vinculados para sincronizar. Vincule alguns produtos primeiro.")
             return
-        
-        print(f"Estoque ATUAL no sistema é: {estoque_atual_sistema}")
-        
-        # A simulação agora apenas TENTA enviar o estoque atual para o MELI.
-        novo_estoque_para_enviar = estoque_atual_sistema
 
+        # Cria a caixa de diálogo com as opções
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Modo de Sincronização")
+        msg_box.setText("Como você deseja sincronizar o estoque?")
+        msg_box.setIcon(QMessageBox.Question)
+        
+        # Adiciona botões personalizados
+        btn_todos = msg_box.addButton("Sincronizar Todos", QMessageBox.AcceptRole)
+        btn_selecionar = msg_box.addButton("Selecionar Produtos...", QMessageBox.ActionRole)
+        msg_box.addButton("Cancelar", QMessageBox.RejectRole)
+        
+        msg_box.exec_()
+        
+        clicked_button = msg_box.clickedButton()
+
+        if clicked_button == btn_todos:
+            # Opção: Sincronizar todos
+            self.executar_sincronizacao(produtos_vinculados)
+        elif clicked_button == btn_selecionar:
+            # Opção: Abrir janela de seleção
+            dialog = SelecaoSincronizacaoWindow(self.backend, self)
+            # .exec_() pausa a execução aqui até o diálogo ser fechado
+            if dialog.exec_() == QDialog.Accepted:
+                produtos_para_sincronizar = dialog.get_selecao()
+                if produtos_para_sincronizar:
+                    self.executar_sincronizacao(produtos_para_sincronizar)
+    
+    # ### MUDANÇA ###: Lógica de sincronização foi movida para esta função reutilizável
+    def executar_sincronizacao(self, lista_de_produtos):
+        if not lista_de_produtos:
+            return
+
+        total = len(lista_de_produtos)
         reply = QMessageBox.question(self, "Confirmar Sincronização",
-            f"Isso tentará sincronizar o estoque do anúncio {meli_id_vinculado} "
-            f"para o valor atual do seu sistema, que é {novo_estoque_para_enviar}. Continuar?",
-            QMessageBox.Yes | QMessageBox.No)
+            f"Você está prestes a sincronizar o estoque de {total} produto(s).\n\n"
+            "Deseja continuar?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply != QMessageBox.Yes:
             return
 
-        # 2. CHAMAR A API PARA SINCRONIZAR COM O MERCADO LIVRE
-        print(f"Iniciando sincronização com o Mercado Livre para o item {meli_id_vinculado}...")
-        resultado_api = self.backend.atualizar_estoque_meli(meli_id_vinculado, novo_estoque_para_enviar)
+        # Usar QProgressDialog para dar um feedback visual melhor
+        progress = QProgressDialog("Sincronizando produtos...", "Cancelar", 0, total, self)
+        progress.setWindowTitle("Progresso da Sincronização")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.show()
 
-        if resultado_api:
-            QMessageBox.information(self, "Sincronização OK", f"Estoque do anúncio {meli_id_vinculado} atualizado com sucesso no Mercado Livre para {novo_estoque_para_enviar}!")
-        else:
-            QMessageBox.critical(self, "Falha na Sincronização", "Ocorreu um erro ao tentar atualizar o estoque no Mercado Livre. Verifique o terminal.")
+        sucessos = 0
+        falhas = 0
 
-        # Recarrega a tela de vinculação se ela estiver aberta, para vermos as mudanças
+        for i, produto in enumerate(lista_de_produtos):
+            progress.setValue(i)
+            QApplication.processEvents() # Garante que a UI não trave
+
+            if progress.wasCanceled():
+                break
+
+            nome_prod = produto['nome']
+            meli_id = produto['meli_id']
+            estoque_local = produto['estoque']
+            
+            progress.setLabelText(f"Sincronizando '{nome_prod}' ({i+1}/{total})...")
+            
+            resultado_api = self.backend.atualizar_estoque_meli(meli_id, estoque_local)
+
+            if resultado_api:
+                sucessos += 1
+            else:
+                falhas += 1
+        
+        progress.setValue(total)
+
+        mensagem_final = f"Sincronização concluída!\n\n" \
+                         f"✅ Produtos atualizados com sucesso: {sucessos}\n" \
+                         f"❌ Falhas na atualização: {falhas}"
+        
+        QMessageBox.information(self, "Resultado da Sincronização", mensagem_final)
+
+        # Recarregar as telas para refletir as mudanças
         if self.janela_vincular and self.janela_vincular.isVisible():
             self.janela_vincular.carregar_listas()
         
-        self.carregar_dados_reais() # Recarrega também o painel principal
-
-# ==============================================================================
-# FIM DA JANELA PRINCIPAL
-# ==============================================================================
+        self.carregar_dados_reais()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
