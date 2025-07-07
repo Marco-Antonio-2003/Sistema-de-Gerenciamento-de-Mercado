@@ -110,7 +110,8 @@ class ConfiguracaoSistemaBackend:
             "Relatório de Vendas de Produtos",
             "Configuração de estação",
             "Configuração do Sistema",
-            "PDV - Ponto de Venda"
+            "PDV - Ponto de Venda",
+            "Ver Dashboard do Mercado livre"
         ]
         return modulos
     
@@ -169,13 +170,14 @@ class ConfiguracaoSistemaBackend:
             for modulo, tem_acesso in resultado:
                 permissoes[modulo] = (tem_acesso == 'S')
             
-            # Adicionar módulos que não estão no banco ainda, com acesso negado por padrão
+            # Adicionar módulos que não estão no banco ainda, com acesso CONCEDIDO por padrão
             modulos_disponiveis = self.listar_modulos_sistema()
             for modulo in modulos_disponiveis:
                 if modulo not in permissoes:
-                    # Criar permissão padrão no banco de dados
-                    self.definir_permissao(id_funcionario, nome_funcionario, modulo, False)
-                    permissoes[modulo] = False
+                    # ### A MUDANÇA ESTÁ AQUI ###
+                    # Criar permissão padrão no banco de dados com acesso VERDADEIRO
+                    self.definir_permissao(id_funcionario, nome_funcionario, modulo, True) # <-- Mudado de False para True
+                    permissoes[modulo] = True # <-- Mudado de False para True
             
             return permissoes
         except Exception as e:

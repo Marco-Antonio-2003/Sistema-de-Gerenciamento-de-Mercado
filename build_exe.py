@@ -1,7 +1,5 @@
 """
-Script para compilar o MB Sistema em um executável (VERSÃO MELHORADA)
-Salve este arquivo na pasta raiz do projeto e execute-o com:
-python build_exe.py
+Script para compilar o MB Sistema em um único executável (Modo --onefile)
 """
 
 import os
@@ -10,12 +8,9 @@ import subprocess
 import sys
 
 def main():
-    print("Preparando para compilar MB Sistema para executável...")
+    print("Preparando para compilar MB Sistema em um único executável...")
     
-    # --- Verificação de Módulos (sem alterações) ---
-    # (Toda a sua parte de verificação de módulos permanece aqui)
-
-    # --- Limpeza de Builds Anteriores (Recomendado) ---
+    # --- Limpeza ---
     print("Limpando builds anteriores...")
     if os.path.exists('build'):
         shutil.rmtree('build')
@@ -24,67 +19,62 @@ def main():
     if os.path.exists('MBSistema.spec'):
         os.remove('MBSistema.spec')
 
-    # --- Comando PyInstaller Mais Robusto ---
+    # --- Comando PyInstaller com --onefile ---
     print("Executando PyInstaller...")
 
-    # Parâmetros para o PyInstaller
     pyinstaller_params = [
         sys.executable, "-m", "PyInstaller",
         "login.py",
         "--name", "MBSistema",
-        "--onefile",
+        "--onefile",  # <<< AQUI ESTÁ A CHAVE: Voltamos para o modo de arquivo único
         "--windowed",
-        # <<< MELHORIA >>> Adiciona o diretório raiz aos caminhos de busca de módulos
-        # Isso ajuda o PyInstaller a encontrar pacotes como 'ecommerce', 'base', etc.
         "--paths", ".",
     ]
 
-    # Adicionar ícone se existir
+    # Adicionar ícone
     if os.path.exists("ico-img/icone.ico"):
         pyinstaller_params.extend(["--icon", "ico-img/icone.ico"])
 
-    # <<< MELHORIA >>> Adicionar dados de forma explícita
-    # O formato é 'origem:destino_dentro_do_exe'
+    # Adicionar dados e binários que precisam ser extraídos em tempo de execução
     data_to_add = [
         "ico-img", "base", "PDV", "geral", "vendas", "produtos_e_servicos",
         "compras", "financeiro", "relatorios", "notas_fiscais", "ferramentas",
-        "mercado_livre" # Adiciona a pasta de ecommerce explicitamente
+        "mercado_livre", "cupons"
     ]
-    for data in data_to_add:
-        if os.path.exists(data):
-            pyinstaller_params.extend(["--add-data", f"{data}{os.pathsep}{data}"])
-        else:
-            print(f"AVISO: Diretório de dados '{data}' não encontrado!")
+    for folder_name in data_to_add:
+        if os.path.exists(folder_name):
+            pyinstaller_params.extend(["--add-data", f"{folder_name};{folder_name}"])
 
-    # Adicionar syncthing.exe se existir
-    if os.path.exists("syncthing.exe"):
-        pyinstaller_params.extend(["--add-data", f"syncthing.exe{os.pathsep}."])
+    files_to_add = ["syncthing.exe", "assistente_historico.json"]
+    for file_name in files_to_add:
+        if os.path.exists(file_name):
+            pyinstaller_params.extend(["--add-data", f"{file_name};."])
 
-    # <<< MELHORIA >>> Adicionar importações ocultas de forma explícita
+    # Adicionar importações ocultas
     hidden_imports = [
-        'requests', 'urllib3', 'idna', 'chardet', 'certifi', 
+        'requests', 'urllib3', 'idna', 'chardet', 'certifi', 'ctypes',
         'PyQt5.QtSvg', 'reportlab.pdfgen.canvas', 'reportlab.lib.pagesizes', 
         'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print',
-        'dotenv', 'webbrowser',
-        # <<< ADICIONADO >>> Força a inclusão dos módulos do seu novo pacote
-        'mercado_livre.main_final',
-        'mercado_livre.gerar_tokens',
+        'dotenv', 'webbrowser', 'mercado_livre.main_final', 'mercado_livre.gerar_tokens',
     ]
     for hi in hidden_imports:
         pyinstaller_params.extend(["--hidden-import", hi])
 
-    # Executar o comando completo
-    print(f"Comando PyInstaller: {' '.join(pyinstaller_params)}")
-    subprocess.run(pyinstaller_params)
-    
+    # Executar o comando
+    print(f"\nComando PyInstaller: {' '.join(pyinstaller_params)}\n")
+    try:
+        subprocess.run(pyinstaller_params, check=True)
+    except subprocess.CalledProcessError:
+        print("\nERRO: O PyInstaller falhou.")
+        return
+
     # --- Verificação Final ---
     exe_path = os.path.join("dist", "MBSistema.exe")
     if os.path.exists(exe_path):
         print("\nCompilação concluída com sucesso!")
-        print(f"O executável está disponível em: {exe_path}")
+        print(f"O executável único está disponível em: dist\\MBSistema.exe")
     else:
         print("\nAVISO: A compilação pode não ter sido concluída corretamente.")
-        print("Verifique as mensagens de erro acima.")
 
 if __name__ == "__main__":
     main()

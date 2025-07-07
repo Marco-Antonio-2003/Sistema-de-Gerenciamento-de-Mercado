@@ -73,11 +73,6 @@ class BancoDadosAssistente:
             
             # Contas correntes
             r'contas?\s*correntes?': self.contar_contas_correntes,
-            
-            # Resumo geral
-            r'resumo\s*geral': self.resumo_geral,
-            r'dashboard': self.resumo_geral,
-            r'visão\s*geral': self.resumo_geral,
         }
     
     def processar_pergunta(self, pergunta):
@@ -1056,6 +1051,9 @@ class ChatWidget(QWidget):
 class ChatbotAssistente(QWidget):
     """Widget principal otimizado"""
     navegar_para = pyqtSignal(str, str)
+    # ### NOVO SINAL ###
+    # Sinal para pedir que o dock seja fechado.
+    fechar_solicitado = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1086,8 +1084,9 @@ class ChatbotAssistente(QWidget):
                 font-weight: bold;
             }
         """)
-        header_layout.addWidget(header, 1)
+        header_layout.addWidget(header, 1) # Adiciona o título
         
+        # Botão Limpar (continua o mesmo)
         btn_limpar = QPushButton("🗑️")
         btn_limpar.setToolTip("Limpar conversa")
         btn_limpar.setFixedSize(30, 30)
@@ -1104,6 +1103,28 @@ class ChatbotAssistente(QWidget):
             }
         """)
         header_layout.addWidget(btn_limpar)
+
+        # ### MUDANÇA 3: Adicionando o botão 'X' de fechar ###
+        btn_fechar = QPushButton("X")
+        btn_fechar.setToolTip("Fechar assistente")
+        btn_fechar.setFixedSize(30, 30)
+        btn_fechar.setStyleSheet("""
+            QPushButton { 
+                background-color: transparent; 
+                color: white; 
+                border: none; 
+                font-size: 14px; 
+                font-weight: bold;
+                border-radius: 15px;
+            }
+            QPushButton:hover { 
+                background-color: #c0392b; /* Vermelho ao passar o mouse */
+            }
+        """)
+        # Conecta o clique do botão ao novo sinal
+        btn_fechar.clicked.connect(self.fechar_solicitado.emit)
+        header_layout.addWidget(btn_fechar)
+        
         layout.addWidget(header_frame)
         
         self.chat_widget = ChatWidget()
@@ -1117,32 +1138,23 @@ class ChatbotDockWidget(QDockWidget):
     navegar_para_main = pyqtSignal(str, str)
     
     def __init__(self, parent=None):
-        super().__init__("Assistente Virtual", parent)
-        self.chatbot_widget_interno = ChatbotAssistente()
-        self.setWidget(self.chatbot_widget_interno)
-        self.chatbot_widget_interno.navegar_para.connect(self.navegar_para_main.emit)
+        super().__init__("", parent) 
         
-        # Configurações otimizadas
-        self.setFeatures(
-            QDockWidget.DockWidgetMovable | 
-            QDockWidget.DockWidgetFloatable | 
-            QDockWidget.DockWidgetClosable
-        )
+        self.chatbot_widget_interno = ChatbotAssistente(self)
+        self.setWidget(self.chatbot_widget_interno)
+        
+        # Conexões dos sinais
+        self.chatbot_widget_interno.navegar_para.connect(self.navegar_para_main.emit)
+        # ### NOVA CONEXÃO ###
+        # Quando o botão 'X' for clicado, ele emite 'fechar_solicitado',
+        # que por sua vez chama o método 'hide()' do próprio dock para se fechar.
+        self.chatbot_widget_interno.fechar_solicitado.connect(self.hide)
+
+        self.setTitleBarWidget(QWidget())
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.setMinimumWidth(350)
         self.setMaximumWidth(500)
-        
-        self.setStyleSheet("""
-            QDockWidget { 
-                border: 1px solid #005079;
-            }
-            QDockWidget::title { 
-                background-color: #005079; 
-                color: white; 
-                padding: 8px; 
-                font-weight: bold;
-            }
-        """)
+        self.setStyleSheet("QDockWidget { border: 1px solid #005079; }")
 
 
 # Função de integração otimizada
