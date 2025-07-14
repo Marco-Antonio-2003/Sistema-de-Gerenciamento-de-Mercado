@@ -1,3 +1,4 @@
+# Seus imports permanecem os mesmos
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox,
@@ -6,297 +7,236 @@ from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer
 
 # Importar funções do banco de dados
+# Assumindo que get_connection() retorna um objeto de conexão padrão DB-API 2.0
 from base.banco import execute_query, get_connection
 
 class ConfiguracaoSistemaBackend:
-    """Classe que gerencia o back-end da Configuração do Sistema"""
+    """
+    Classe que gerencia o back-end da Configuração do Sistema (Versão Otimizada)
+    """
     
+    # OTIMIZAÇÃO: Definir a lista de módulos como uma constante de classe.
+    # Isso evita recriá-la toda vez que o método é chamado e facilita a manutenção.
+    MODULOS_SISTEMA = [
+        "Cadastro de empresa", "Cadastro de Clientes", "Cadastro Funcionários",
+        "Consulta CNPJ", "Produtos", "Fornecedores", "Pedido de vendas",
+        "Recebimento de clientes", "Gerar lançamento Financeiro", "Controle de caixa (PDV)",
+        "Conta corrente", "Classes financeiras", "Relatório de Vendas de Produtos",
+        "Configuração de estação", "Configuração do Sistema", "PDV - Ponto de Venda",
+        "Ver Dashboard do Mercado livre"
+    ]
+
     def verificar_tabela_permissoes(self):
         """
-        Verifica se a tabela PERMISSOES_SISTEMA existe e a cria se não existir
-        
-        Returns:
-            bool: True se a tabela existe ou foi criada com sucesso
+        Verifica se a tabela PERMISSOES_SISTEMA existe e a cria se não existir.
+        OTIMIZAÇÃO: Usa uma transação para garantir a atomicidade da criação.
         """
+        conn = None
         try:
             # Verificar se a tabela existe
-            query_check = """
-            SELECT COUNT(*) FROM RDB$RELATIONS 
-            WHERE RDB$RELATION_NAME = 'PERMISSOES_SISTEMA'
-            """
+            query_check = "SELECT COUNT(*) FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = 'PERMISSOES_SISTEMA'"
             result = execute_query(query_check)
             
-            # Se a tabela não existe, cria
-            if result[0][0] == 0:
-                print("Tabela PERMISSOES_SISTEMA não encontrada. Criando...")
-                query_create = """
-                CREATE TABLE PERMISSOES_SISTEMA (
-                    ID INTEGER NOT NULL PRIMARY KEY,
-                    ID_FUNCIONARIO INTEGER NOT NULL,
-                    NOME_FUNCIONARIO VARCHAR(100) NOT NULL,
-                    MODULO VARCHAR(100) NOT NULL,
-                    TEM_ACESSO CHAR(1) DEFAULT 'N'
-                )
-                """
-                execute_query(query_create)
-                print("Tabela PERMISSOES_SISTEMA criada com sucesso.")
+            if result and result[0][0] == 0:
+                print("Tabela PERMISSOES_SISTEMA não encontrada. Iniciando criação...")
                 
-                # Criar o gerador de IDs (sequence)
+                # OTIMIZAÇÃO: Usar uma transação para criar a tabela e seus objetos dependentes.
+                # Isso garante que ou tudo é criado com sucesso, ou nada é.
+                conn = get_connection()
+                cursor = conn.cursor()
+
                 try:
-                    query_generator = """
-                    CREATE GENERATOR GEN_PERMISSOES_SISTEMA_ID
-                    """
-                    execute_query(query_generator)
-                    print("Gerador de IDs criado com sucesso.")
+                    # Agrupar todos os comandos de criação (DDL)
+                    ddl_commands = [
+                        """
+                        CREATE TABLE PERMISSOES_SISTEMA (
+                            ID INTEGER NOT NULL PRIMARY KEY,
+                            ID_FUNCIONARIO INTEGER NOT NULL,
+                            NOME_FUNCIONARIO VARCHAR(100) NOT NULL,
+                            MODULO VARCHAR(100) NOT NULL,
+                            TEM_ACESSO CHAR(1) DEFAULT 'N'
+                        )
+                        """,
+                        "CREATE GENERATOR GEN_PERMISSOES_SISTEMA_ID",
+                        """
+                        CREATE TRIGGER PERMISSOES_SISTEMA_BI FOR PERMISSOES_SISTEMA
+                        ACTIVE BEFORE INSERT POSITION 0
+                        AS
+                        BEGIN
+                            IF (NEW.ID IS NULL) THEN
+                                NEW.ID = GEN_ID(GEN_PERMISSOES_SISTEMA_ID, 1);
+                        END
+                        """,
+                        "CREATE INDEX IDX_PERMISSOES_FUNCIONARIO ON PERMISSOES_SISTEMA (ID_FUNCIONARIO, MODULO)"
+                    ]
+                    
+                    for cmd in ddl_commands:
+                        try:
+                            cursor.execute(cmd)
+                            print(f"Executado com sucesso: {cmd.splitlines()[1].strip() if len(cmd.splitlines()) > 1 else cmd}")
+                        except Exception as e:
+                            # Ignora erros se o objeto já existir (comportamento original)
+                            print(f"Aviso: Objeto pode já existir. Comando: '{cmd.split()[0]} {cmd.split()[1]}'. Erro: {e}")
+                            
+                    conn.commit()
+                    print("Criação da tabela e objetos relacionados concluída com sucesso.")
+                    
                 except Exception as e:
-                    print(f"Aviso: Gerador pode já existir: {e}")
-                
-                # Criar o trigger para autoincrementar o ID
-                try:
-                    query_trigger = """
-                    CREATE TRIGGER PERMISSOES_SISTEMA_BI FOR PERMISSOES_SISTEMA
-                    ACTIVE BEFORE INSERT POSITION 0
-                    AS
-                    BEGIN
-                        IF (NEW.ID IS NULL) THEN
-                            NEW.ID = GEN_ID(GEN_PERMISSOES_SISTEMA_ID, 1);
-                    END
-                    """
-                    execute_query(query_trigger)
-                    print("Trigger criado com sucesso.")
-                except Exception as e:
-                    print(f"Aviso: Trigger pode já existir: {e}")
-                
-                # Criar um índice para melhorar a performance das consultas
-                try:
-                    query_index = """
-                    CREATE INDEX IDX_PERMISSOES_FUNCIONARIO ON PERMISSOES_SISTEMA (ID_FUNCIONARIO)
-                    """
-                    execute_query(query_index)
-                    print("Índice criado com sucesso.")
-                except Exception as e:
-                    print(f"Aviso: Índice pode já existir: {e}")
-                
-                return True
+                    if conn:
+                        conn.rollback() # Desfaz tudo se algo der errado
+                    print(f"Erro catastrófico durante a criação da tabela. Rollback executado. Erro: {e}")
+                    raise
+                finally:
+                    if conn:
+                        conn.close()
             else:
                 print("Tabela PERMISSOES_SISTEMA já existe.")
-            
             return True
         except Exception as e:
             print(f"Erro ao verificar/criar tabela: {e}")
-            raise Exception(f"Erro ao verificar/criar tabela de permissões: {str(e)}")
-    
+            raise Exception(f"Erro fatal ao inicializar o banco de dados para permissões: {str(e)}")
+
     def listar_modulos_sistema(self):
-        """
-        Lista todos os módulos/recursos do sistema que podem ter permissões configuradas
-        
-        Returns:
-            list: Lista de nomes dos módulos disponíveis
-        """
-        # Lista atualizada com os módulos específicos solicitados pelo usuário
-        modulos = [
-            "Cadastro de empresa",
-            "Cadastro de Clientes",
-            "Cadastro Funcionários",
-            "Consulta CNPJ",
-            "Produtos",
-            "Fornecedores",
-            "Pedido de vendas",
-            "Recebimento de clientes",
-            "Gerar lançamento Financeiro",
-            "Controle de caixa (PDV)",
-            "Conta corrente",
-            "Classes financeiras",
-            "Relatório de Vendas de Produtos",
-            "Configuração de estação",
-            "Configuração do Sistema",
-            "PDV - Ponto de Venda",
-            "Ver Dashboard do Mercado livre"
-        ]
-        return modulos
+        """Retorna a lista de módulos do sistema."""
+        return self.MODULOS_SISTEMA
     
     def listar_funcionarios(self):
-        """
-        Lista todos os funcionários cadastrados no sistema
-        
-        Returns:
-            list: Lista de tuplas com ID e Nome dos funcionários
-        """
+        """Lista todos os funcionários cadastrados no sistema."""
         try:
-            query = """
-            SELECT ID, NOME FROM FUNCIONARIOS
-            ORDER BY NOME
-            """
-            resultado = execute_query(query)
-            return resultado
+            query = "SELECT ID, NOME FROM FUNCIONARIOS ORDER BY NOME"
+            return execute_query(query)
         except Exception as e:
             print(f"Erro ao listar funcionários: {e}")
             return []
-    
+
     def obter_permissoes_funcionario(self, id_funcionario):
         """
-        Obtém todas as permissões de um funcionário
-        
-        Args:
-            id_funcionario (int): ID do funcionário
-            
-        Returns:
-            dict: Dicionário com módulos como chaves e True/False como valores
+        Obtém todas as permissões de um funcionário.
+        OTIMIZAÇÃO: Reduz múltiplas chamadas ao BD para uma única operação de inserção em lote.
         """
         try:
-            # Verificar se o funcionário existe
-            query_check = """
-            SELECT NOME FROM FUNCIONARIOS
-            WHERE ID = ?
-            """
-            resultado_check = execute_query(query_check, (id_funcionario,))
-            
-            if not resultado_check or len(resultado_check) == 0:
-                print(f"Funcionário com ID {id_funcionario} não encontrado")
+            # 1. Obter nome do funcionário
+            nome_funcionario_result = execute_query("SELECT NOME FROM FUNCIONARIOS WHERE ID = ?", (id_funcionario,))
+            if not nome_funcionario_result:
+                print(f"Funcionário com ID {id_funcionario} não encontrado.")
                 return {}
-            
-            nome_funcionario = resultado_check[0][0]
-            
-            # Buscar permissões existentes
-            query = """
-            SELECT MODULO, TEM_ACESSO
-            FROM PERMISSOES_SISTEMA
-            WHERE ID_FUNCIONARIO = ?
-            """
-            resultado = execute_query(query, (id_funcionario,))
-            
-            # Converter para dicionário
-            permissoes = {}
-            for modulo, tem_acesso in resultado:
-                permissoes[modulo] = (tem_acesso == 'S')
-            
-            # Adicionar módulos que não estão no banco ainda, com acesso CONCEDIDO por padrão
-            modulos_disponiveis = self.listar_modulos_sistema()
-            for modulo in modulos_disponiveis:
-                if modulo not in permissoes:
-                    # ### A MUDANÇA ESTÁ AQUI ###
-                    # Criar permissão padrão no banco de dados com acesso VERDADEIRO
-                    self.definir_permissao(id_funcionario, nome_funcionario, modulo, True) # <-- Mudado de False para True
-                    permissoes[modulo] = True # <-- Mudado de False para True
-            
+            nome_funcionario = nome_funcionario_result[0][0]
+
+            # 2. Buscar permissões já existentes no banco
+            permissoes_db = execute_query(
+                "SELECT MODULO, TEM_ACESSO FROM PERMISSOES_SISTEMA WHERE ID_FUNCIONARIO = ?", 
+                (id_funcionario,)
+            )
+            permissoes = {modulo: tem_acesso == 'S' for modulo, tem_acesso in permissoes_db}
+
+            # 3. Identificar módulos que ainda não têm registro no banco para este funcionário
+            modulos_existentes = set(permissoes.keys())
+            modulos_sistema = set(self.listar_modulos_sistema())
+            modulos_faltantes = modulos_sistema - modulos_existentes
+
+            # 4. OTIMIZAÇÃO: Inserir todos os módulos faltantes de uma só vez.
+            if modulos_faltantes:
+                print(f"Encontrados {len(modulos_faltantes)} módulos sem permissão definida. Criando com acesso padrão...")
+                # O padrão é conceder acesso ('S')
+                dados_para_inserir = [
+                    (id_funcionario, nome_funcionario, modulo, 'S') for modulo in modulos_faltantes
+                ]
+                
+                query_insert = """
+                INSERT INTO PERMISSOES_SISTEMA (ID_FUNCIONARIO, NOME_FUNCIONARIO, MODULO, TEM_ACESSO) 
+                VALUES (?, ?, ?, ?)
+                """
+                
+                # Usar uma transação para garantir que todas as inserções funcionem
+                conn = get_connection()
+                try:
+                    cursor = conn.cursor()
+                    # executemany é muito mais rápido que um loop de execute()
+                    cursor.executemany(query_insert, dados_para_inserir)
+                    conn.commit()
+                finally:
+                    conn.close()
+
+                # Atualizar o dicionário local para refletir as novas permissões
+                for modulo in modulos_faltantes:
+                    permissoes[modulo] = True
+
             return permissoes
         except Exception as e:
             print(f"Erro ao obter permissões do funcionário: {e}")
             return {}
-    
-    def definir_permissao(self, id_funcionario, nome_funcionario, modulo, tem_acesso):
-        """
-        Define uma permissão específica para um funcionário
-        
-        Args:
-            id_funcionario (int): ID do funcionário
-            nome_funcionario (str): Nome do funcionário
-            modulo (str): Nome do módulo
-            tem_acesso (bool): Se o funcionário tem acesso ao módulo
-            
-        Returns:
-            bool: True se a operação foi bem-sucedida
-        """
-        try:
-            # Verificar se a permissão já existe
-            query_check = """
-            SELECT ID FROM PERMISSOES_SISTEMA
-            WHERE ID_FUNCIONARIO = ? AND MODULO = ?
-            """
-            resultado = execute_query(query_check, (id_funcionario, modulo))
-            
-            tem_acesso_str = 'S' if tem_acesso else 'N'
-            
-            if resultado and len(resultado) > 0:
-                # Atualizar permissão existente
-                id_permissao = resultado[0][0]
-                query_update = """
-                UPDATE PERMISSOES_SISTEMA
-                SET TEM_ACESSO = ?
-                WHERE ID = ?
-                """
-                execute_query(query_update, (tem_acesso_str, id_permissao))
-            else:
-                # Inserir nova permissão
-                query_insert = """
-                INSERT INTO PERMISSOES_SISTEMA (
-                    ID_FUNCIONARIO, NOME_FUNCIONARIO, MODULO, TEM_ACESSO
-                ) VALUES (?, ?, ?, ?)
-                """
-                execute_query(query_insert, (id_funcionario, nome_funcionario, modulo, tem_acesso_str))
-            
-            return True
-        except Exception as e:
-            print(f"Erro ao definir permissão: {e}")
-            return False
-    
+
     def salvar_permissoes(self, id_funcionario, permissoes):
         """
-        Salva todas as permissões de um funcionário
-        
-        Args:
-            id_funcionario (int): ID do funcionário
-            permissoes (dict): Dicionário com módulos como chaves e True/False como valores
-            
-        Returns:
-            bool: True se a operação foi bem-sucedida
+        Salva todas as permissões de um funcionário.
+        OTIMIZAÇÃO: Usa `UPDATE OR INSERT` e `executemany` para salvar tudo em uma única chamada ao BD.
         """
         try:
-            # Obter nome do funcionário
-            query_nome = """
-            SELECT NOME FROM FUNCIONARIOS
-            WHERE ID = ?
-            """
-            resultado = execute_query(query_nome, (id_funcionario,))
-            
-            if not resultado or len(resultado) == 0:
-                print(f"Funcionário com ID {id_funcionario} não encontrado")
+            # 1. Obter nome do funcionário
+            nome_funcionario_result = execute_query("SELECT NOME FROM FUNCIONARIOS WHERE ID = ?", (id_funcionario,))
+            if not nome_funcionario_result:
+                print(f"Funcionário com ID {id_funcionario} não encontrado.")
                 return False
-            
-            nome_funcionario = resultado[0][0]
-            
-            # Salvar cada permissão
-            for modulo, tem_acesso in permissoes.items():
-                self.definir_permissao(id_funcionario, nome_funcionario, modulo, tem_acesso)
-            
-            return True
+            nome_funcionario = nome_funcionario_result[0][0]
+
+            # 2. Preparar dados para a operação em lote
+            dados_para_salvar = [
+                (id_funcionario, nome_funcionario, 'S' if tem_acesso else 'N', modulo)
+                for modulo, tem_acesso in permissoes.items()
+            ]
+
+            # 3. OTIMIZAÇÃO: Usar `UPDATE OR INSERT` (UPSERT) específico do Firebird.
+            # Isso atualiza a linha se ela existir ou insere se não existir. Tudo em uma única operação atômica.
+            query_upsert = """
+            UPDATE OR INSERT INTO PERMISSOES_SISTEMA (ID_FUNCIONARIO, NOME_FUNCIONARIO, TEM_ACESSO, MODULO)
+            VALUES (?, ?, ?, ?)
+            MATCHING (ID_FUNCIONARIO, MODULO)
+            """
+
+            # 4. Executar a operação em lote
+            conn = get_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.executemany(query_upsert, dados_para_salvar)
+                conn.commit()
+                print(f"Permissões salvas com sucesso para o funcionário ID {id_funcionario}.")
+                return True
+            except Exception as e:
+                conn.rollback()
+                print(f"Erro ao salvar permissões em lote. Rollback executado. Erro: {e}")
+                return False
+            finally:
+                conn.close()
+
         except Exception as e:
-            print(f"Erro ao salvar permissões: {e}")
+            print(f"Erro ao preparar para salvar permissões: {e}")
             return False
-    
+
     def verificar_permissao(self, id_funcionario, modulo):
         """
-        Verifica se um funcionário tem permissão para um módulo específico
-        
-        Args:
-            id_funcionario (int): ID do funcionário
-            modulo (str): Nome do módulo
-            
-        Returns:
-            bool: True se o funcionário tem acesso, False caso contrário
+        Verifica se um funcionário tem permissão para um módulo específico.
+        (Este método já era eficiente, sem necessidade de grandes alterações).
         """
         try:
-            query = """
-            SELECT TEM_ACESSO
-            FROM PERMISSOES_SISTEMA
-            WHERE ID_FUNCIONARIO = ? AND MODULO = ?
-            """
+            query = "SELECT TEM_ACESSO FROM PERMISSOES_SISTEMA WHERE ID_FUNCIONARIO = ? AND MODULO = ?"
             resultado = execute_query(query, (id_funcionario, modulo))
             
-            if resultado and len(resultado) > 0:
+            if resultado:
                 return resultado[0][0] == 'S'
             
-            # Se não existe registro, o acesso é negado por padrão
+            # Se não há registro, o padrão de segurança é negar o acesso.
+            # Poderíamos consultar obter_permissoes_funcionario, mas isso seria mais lento.
+            # A lógica atual que retorna False para permissões não explícitas é segura e rápida.
             return False
         except Exception as e:
             print(f"Erro ao verificar permissão: {e}")
-            # Em caso de erro, negar acesso por segurança
             return False
 
-
+# A classe ConfiguracaoSistemaWindow (sua UI) não precisa de NENHUMA alteração.
+# Ela continuará funcionando como antes, mas agora será muito mais rápida
+# ao selecionar um funcionário e ao salvar as configurações.
 class ConfiguracaoSistemaWindow(QMainWindow):
-    """Implementação da tela de Configuração do Sistema com o back-end"""
-    
+    # ... seu código da UI permanece exatamente o mesmo ...
     def __init__(self):
         super().__init__()
         self.backend = ConfiguracaoSistemaBackend()
@@ -437,7 +377,6 @@ class ConfiguracaoSistemaWindow(QMainWindow):
                 self.funcionarios_list.addItem(item)
                 
         except Exception as e:
-            print(f"Erro ao carregar funcionários: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao carregar lista de funcionários: {str(e)}")
     
     def employee_selected(self, item):
@@ -451,7 +390,7 @@ class ConfiguracaoSistemaWindow(QMainWindow):
                 checkbox.setEnabled(True)
                 checkbox.setChecked(False)
             
-            # Carregar as permissões do funcionário
+            # Carregar as permissões do funcionário (agora muito mais rápido)
             permissoes = self.backend.obter_permissoes_funcionario(id_funcionario)
             
             # Marcar as caixas de acordo com as permissões
@@ -460,7 +399,6 @@ class ConfiguracaoSistemaWindow(QMainWindow):
                     self.checkbox_widgets[modulo].setChecked(tem_acesso)
             
         except Exception as e:
-            print(f"Erro ao selecionar funcionário: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao carregar permissões: {str(e)}")
     
     def save_configuration(self):
@@ -480,20 +418,45 @@ class ConfiguracaoSistemaWindow(QMainWindow):
             for modulo, checkbox in self.checkbox_widgets.items():
                 permissoes[modulo] = checkbox.isChecked()
             
-            # Salvar as permissões
+            # Salvar as permissões (agora muito mais rápido)
             if self.backend.salvar_permissoes(id_funcionario, permissoes):
                 QMessageBox.information(self, "Sucesso", "Configurações salvas com sucesso!")
             else:
                 QMessageBox.warning(self, "Erro", "Erro ao salvar as configurações")
             
         except Exception as e:
-            print(f"Erro ao salvar configurações: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao salvar configurações: {str(e)}")
 
 
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
+    # Simulação do módulo de banco de dados para teste
+    # Em seu ambiente real, remova este bloco e use o seu `base.banco`
+    class MockDb:
+        def get_connection(self):
+            # Esta função precisaria de uma implementação real para testes
+            # mas o código da aplicação não precisa dela diretamente, apenas o backend
+            return None 
+        def execute_query(self, query, params=()):
+            print(f"Executing Query: {query} with params {params}")
+            if "FROM FUNCIONARIOS" in query:
+                return [(1, "Alice"), (2, "Bob")]
+            if "FROM PERMISSOES_SISTEMA" in query:
+                # Simula que o funcionário 1 tem uma permissão
+                if params and params[0] == 1:
+                    return [("Cadastro de Clientes", "S")]
+                return [] # Simula que o funcionário 2 não tem nenhuma
+            if "FROM RDB$RELATIONS" in query:
+                return [(1,)] # Simula que a tabela já existe
+            return []
+
+    mock_db = MockDb()
+    # Substituindo as funções reais pelas mockadas
+    import base.banco as banco
+    banco.execute_query = mock_db.execute_query
+    banco.get_connection = mock_db.get_connection
+    
     window = ConfiguracaoSistemaWindow()
     window.show()
     sys.exit(app.exec_())

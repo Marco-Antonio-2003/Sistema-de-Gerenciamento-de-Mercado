@@ -3,10 +3,10 @@
 
 a = Analysis(
     ['login.py'],
-    pathex=['.'],
+    pathex=[],
     binaries=[],
-    datas=[('ico-img', 'ico-img'), ('base', 'base'), ('PDV', 'PDV'), ('geral', 'geral'), ('vendas', 'vendas'), ('produtos_e_servicos', 'produtos_e_servicos'), ('compras', 'compras'), ('financeiro', 'financeiro'), ('relatorios', 'relatorios'), ('notas_fiscais', 'notas_fiscais'), ('ferramentas', 'ferramentas'), ('mercado_livre', 'mercado_livre'), ('cupons', 'cupons'), ('syncthing.exe', '.'), ('assistente_historico.json', '.')],
-    hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'ctypes', 'PyQt5.QtSvg', 'reportlab.pdfgen.canvas', 'reportlab.lib.pagesizes', 'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print', 'dotenv', 'webbrowser', 'mercado_livre.main_final', 'mercado_livre.gerar_tokens'],
+    datas=[('PDV', 'PDV'), ('geral', 'geral'), ('vendas', 'vendas'), ('produtos_e_servicos', 'produtos_e_servicos'), ('compras', 'compras'), ('financeiro', 'financeiro'), ('relatorios', 'relatorios'), ('notas_fiscais', 'notas_fiscais'), ('ferramentas', 'ferramentas'), ('mercado_livre', 'mercado_livre'), ('cupons', 'cupons'), ('ico-img', 'ico-img'), ('syncthing.exe', '.'), ('assistente_historico.json', '.')],
+    hiddenimports=['requests', 'urllib3', 'idna', 'chardet', 'certifi', 'ctypes', 'PyQt5.QtSvg', 'PyQt5.QtPrintSupport', 'reportlab.pdfgen.canvas', 'reportlab.lib.pagesizes', 'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print', 'dotenv', 'webbrowser', 'fdb'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

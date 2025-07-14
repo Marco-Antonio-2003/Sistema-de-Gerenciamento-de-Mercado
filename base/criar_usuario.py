@@ -15,11 +15,11 @@ from datetime import datetime, timedelta, date
 
 # Importar funções do módulo banco.py
 try:
-    import banco
+    import base.banco as banco
 except ImportError:
     # Caso o módulo não esteja no path, tentamos adicionar o diretório pai
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    import banco
+    import base.banco as banco
 
 class CriarUsuarioApp:
     """
@@ -471,7 +471,7 @@ class CriarUsuarioApp:
         novo_status = 'S' if resposta == 'yes' else 'N'
         
         try:
-            from banco import modificar_acesso_ecommerce
+            from base.banco import modificar_acesso_ecommerce
             modificar_acesso_ecommerce(user_id, novo_status)
             status_texto = "LIBERADO" if novo_status == 'S' else "BLOQUEADO"
             messagebox.showinfo("Sucesso", f"Acesso ao e-commerce foi definido como {status_texto} para {username} e seus funcionários.")
@@ -656,7 +656,7 @@ class CriarUsuarioApp:
             JOIN USUARIOS U ON L.USUARIO_ID = U.ID
             ORDER BY L.DATA_GERACAO DESC
             """
-            from banco import execute_query
+            from base.banco import execute_query
             licencas = execute_query(query)
             
             if not licencas:
@@ -711,7 +711,7 @@ class CriarUsuarioApp:
             WHERE USUARIO_MASTER IS NULL
             ORDER BY EMPRESA, USUARIO
             """
-            from banco import execute_query
+            from base.banco import execute_query
             usuarios = execute_query(query)
             
             # Preencher o ComboBox
@@ -746,7 +746,7 @@ class CriarUsuarioApp:
             data_expiracao = data_atual + timedelta(days=meses * 30)
             
             # Gerar código
-            from banco import gerar_codigo_licenca, salvar_codigo_licenca
+            from base.banco import gerar_codigo_licenca, salvar_codigo_licenca
             codigo = gerar_codigo_licenca(usuario_id, data_expiracao)
             
             # Salvar no banco
@@ -836,11 +836,11 @@ class CriarUsuarioApp:
             
             try:
                 # Importar função para atualizar data
-                from banco import atualizar_data_expiracao
+                from base.banco import atualizar_data_expiracao
                 atualizar_data_expiracao(user_id, nova_data)
                 
                 # Desbloquear usuário se estava bloqueado
-                from banco import desbloquear_usuario
+                from base.banco import desbloquear_usuario
                 desbloquear_usuario(user_id)
                 
                 messagebox.showinfo("Sucesso", f"Mensalidade renovada por {meses} meses.\nNova data de expiração: {nova_data.strftime('%d/%m/%Y')}")
@@ -895,7 +895,7 @@ class CriarUsuarioApp:
         
         try:
             # Importar função para bloquear usuário
-            from banco import bloquear_usuario
+            from base.banco import bloquear_usuario
             bloquear_usuario(user_id, motivo)
             
             messagebox.showinfo("Sucesso", f"Usuário {username} bloqueado com sucesso!")
@@ -922,7 +922,7 @@ class CriarUsuarioApp:
             
         try:
             # Importar função para desbloquear usuário
-            from banco import desbloquear_usuario
+            from base.banco import desbloquear_usuario
             desbloquear_usuario(user_id)
             
             messagebox.showinfo("Sucesso", f"Usuário {username} liberado com sucesso!")
@@ -948,7 +948,7 @@ class CriarUsuarioApp:
             FROM USUARIOS U
             WHERE U.USUARIO_MASTER IS NULL ORDER BY U.EMPRESA, U.USUARIO
         """
-            from banco import execute_query
+            from base.banco import execute_query
             usuarios = execute_query(query)
             
             if not usuarios:
@@ -1024,7 +1024,7 @@ class CriarUsuarioApp:
             WHERE RDB$RELATION_NAME = 'USUARIOS' 
             AND RDB$FIELD_NAME = 'BLOQUEADO'
             """
-            from banco import execute_query
+            from base.banco import execute_query
             result = execute_query(query)
             
             # Se o campo não existe, adicionar os campos necessários

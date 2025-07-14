@@ -1,25 +1,133 @@
-"""
-Módulo para gerenciar conexões com o banco de dados Firebird
-"""
+# Arquivo: base/banco_otimizado.py
 
-#banco.py
-from datetime import date
+# --- IMPORTS PADRÃO E DE OTIMIZAÇÃO ---
 import os
 import sys
-import fdb  # Módulo para conexão com Firebird
-from PyQt5.QtWidgets import QMessageBox
+import fdb
+import functools
+import threading
+import time
+import atexit
+from datetime import date, datetime, timedelta
+import glob
 import hashlib
 import base64
-import time
 import random
 import string
-import threading
-import atexit
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import QueuePool
+from PyQt5.QtWidgets import QMessageBox
 
-# Variáveis globais para controle de sincronização (adicione junto às outras variáveis globais)
+print("Módulo 'banco_otimizado.py' sendo carregado...")
+
+# --- CONFIGURAÇÃO INICIAL E VARIÁVEIS GLOBAIS ---
 SINCRONIZACAO_ATIVA = False
 ULTIMA_SINCRONIZACAO = 0
-INTERVALO_MIN_SYNC = 300  # 5 minutos entre sincronizações
+INTERVALO_MIN_SYNC = 300  # 5 minutos
+
+usuario_logado = {
+    "id": None,
+    "nome": None,
+    "empresa": None
+}
+
+# --- FUNÇÕES DE CAMINHO E CONFIGURAÇÃO ---
+def get_base_path():
+    """Retorna o caminho base da aplicação, seja em modo dev ou compilado."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def get_db_path():
+    """Determina o caminho do banco de dados MBDATA_NOVO.FDB de forma robusta."""
+    base_dir = get_base_path()
+    # Caminho principal (estrutura padrão)
+    db_path = os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB")
+    if os.path.isfile(db_path):
+        return db_path
+
+    # Caminho alternativo (caso a estrutura do executável seja diferente)
+    alt_db_path = os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB")
+    if os.path.isfile(alt_db_path):
+        return alt_db_path
+    
+    # Se ainda não encontrou, assume o caminho principal e avisa
+    print(f"AVISO: Banco de dados não encontrado. Tentando usar o caminho padrão: {db_path}")
+    db_dir = os.path.dirname(db_path)
+    if not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"Diretório criado: {db_dir}")
+        except Exception as e:
+            print(f"Erro ao criar diretório do banco: {e}")
+    return db_path
+
+# Configurações do banco (carregadas dinamicamente)
+DB_PATH = get_db_path()
+DB_USER = "SYSDBA"
+DB_PASSWORD = "masterkey"
+DB_HOST = "localhost"
+DB_PORT = 3050
+
+# --- OTIMIZAÇÃO: POOL DE CONEXÕES COM SQLAlchemy (O CORAÇÃO DA MELHORIA) ---
+engine = None
+try:
+    DATABASE_URL = f"firebird+fdb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_PATH}?charset=UTF8"
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=3600,
+        echo=False
+    )
+    with engine.connect() as conn: # Testa a conexão inicial
+        print("✅ Pool de conexões com o banco de dados inicializado com sucesso.")
+except Exception as e:
+    print(f"❌ ERRO CRÍTICO: Não foi possível criar o pool de conexões. {e}")
+    engine = None
+
+# --- OTIMIZAÇÃO: NOVA FUNÇÃO execute_query ---
+def execute_query(query: str, params: tuple = None, commit=True): # Mantido 'commit' por compatibilidade
+    """
+    Executa uma query no banco de dados usando o pool de conexões.
+    É mais rápido, seguro e limpo.
+    """
+    if not engine:
+        raise ConnectionError("A conexão com o banco de dados não foi estabelecida.")
+
+    with engine.connect() as connection:
+        try:
+            trans = connection.begin()
+            # O placeholder '?' é padrão do fdb, SQLAlchemy o converte.
+            cursor_result = connection.execute(text(query), params or ())
+            
+            if cursor_result.returns_rows:
+                result = cursor_result.fetchall()
+            else:
+                result = []
+
+            trans.commit()
+            return result
+        except Exception as e:
+            # O 'with' garante o rollback automático da transação em caso de erro.
+            print(f"❌ ERRO na execução da query: {query}\nParâmetros: {params}\nErro: {e}")
+            raise # Propaga o erro para a camada superior saber o que aconteceu.
+
+# --- FUNÇÃO DE DESLIGAMENTO ---
+def desligar_banco():
+    """Fecha o pool de conexões de forma segura."""
+    if engine:
+        engine.dispose()
+        print("🔌 Pool de conexões do banco de dados foi encerrado.")
+
+# Garante que o pool seja fechado quando o programa terminar
+atexit.register(desligar_banco)
+
+
+# ==============================================================================
+#  A PARTIR DAQUI VAMOS COLAR AS SUAS FUNÇÕES ANTIGAS, UMA POR UMA
+# ==============================================================================
 
 def iniciar_syncthing_se_necessario():
     """Inicia o Syncthing se ele não estiver em execução, usando o gerenciador singleton"""
@@ -173,152 +281,7 @@ def arquivo_esta_em_uso(caminho_arquivo):
     except Exception:
         # Para qualquer outro erro, assumir que está em uso por segurança
         return True
-
-# Função para encontrar o caminho do banco de dados
-# Função adicionada para resolver problemas de caminho no executável
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        # Executando como executable
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        # Executando em desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return base_dir
-
-def get_db_path():
-    """
-    Determina o caminho do banco de dados considerando diferentes ambientes
-    de execução (desenvolvimento ou aplicação compilada)
-    """
-    # Opção 1: Verifica se estamos em uma aplicação compilada (PyInstaller)
-    if getattr(sys, 'frozen', False):
-        # Se estiver executando como um executável compilado
-        base_dir = os.path.dirname(sys.executable)
-        db_paths = [
-            # Caminho relativo ao executável
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho relativo ao executável (pasta pai)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho absoluto fixo (caso seja uma instalação específica)
-            r"C:\MBSistema\base\banco\MBDATA_NOVO.FDB",
-        ]
-    else:
-        # Se estiver executando em modo de desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        db_paths = [
-            # Caminho relativo ao script atual
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho alternativo (um nível acima)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-        ]
     
-    # Verificar qual caminho existe
-    for path in db_paths:
-        if os.path.isfile(path):
-            print(f"Banco de dados encontrado em: {path}")
-            return path
-    
-    # Se chegou até aqui, não encontrou o arquivo
-    # Vamos retornar o primeiro caminho e deixar o Firebird gerar o erro apropriado
-    print(f"AVISO: Banco de dados não encontrado. Tentando usar: {db_paths[0]}")
-    
-    # Verificar se o diretório existe, se não, tentar criá-lo
-    db_dir = os.path.dirname(db_paths[0])
-    if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"Diretório criado: {db_dir}")
-        except Exception as e:
-            print(f"Erro ao criar diretório: {e}")
-    
-    return db_paths[0]
-
-# Configurações do banco de dados
-DB_PATH = get_db_path()
-DB_USER = "SYSDBA"
-DB_PASSWORD = "masterkey"
-DB_HOST = "localhost"
-DB_PORT = 3050
-
-def get_connection():
-    """
-    Retorna uma conexão com o banco de dados Firebird
-    """
-    try:
-        print(f"Tentando conectar ao banco de dados: {DB_PATH}")
-        conn = fdb.connect(
-            host=DB_HOST,
-            database=DB_PATH,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT,
-            charset='UTF8'  # Garantir codificação correta
-        )
-        return conn
-    except Exception as e:
-        print(f"Erro de conexão: {e}")
-        raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
-
-def execute_query(query, params=None, commit=True, verificar_sync=True):
-    """
-    Executa uma query no banco de dados com suporte a sincronização
-    """
-    conn = None
-    cursor = None
-    try:
-        conn = get_connection(verificar_sync=verificar_sync)
-        cursor = conn.cursor()
-        
-        if params:
-            print(f"Executando query com parâmetros: {params}")
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-            
-        # Se for um SELECT, retorna os resultados
-        if query.strip().upper().startswith("SELECT"):
-            results = cursor.fetchall()
-            return results
-        
-        # Se precisar fazer commit
-        if commit:
-            conn.commit()
-            
-        return True
-    except Exception as e:
-        if conn and commit:
-            conn.rollback()
-        print(f"Erro na execução da query: {str(e)}")
-        raise Exception(f"Erro ao executar query: {str(e)}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-def verificar_conectividade():
-    """Verifica se há conexão com a internet"""
-    try:
-        import socket
-        socket.create_connection(("www.google.com", 80), timeout=3)
-        return True
-    except OSError:
-        return False
-def banco_em_uso():
-    """Verifica se o banco de dados está em uso no momento"""
-    try:
-        # Tenta abrir o arquivo do banco para verificar se está bloqueado
-        caminho_banco = get_db_path()
-        with open(caminho_banco, 'rb') as f:
-            # Tenta apenas ler o começo do arquivo para verificar acesso
-            f.read(10)
-            return False  # Se conseguir abrir, o banco não está em uso exclusivo
-    except (IOError, PermissionError):
-        return True  # Erro ao abrir, indica que o banco está em uso
-    except Exception as e:
-        print(f"Erro ao verificar uso do banco: {e}")
-        return True  # Em caso de dúvida, considerar como em uso
-
 def controlar_sincronizacao():
     """Controla o processo de sincronização do banco principal"""
     global SINCRONIZACAO_ATIVA, ULTIMA_SINCRONIZACAO
@@ -487,6 +450,163 @@ def sincronizar_banco(force=False):
         return criar_backup_banco()
     
     return False
+
+def obter_estacao_atual():
+    """
+    Obtém o nome da estação atual (computador)
+    
+    Returns:
+        str: Nome da estação
+    """
+    try:
+        import socket
+        return socket.gethostname()
+    except Exception as e:
+        print(f"Erro ao obter nome da estação: {e}")
+        return "Estação Desconhecida"
+    
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        # Executando como executable
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # Executando em desenvolvimento
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return base_dir
+
+def get_db_path():
+    """
+    Determina o caminho do banco de dados considerando diferentes ambientes
+    de execução (desenvolvimento ou aplicação compilada)
+    """
+    # Opção 1: Verifica se estamos em uma aplicação compilada (PyInstaller)
+    if getattr(sys, 'frozen', False):
+        # Se estiver executando como um executável compilado
+        base_dir = os.path.dirname(sys.executable)
+        db_paths = [
+            # Caminho relativo ao executável
+            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
+            # Caminho relativo ao executável (pasta pai)
+            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
+            # Caminho absoluto fixo (caso seja uma instalação específica)
+            r"C:\MBSistema\base\banco\MBDATA_NOVO.FDB",
+        ]
+    else:
+        # Se estiver executando em modo de desenvolvimento
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_paths = [
+            # Caminho relativo ao script atual
+            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
+            # Caminho alternativo (um nível acima)
+            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
+        ]
+    
+    # Verificar qual caminho existe
+    for path in db_paths:
+        if os.path.isfile(path):
+            print(f"Banco de dados encontrado em: {path}")
+            return path
+    
+    # Se chegou até aqui, não encontrou o arquivo
+    # Vamos retornar o primeiro caminho e deixar o Firebird gerar o erro apropriado
+    print(f"AVISO: Banco de dados não encontrado. Tentando usar: {db_paths[0]}")
+    
+    # Verificar se o diretório existe, se não, tentar criá-lo
+    db_dir = os.path.dirname(db_paths[0])
+    if not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"Diretório criado: {db_dir}")
+        except Exception as e:
+            print(f"Erro ao criar diretório: {e}")
+    
+    return db_paths[0]
+
+# Configurações do banco de dados
+DB_PATH = get_db_path()
+DB_USER = "SYSDBA"
+DB_PASSWORD = "masterkey"
+DB_HOST = "localhost"
+DB_PORT = 3050
+
+def get_connection():
+    """
+    Retorna uma conexão com o banco de dados Firebird
+    """
+    try:
+        print(f"Tentando conectar ao banco de dados: {DB_PATH}")
+        conn = fdb.connect(
+            host=DB_HOST,
+            database=DB_PATH,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            port=DB_PORT,
+            charset='UTF8'  # Garantir codificação correta
+        )
+        return conn
+    except Exception as e:
+        print(f"Erro de conexão: {e}")
+        raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
+
+def execute_query(query, params=None, commit=True, verificar_sync=True):
+    """
+    Executa uma query no banco de dados com suporte a sincronização
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection(verificar_sync=verificar_sync)
+        cursor = conn.cursor()
+        
+        if params:
+            print(f"Executando query com parâmetros: {params}")
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+            
+        # Se for um SELECT, retorna os resultados
+        if query.strip().upper().startswith("SELECT"):
+            results = cursor.fetchall()
+            return results
+        
+        # Se precisar fazer commit
+        if commit:
+            conn.commit()
+            
+        return True
+    except Exception as e:
+        if conn and commit:
+            conn.rollback()
+        print(f"Erro na execução da query: {str(e)}")
+        raise Exception(f"Erro ao executar query: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def verificar_conectividade():
+    """Verifica se há conexão com a internet"""
+    try:
+        import socket
+        socket.create_connection(("www.google.com", 80), timeout=3)
+        return True
+    except OSError:
+        return False
+def banco_em_uso():
+    """Verifica se o banco de dados está em uso no momento"""
+    try:
+        # Tenta abrir o arquivo do banco para verificar se está bloqueado
+        caminho_banco = get_db_path()
+        with open(caminho_banco, 'rb') as f:
+            # Tenta apenas ler o começo do arquivo para verificar acesso
+            f.read(10)
+            return False  # Se conseguir abrir, o banco não está em uso exclusivo
+    except (IOError, PermissionError):
+        return True  # Erro ao abrir, indica que o banco está em uso
+    except Exception as e:
+        print(f"Erro ao verificar uso do banco: {e}")
+        return True  # Em caso de dúvida, considerar como em uso
 
 # Modifique a função get_connection para verificar sincronização
 def get_connection(verificar_sync=True):
@@ -1193,7 +1313,8 @@ def listar_empresas():
     except Exception as e:
         print(f"Erro ao listar empresas: {e}")
         raise Exception(f"Erro ao listar empresas: {str(e)}")
-
+    
+@functools.lru_cache(maxsize=512)
 def buscar_empresa_por_id(id_empresa):
     """
     Busca uma empresa pelo ID
@@ -1459,6 +1580,35 @@ def atualizar_empresa(id_empresa, nome_empresa, nome_pessoa, documento, tipo_doc
         print(f"Erro ao atualizar empresa: {e}")
         raise Exception(f"Erro ao atualizar empresa: {str(e)}")
 
+def buscar_empresas_por_filtro(codigo: str, nome: str, documento: str):
+    """
+    Busca empresas no banco de dados com base em filtros dinâmicos.
+    
+    Returns:
+        list: Lista de tuplas com (ID, NOME_EMPRESA, DOCUMENTO)
+    """
+    try:
+        query = "SELECT ID, NOME_EMPRESA, DOCUMENTO FROM EMPRESAS WHERE 1=1"
+        params = []
+        
+        if codigo:
+            query += " AND ID = ?"
+            params.append(int(codigo))
+        if nome:
+            query += " AND UPPER(NOME_EMPRESA) LIKE UPPER(?)"
+            params.append(f"%{nome}%")
+        if documento:
+            doc_limpo = ''.join(filter(str.isdigit, documento))
+            if doc_limpo:
+                query += " AND DOCUMENTO LIKE ?"
+                params.append(f"%{doc_limpo}%")
+        
+        query += " ORDER BY ID"
+        return execute_query(query, tuple(params))
+    except Exception as e:
+        print(f"Erro ao buscar empresas por filtro: {e}")
+        return []
+
 def excluir_empresa(id_empresa):
     """
     Exclui uma empresa do banco de dados
@@ -1606,7 +1756,7 @@ def listar_pessoas():
     except Exception as e:
         print(f"Erro ao listar pessoas: {e}")
         raise Exception(f"Erro ao listar pessoas: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_pessoa_por_id(id_pessoa):
     """
     Busca uma pessoa pelo ID
@@ -1993,7 +2143,7 @@ def listar_funcionarios():
     except Exception as e:
         print(f"Erro ao listar funcionários: {e}")
         raise Exception(f"Erro ao listar funcionários: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_funcionario_por_id(id_funcionario):
     """
     Busca um funcionário pelo ID
@@ -2395,7 +2545,7 @@ def listar_produtos():
     except Exception as e:
         print(f"Erro ao listar produtos: {e}")
         raise Exception(f"Erro ao listar produtos: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_produto_por_id(id_produto):
     """
     Busca um produto pelo ID
@@ -3278,28 +3428,17 @@ def listar_fornecedores():
         print(f"Erro ao listar fornecedores: {e}")
         raise Exception(f"Erro ao listar fornecedores: {str(e)}")
 
+@functools.lru_cache(maxsize=128)
 def buscar_fornecedor_por_id(id_fornecedor):
-    """
-    Busca um fornecedor pelo ID
-    
-    Args:
-        id_fornecedor (int): ID do fornecedor
-        
-    Returns:
-        tuple: Dados do fornecedor ou None se não encontrado
-    """
+    """Busca um fornecedor pelo seu ID (PK)."""
+    # A sua lógica de busca continua a mesma aqui dentro
     try:
-        query = """
-        SELECT * FROM FORNECEDORES
-        WHERE ID = ?
-        """
-        result = execute_query(query, (id_fornecedor,))
-        if result and len(result) > 0:
-            return result[0]
-        return None
+        query = "SELECT * FROM FORNECEDORES WHERE ID = ?"
+        resultado = execute_query(query, (id_fornecedor,))
+        return resultado[0] if resultado else None
     except Exception as e:
-        print(f"Erro ao buscar fornecedor: {e}")
-        raise Exception(f"Erro ao buscar fornecedor: {str(e)}")
+        print(f"Erro ao buscar fornecedor por ID {id_fornecedor}: {e}")
+        return None
 
 def buscar_fornecedor_por_codigo(codigo):
     """
@@ -4074,7 +4213,7 @@ def listar_pedidos_venda():
     except Exception as e:
         print(f"Erro ao listar pedidos de venda: {e}")
         raise Exception(f"Erro ao listar pedidos de venda: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_pedido_por_id(id_pedido):
     """
     Busca um pedido pelo ID
@@ -4637,7 +4776,7 @@ def listar_recebimentos_pendentes():
         print(f"Erro ao listar recebimentos pendentes: {e}")
         raise Exception(f"Erro ao listar recebimentos pendentes: {str(e)}")
     
-
+@functools.lru_cache(maxsize=512)
 def buscar_recebimento_por_id(id_recebimento):
     """
     Busca um recebimento pelo ID
@@ -4914,7 +5053,7 @@ def listar_recebimentos_concluidos():
     except Exception as e:
         print(f"Erro ao listar recebimentos concluídos: {e}")
         raise Exception(f"Erro ao listar recebimentos concluídos: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_recebimento_por_id(id_recebimento):
     """
     Busca um recebimento pelo ID
@@ -6556,7 +6695,7 @@ def listar_caixas(data_inicial=None, data_final=None, status=None, codigo=None, 
     except Exception as e:
         print(f"Erro ao listar caixas: {e}")
         raise Exception(f"Erro ao listar caixas: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def obter_caixa_por_id(id_caixa):
     """
     Obtém os dados de um caixa específico pelo ID
@@ -7232,7 +7371,7 @@ def listar_contas_correntes():
     except Exception as e:
         print(f"Erro ao listar contas correntes: {e}")
         raise Exception(f"Erro ao listar contas correntes: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_conta_corrente_por_id(id_conta):
     """
     Busca uma conta corrente pelo ID
@@ -7629,7 +7768,7 @@ def criar_classe_financeira(codigo, descricao):
     except Exception as e:
         print(f"Erro ao criar classe financeira: {e}")
         raise Exception(f"Erro ao criar classe financeira: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_classe_financeira_por_id(id_classe):
     """
     Busca uma classe financeira pelo ID
@@ -7917,21 +8056,6 @@ def excluir_configuracao_impressora(id_config):
     except Exception as e:
         print(f"Erro ao excluir configuração de impressora: {e}")
         raise Exception(f"Erro ao excluir configuração de impressora: {str(e)}")
-
-def obter_estacao_atual():
-    """
-    Obtém o nome da estação atual (computador)
-    
-    Returns:
-        str: Nome da estação
-    """
-    try:
-        import socket
-        return socket.gethostname()
-    except Exception as e:
-        print(f"Erro ao obter nome da estação: {e}")
-        return "Estação Desconhecida"
-
 
 # cadastrar funcionario para login
 def verificar_usuario_existente(nome_usuario):
