@@ -1,4 +1,4 @@
-# build_exe.py - VERSÃO FINAL CORRIGIDA
+# build_exe.py - VERSÃO FINAL E CORRETA - MODO --onefile COM BANCO EXTERNO
 
 import os
 import shutil
@@ -11,40 +11,42 @@ def main():
 
     print(f"Preparando para compilar '{NOME_DO_PROGRAMA}' em um único executável...")
     
-    # Limpeza
-    for folder in ['build', 'dist']:
-        if os.path.exists(folder):
-            shutil.rmtree(folder)
+    # --- Limpeza ---
+    print("Limpando builds e distribuições anteriores...")
+    if os.path.exists('build'):
+        shutil.rmtree('build')
+    if os.path.exists('dist'):
+        shutil.rmtree('dist')
     if os.path.exists(f'{NOME_DO_PROGRAMA}.spec'):
         os.remove(f'{NOME_DO_PROGRAMA}.spec')
 
-    # Comando PyInstaller
+    # --- Comando PyInstaller com --onefile ---
     pyinstaller_params = [
         sys.executable, "-m", "PyInstaller",
         PONTO_DE_ENTRADA,
         "--name", NOME_DO_PROGRAMA,
         "--onefile",
         "--windowed",
-        "--noconfirm",
-        "--clean",
+        "--noconfirm", # Evita perguntas durante a compilação
     ]
 
-    # Ícone
+    # Adicionar ícone
     if os.path.exists("ico-img/icone.ico"):
         pyinstaller_params.extend(["--icon", "ico-img/icone.ico"])
 
     # --- INCLUSÃO DE DADOS DENTRO DO .EXE ---
-    # **CORREÇÃO 1:** REMOVIDA A PASTA 'base' DESTA LISTA.
-    # Agora, o banco de dados NÃO será empacotado dentro do .exe.
+    # Lista de pastas que serão empacotadas DENTRO do .exe.
+    # Note que a pasta 'base' foi REMOVIDA desta lista.
     pastas_de_dados_internas = [
-        "PDV", "geral", "vendas", "produtos_e_servicos",
-        "compras", "financeiro", "relatorios", "notas_fiscais", 
-        "ferramentas", "mercado_livre", "cupons", "ico-img"
+        "ico-img", "PDV", "geral", "vendas", "produtos_e_servicos",
+        "compras", "financeiro", "relatorios", "notas_fiscais", "ferramentas",
+        "mercado_livre", "cupons"
     ]
     
     print("\nAdicionando pastas de dados ao executável:")
     for pasta in pastas_de_dados_internas:
         if os.path.exists(pasta):
+            # O separador correto é os.pathsep (';' no Windows, ':' no Linux/macOS)
             pyinstaller_params.extend(["--add-data", f"{pasta}{os.pathsep}{pasta}"])
             print(f"- {pasta}")
 
@@ -55,16 +57,20 @@ def main():
             pyinstaller_params.extend(["--add-data", f"{arquivo}{os.pathsep}."])
             print(f"- {arquivo}")
 
-
     # --- Adicionar importações ocultas ---
-    # **CORREÇÃO 2:** ADICIONADO 'PyQt5.QtPrintSupport'.
+    # Usando a sua lista original e adicionando as que descobrimos serem necessárias.
+    # Adicione 'matplotlib.backends.backend_qtagg' e outras que derem erro.
     hidden_imports = [
         'requests', 'urllib3', 'idna', 'chardet', 'certifi', 'ctypes',
-        'PyQt5.QtSvg', 'PyQt5.QtPrintSupport',  # <<< MÓDULO ADICIONADO AQUI
+        'PyQt5.QtSvg', 'PyQt5.QtPrintSupport', # <-- Adicionado da correção anterior
         'reportlab.pdfgen.canvas', 'reportlab.lib.pagesizes', 
         'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print',
-        'dotenv', 'webbrowser', 'fdb'
+        'dotenv', 'webbrowser', 'fdb', 'matplotlib.backends.backend_qtagg' # <-- Adicionado Matplotlib
     ]
+    # Se seu sistema importa módulos de subpastas (ex: from mercado_livre import main_final),
+    # é uma boa prática adicioná-los aqui também para garantir.
+    hidden_imports.extend(['mercado_livre.main_final'])
+
     for hi in hidden_imports:
         pyinstaller_params.extend(["--hidden-import", hi])
 
@@ -80,7 +86,7 @@ def main():
     print("\n------------------------------------------------------")
     print("✅ Compilação concluída com sucesso!")
     print(f"O executável está pronto em: .\\dist\\{NOME_DO_PROGRAMA}.exe")
-    print("\nLembre-se: Para o programa funcionar, ele precisa da pasta 'base' ao seu lado.")
+    print("\nLembre-se: Para distribuir, você precisa do MBSistema.exe e da pasta 'base' ao seu lado.")
     print("------------------------------------------------------")
 
 if __name__ == "__main__":

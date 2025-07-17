@@ -386,6 +386,8 @@ class CadastroPessoa(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.table.itemClicked.connect(self.selecionar_pessoa)
+
+        self.table.itemDoubleClicked.connect(self.abrir_alteracao_por_duplo_clique)
         
         main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
@@ -394,6 +396,22 @@ class CadastroPessoa(QWidget):
         
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
+
+    def abrir_alteracao_por_duplo_clique(self, item):
+        """
+        Abre o formulário de alteração ao dar um duplo clique em uma linha.
+        """
+        # Pega a linha do item que recebeu o duplo clique
+        row = item.row()
+        
+        # Pega o código da pessoa da primeira coluna (coluna 0) da linha clicada
+        codigo_da_pessoa = self.table.item(row, 0).text()
+        
+        # Preenche o campo de texto 'codigo_input' que a função alterar_pessoa já utiliza
+        self.codigo_input.setText(codigo_da_pessoa)
+        
+        # Chama a sua função de alterar existente, que fará todo o trabalho
+        self.alterar_pessoa()
 
     # Método para selecionar pessoa (modificado para simplificar)
     def selecionar_pessoa(self, item):

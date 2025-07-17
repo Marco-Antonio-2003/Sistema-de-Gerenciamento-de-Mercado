@@ -477,6 +477,8 @@ class PedidoVendasWindow(QWidget):
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QTableWidget.SingleSelection)
         self.tabela.itemSelectionChanged.connect(self.selecionar_item)
+
+        self.tabela.itemDoubleClicked.connect(self.abrir_alteracao_por_duplo_clique)
         
         # Carregar dados do banco
         self.carregar_dados()
@@ -488,6 +490,17 @@ class PedidoVendasWindow(QWidget):
             child.setCurrentIndex(-1)
             child.clearEditText()
     
+    def abrir_alteracao_por_duplo_clique(self, item):
+        """
+        Abre o formulário de alteração ao dar um duplo clique em uma linha da tabela.
+        """
+        # Se um item foi clicado, seleciona a linha inteira dele
+        if item:
+            self.tabela.selectRow(item.row())
+        
+        # Chama a sua função de alterar existente, que já trabalha com a linha selecionada
+        self.alterar()
+
     def carregar_dados(self, limpar_filtros=False):
         """Carrega dados do banco na tabela, com opção para limpar filtros"""
         try:
