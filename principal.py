@@ -12,6 +12,16 @@ from PyQt5.QtGui import QDesktopServices
 # A importação do assistente foi movida para dentro do initUI para clareza
 # from assistente import adicionar_assistente_ao_sistema 
 
+# ### NOVIDADE: Importar o backend do Mercado Livre ###
+try:
+    # Esta estrutura de importação funciona tanto em dev quanto no .exe
+    from mercado_livre.main_final import MercadoLivreBackend
+    ML_BACKEND_DISPONIVEL = True
+except ImportError:
+    print("AVISO: Módulo do Mercado Livre não encontrado. A funcionalidade será desativada.")
+    ML_BACKEND_DISPONIVEL = False
+    MercadoLivreBackend = None
+
 class ContatosWhatsAppDialog(QDialog):
     # ... (Seu código da classe ContatosWhatsAppDialog - sem alterações) ...
     """Janela de contatos do WhatsApp com design melhorado"""
@@ -307,6 +317,17 @@ class MainWindow(QMainWindow):
         self.opened_windows = []
         self.contadores_labels = {}
         
+        # ### NOVIDADE: Inicializa o backend do ML se disponível ###
+        self.ml_backend = None
+        if ML_BACKEND_DISPONIVEL:
+            try:
+                # Cria uma instância do backend que pode ser usada depois
+                self.ml_backend = MercadoLivreBackend()
+            except Exception as e:
+                print(f"Não foi possível inicializar o backend do Mercado Livre: {e}")
+                self.ml_backend = None
+
+        # O resto do seu método __init__ continua igual...
         self.tem_acesso_ecommerce = False
         self.verificar_acesso_geral_modulos()
         self.carregar_permissoes()
@@ -315,9 +336,9 @@ class MainWindow(QMainWindow):
         
         self.atualizar_visibilidade_pdv()
         
-        self.timer_atualizacao = QTimer(self)
-        self.timer_atualizacao.timeout.connect(self.atualizar_contadores)
-        self.timer_atualizacao.start(30000)
+        # self.timer_atualizacao = QTimer(self)
+        # self.timer_atualizacao.timeout.connect(self.atualizar_contadores)
+        # self.timer_atualizacao.start(30000)
         
         self.timer_syncthing = QTimer(self)
         self.timer_syncthing.timeout.connect(self.verificar_syncthing)
@@ -477,6 +498,8 @@ class MainWindow(QMainWindow):
         self.atualizar_visibilidade_modulos()
         
         # --- Tela Principal (sem alterações) ---
+        # BLOCO NOVO E CORRIGIDO
+
         home_screen = QWidget()
         home_screen.setStyleSheet("background-color: #005079;")
         home_layout = QVBoxLayout(home_screen)
@@ -491,17 +514,60 @@ class MainWindow(QMainWindow):
             logo_label.setText("erro logo")
         home_layout.addWidget(logo_label)
         
+        # --- Seção do Título e Botão de Atualizar ---
+        # Usamos um widget como container para um layout horizontal
+        title_section_widget = QWidget()
+        title_section_layout = QHBoxLayout(title_section_widget)
+        title_section_layout.setContentsMargins(0,0,0,0)
+        title_section_layout.setSpacing(20)
+        title_section_layout.setAlignment(Qt.AlignCenter)
+
+        # Layout vertical apenas para o texto (título + subtítulo)
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(0)
+        
         system_title = QLabel("MB Sistema")
         system_title.setFont(QFont("Arial", 36, QFont.Bold))
         system_title.setStyleSheet("color: white;")
         system_title.setAlignment(Qt.AlignCenter)
-        home_layout.addWidget(system_title)
+        text_layout.addWidget(system_title)
         
         system_subtitle = QLabel("Sistema de gerenciamento")
         system_subtitle.setFont(QFont("Arial", 26))
         system_subtitle.setStyleSheet("color: white;")
         system_subtitle.setAlignment(Qt.AlignCenter)
-        home_layout.addWidget(system_subtitle)
+        text_layout.addWidget(system_subtitle)
+        
+        # Adiciona o texto (agrupado verticalmente) ao layout da seção
+        title_section_layout.addLayout(text_layout)
+
+        # Botão de Atualizar
+        self.btn_atualizar = QPushButton(self)
+        self.btn_atualizar.setFixedSize(40, 40)
+        self.btn_atualizar.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_atualizar.setToolTip("Atualizar dados do painel")
+        refresh_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "refresh.png")
+        if os.path.exists(refresh_icon_path):
+            self.btn_atualizar.setIcon(QIcon(refresh_icon_path))
+            self.btn_atualizar.setIconSize(QSize(24, 24))
+        else:
+            self.btn_atualizar.setText("🔄"); self.btn_atualizar.setFont(QFont("Arial", 16))
+        self.btn_atualizar.setStyleSheet("""
+            QPushButton { background-color: transparent; border: 2px solid #FFFFFF; border-radius: 20px; color: white; }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.1); }
+            QPushButton:pressed { background-color: rgba(255, 255, 255, 0.2); }
+        """)
+        
+        # Conecta o clique à função de atualização
+        self.btn_atualizar.clicked.connect(self.atualizar_contadores)
+        
+        # Adiciona o botão ao lado do texto
+        title_section_layout.addWidget(self.btn_atualizar)
+
+        # Adiciona a seção inteira (título + subtítulo + botão) ao layout principal
+        home_layout.addWidget(title_section_widget)
+        
+        # --- O resto do código (criação das caixas de info) continua aqui --
         
         info_frame = QFrame()
         info_frame.setMaximumHeight(180)
@@ -512,6 +578,11 @@ class MainWindow(QMainWindow):
         self.criar_caixa_info(info_layout, "Clientes", "user.png", self.obter_contagem_pessoas())
         self.criar_caixa_info(info_layout, "Produtos", "product.png", self.obter_contagem_produtos())
         self.criar_caixa_info(info_layout, "Vendas", "sales.png", self.obter_contagem_vendas())
+        # ### NOVIDADE: Criar a caixa de info do Mercado Livre ###
+        # Só cria a caixa se o módulo estiver disponível e o usuário tiver acesso.
+        if self.tem_acesso_ecommerce:
+             self.criar_caixa_info(info_layout, "ML Envios", "mercado-livre.png", self.obter_pedidos_pendentes_ml())
+        
         home_layout.addWidget(info_frame)
         
         user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
@@ -630,6 +701,18 @@ class MainWindow(QMainWindow):
             "Configuração do Sistema": "ConfiguracaoSistemaWindow", "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
             "PDV - Ponto de Venda": "PDVWindow"
         }
+
+    # Adicione este novo método dentro da classe MainWindow
+
+    def obter_pedidos_pendentes_ml(self):
+        """Busca o número de pedidos pendentes usando o backend do ML."""
+        if self.ml_backend and self.ml_backend.is_configured():
+            try:
+                return self.ml_backend.get_pedidos_pendentes()
+            except Exception as e:
+                print(f"Erro ao buscar pedidos pendentes do ML: {e}")
+                return 0
+        return 0
 
     # --- NOVO MÉTODO ÚNICO PARA resizeEvent ---
     def _novo_resizeEvent(self, event):
@@ -757,6 +840,7 @@ class MainWindow(QMainWindow):
             if titulo == "Clientes": self.menu_action_triggered("Cadastro de Clientes")
             elif titulo == "Produtos": self.menu_action_triggered("Produtos")
             elif titulo == "Vendas": self.menu_action_triggered("Relatório de Vendas de Produtos")
+            elif titulo == "ML Envios": self.menu_action_triggered("Ver Dashboard do Mercado livre")
         box_frame.mousePressEvent = on_click
         def on_enter(event): self.animar_caixa_info(box_frame, aumentar=True)
         def on_leave(event): self.animar_caixa_info(box_frame, aumentar=False)
@@ -795,14 +879,43 @@ class MainWindow(QMainWindow):
     def animar_caixa(self, caixa, fator_escala): self.animar_caixa_info(caixa, fator_escala > 1.0)
     
     def atualizar_contadores(self):
+        print("Botão clicado: Atualizando todos os contadores...")
+        
+        # ### NOVIDADE: Desabilita o botão e muda o cursor para 'Aguarde' ###
+        if hasattr(self, 'btn_atualizar'):
+            self.btn_atualizar.setEnabled(False)
+        self.setCursor(QCursor(Qt.WaitCursor))
+        
+        # O QTimer.singleShot força a interface a se redesenhar ANTES de começar o trabalho pesado.
+        # Isso garante que o cursor de "aguarde" apareça imediatamente.
+        QTimer.singleShot(50, self._executar_atualizacao)
+
+    def _executar_atualizacao(self):
+        """Função auxiliar que faz o trabalho pesado da atualização."""
         try:
-            if "Clientes" in self.contadores_labels: self.atualizar_contador_com_animacao(self.contadores_labels["Clientes"], self.obter_contagem_pessoas())
-            if "Produtos" in self.contadores_labels: self.atualizar_contador_com_animacao(self.contadores_labels["Produtos"], self.obter_contagem_produtos())
+            # Atualiza contadores locais
+            if "Clientes" in self.contadores_labels:
+                self.atualizar_contador_com_animacao(self.contadores_labels["Clientes"], self.obter_contagem_pessoas())
+            if "Produtos" in self.contadores_labels:
+                self.atualizar_contador_com_animacao(self.contadores_labels["Produtos"], self.obter_contagem_produtos())
             if "Vendas" in self.contadores_labels:
-                novo_valor = self.obter_contagem_vendas(); label = self.contadores_labels["Vendas"]
-                valor_formatado = f"R$ {novo_valor:.2f}".replace('.', ','); label.setText(valor_formatado)
+                novo_valor = self.obter_contagem_vendas()
+                label = self.contadores_labels["Vendas"]
+                valor_formatado = f"R$ {novo_valor:.2f}".replace('.', ',')
+                label.setText(valor_formatado)
+
+            # Atualiza o contador do Mercado Livre
+            if "ML Envios" in self.contadores_labels:
+                pedidos_pendentes = self.obter_pedidos_pendentes_ml()
+                self.atualizar_contador_com_animacao(self.contadores_labels["ML Envios"], pedidos_pendentes)
+
         except Exception as e:
             print(f"Erro ao atualizar contadores: {e}")
+        finally:
+            # ### NOVIDADE: Reabilita o botão e restaura o cursor ao final ###
+            if hasattr(self, 'btn_atualizar'):
+                self.btn_atualizar.setEnabled(True)
+            self.unsetCursor()
 
     def forcar_atualizacao_contadores(self): QTimer.singleShot(100, self.atualizar_contadores) 
 

@@ -1,4 +1,4 @@
-# main_final.py - VERSÃO COMERCIAL FINAL, CAMINHO DINÂMICO E AUTENTICAÇÃO VIA SITE
+# main_final.py - VERSÃO COM ATUALIZAÇÃO AUTOMÁTICA EM TEMPO REAL
 
 import sys
 import webbrowser
@@ -8,156 +8,88 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTableWidgetItem, QHeaderView, QMessageBox, QProgressDialog,
                              QDialog, QCheckBox, QLineEdit)
 from PyQt5.QtGui import QFont, QCursor, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer # <<< NOVIDADE: QTimer importado
+
 import fdb
 import requests
 from datetime import datetime, timedelta
 
 # ==============================================================================
-# CLASSE MercadoLivreBackend (COM CAMINHO EXTERNO E DINÂMICO)
+# CLASSE MercadoLivreBackend (SEM ALTERAÇÕES)
 # ==============================================================================
 class MercadoLivreBackend:
-    
+    # (O código do backend continua o mesmo, sem alterações)
     def __init__(self):
-        self.base_url = "https://api.mercadolibre.com"
-        self.redirect_uri = "https://callbackmbsistema.netlify.app/"
-        self.config = {}
-        self.session = requests.Session() 
-        self.session.proxies = {'http': None, 'https': None}
-
-        # ### LÓGICA FINAL E CORRETA PARA ENCONTRAR O BANCO DE DADOS EXTERNO ###
-        # Esta lógica encontra o banco de dados na pasta 'base/banco/'
-        # que deve estar ao lado do executável (.exe) ou do script (.py).
-        
-        if getattr(sys, 'frozen', False):
-            # Se o programa estiver rodando como um .exe compilado
-            application_path = os.path.dirname(sys.executable)
-        else:
-            # Se estiver rodando como um script .py no desenvolvimento
-            # A função __file__ nos dá o caminho do script atual.
-            application_path = os.path.dirname(os.path.abspath(__file__))
-
-        # Constrói o caminho completo para o banco de dados
+        self.base_url = "https://api.mercadolibre.com"; self.redirect_uri = "https://callbackmbsistema.netlify.app/"; self.config = {}; self.session = requests.Session(); self.session.proxies = {'http': None, 'https': None}
+        if getattr(sys, 'frozen', False): application_path = os.path.dirname(sys.executable)
+        else: application_path = os.path.dirname(os.path.abspath(__file__))
         db_full_path = os.path.join(application_path, 'base', 'banco', 'MBDATA_NOVO.FDB')
-
-        self.DB_CONFIG = { 
-            'dsn': f'localhost:{db_full_path}',
-            'user': 'SYSDBA',
-            'password': 'masterkey'
-        }
-        self._load_config()
-
+        self.DB_CONFIG = {'dsn': f'localhost:{db_full_path}', 'user': 'SYSDBA', 'password': 'masterkey'}; self._load_config()
+    def logout(self):
+        try:
+            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor()
+            sql = "UPDATE MELI_CONFIG SET ACCESS_TOKEN = NULL, REFRESH_TOKEN = NULL, USER_ID = NULL, TOKEN_EXPIRATION_TIME = NULL WHERE ID = 1"
+            cur.execute(sql); con.commit(); con.close(); self._load_config(); return True, "Conta desconectada com sucesso."
+        except Exception as e: return False, f"Ocorreu um erro ao tentar desconectar: {e}"
     def get_authorization_url(self):
-        if not self.config.get('app_id'):
-            return None, "APP_ID não encontrado no banco de dados.\n\nVerifique se as credenciais estão preenchidas na tabela MELI_CONFIG."
-        app_id = self.config['app_id']
-        url = (f"https://auth.mercadolivre.com/authorization"
-               f"?response_type=code&client_id={app_id}&redirect_uri={self.redirect_uri}")
-        return url, None
-        
+        if not self.config.get('app_id'): return None, "APP_ID não encontrado no banco de dados.\n\nVerifique se as credenciais estão preenchidas na tabela MELI_CONFIG."
+        app_id = self.config['app_id']; url = (f"https://auth.mercadolibre.com/authorization?response_type=code&client_id={app_id}&redirect_uri={self.redirect_uri}"); return url, None
     def exchange_code_for_token(self, code):
         url = f"{self.base_url}/oauth/token"
-        payload = {
-            'grant_type': 'authorization_code',
-            'client_id': self.config.get('app_id'),
-            'client_secret': self.config.get('client_secret'),
-            'code': code,
-            'redirect_uri': self.redirect_uri
-        }
+        payload = {'grant_type': 'authorization_code', 'client_id': self.config.get('app_id'), 'client_secret': self.config.get('client_secret'), 'code': code, 'redirect_uri': self.redirect_uri}
         try:
-            response = self.session.post(url, data=payload, timeout=15)
-            response.raise_for_status()
-            token_data = response.json()
-            if self._save_tokens_to_db(token_data):
-                self._load_config()
-                return True, "Autenticação realizada com sucesso!"
-            else:
-                return False, "Erro ao salvar os tokens no banco de dados."
+            response = self.session.post(url, data=payload, timeout=15); response.raise_for_status(); token_data = response.json()
+            if self._save_tokens_to_db(token_data): self._load_config(); return True, "Autenticação realizada com sucesso!"
+            else: return False, "Erro ao salvar os tokens no banco de dados."
         except requests.exceptions.RequestException as e:
             error_msg = f"Erro na comunicação com o Mercado Livre: {e}"
             if hasattr(e, 'response') and e.response:
-                try:
-                    error_data = e.response.json()
-                    error_msg = error_data.get('message', 'Erro desconhecido. Verifique se o código não expirou.')
-                except ValueError:
-                    error_msg = f"Resposta inesperada do servidor: {e.response.text}"
+                try: error_data = e.response.json(); error_msg = error_data.get('message', 'Erro desconhecido. Verifique se o código não expirou.')
+                except ValueError: error_msg = f"Resposta inesperada do servidor: {e.response.text}"
             return False, error_msg
-
     def _load_config(self):
         try:
-            con = fdb.connect(**self.DB_CONFIG)
-            cur = con.cursor()
-            cur.execute("SELECT APP_ID, CLIENT_SECRET, ACCESS_TOKEN, REFRESH_TOKEN, USER_ID, TOKEN_EXPIRATION_TIME FROM MELI_CONFIG WHERE ID = 1")
-            row = cur.fetchone()
-            if row and row[2]:
-                self.config = {'app_id': row[0], 'client_secret': row[1], 'access_token': row[2], 'refresh_token': row[3], 'user_id': row[4], 'expiration_time': row[5]}
+            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor()
+            cur.execute("SELECT APP_ID, CLIENT_SECRET, ACCESS_TOKEN, REFRESH_TOKEN, USER_ID, TOKEN_EXPIRATION_TIME FROM MELI_CONFIG WHERE ID = 1"); row = cur.fetchone()
+            if row and row[2]: self.config = {'app_id': row[0], 'client_secret': row[1], 'access_token': row[2], 'refresh_token': row[3], 'user_id': row[4], 'expiration_time': row[5]}
             else:
-                cur.execute("SELECT APP_ID, CLIENT_SECRET FROM MELI_CONFIG WHERE ID = 1")
-                row_secrets = cur.fetchone()
+                cur.execute("SELECT APP_ID, CLIENT_SECRET FROM MELI_CONFIG WHERE ID = 1"); row_secrets = cur.fetchone()
                 if row_secrets: self.config = {'app_id': row_secrets[0], 'client_secret': row_secrets[1]}
                 else: self.config = {}
             con.close()
         except Exception as e:
-            QMessageBox.critical(None, "Erro Crítico de Banco de Dados", f"Não foi possível conectar ou ler a configuração do banco.\n\nVerifique se:\n1. O servidor Firebird está instalado e rodando.\n2. O arquivo do banco de dados está na pasta 'base/banco/' junto ao executável.\n\nErro técnico: {e}")
-            self.config = {}
-            sys.exit(1)
-
+            QMessageBox.critical(None, "Erro Crítico de Banco de Dados", f"Não foi possível conectar ou ler a configuração do banco.\n\nVerifique se:\n1. O servidor Firebird está instalado e rodando.\n2. O arquivo do banco de dados está na pasta 'base/banco/' junto ao executável.\n\nErro técnico: {e}"); self.config = {}; sys.exit(1)
     def _save_tokens_to_db(self, new_token_data):
         try:
-            con = fdb.connect(**self.DB_CONFIG)
-            cur = con.cursor()
-            expires_in = new_token_data['expires_in']
-            expiration_time = datetime.now() + timedelta(seconds=expires_in)
+            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor(); expires_in = new_token_data['expires_in']; expiration_time = datetime.now() + timedelta(seconds=expires_in)
             sql = "UPDATE MELI_CONFIG SET ACCESS_TOKEN = ?, REFRESH_TOKEN = ?, TOKEN_EXPIRATION_TIME = ?, USER_ID = ? WHERE ID = 1"
             params = (new_token_data['access_token'], new_token_data['refresh_token'], expiration_time, str(new_token_data['user_id']))
-            cur.execute(sql, params)
-            con.commit()
-            con.close()
-            return True
-        except Exception:
-            return False
-
+            cur.execute(sql, params); con.commit(); con.close(); return True
+        except Exception: return False
     def _refresh_token(self):
-        url = f"{self.base_url}/oauth/token"
-        payload = {'grant_type': 'refresh_token', 'client_id': self.config.get('app_id'), 'client_secret': self.config.get('client_secret'), 'refresh_token': self.config.get('refresh_token')}
+        url = f"{self.base_url}/oauth/token"; payload = {'grant_type': 'refresh_token', 'client_id': self.config.get('app_id'), 'client_secret': self.config.get('client_secret'), 'refresh_token': self.config.get('refresh_token')}
         try:
-            response = self.session.post(url, data=payload, timeout=15)
-            response.raise_for_status()
-            new_token_data = response.json()
-            self.config['access_token'] = new_token_data['access_token']
-            self.config['refresh_token'] = new_token_data['refresh_token']
-            self._save_tokens_to_db(new_token_data)
-            return True
-        except requests.exceptions.RequestException:
-            return False
-            
+            response = self.session.post(url, data=payload, timeout=15); response.raise_for_status(); new_token_data = response.json()
+            self.config['access_token'] = new_token_data['access_token']; self.config['refresh_token'] = new_token_data['refresh_token']
+            self._save_tokens_to_db(new_token_data); return True
+        except requests.exceptions.RequestException: return False
     def _is_token_expired(self):
-        expiration_time = self.config.get('expiration_time')
+        expiration_time = self.config.get('expiration_time');
         if not expiration_time: return True
         return datetime.now() >= (expiration_time - timedelta(minutes=5))
-
     def _make_request(self, method, url, **kwargs):
         if self._is_token_expired():
-            if not self._refresh_token():
-                raise ConnectionError("Falha ao renovar o token de acesso. Sua sessão expirou.")
+            if not self._refresh_token(): raise ConnectionError("Falha ao renovar o token de acesso. Sua sessão expirou.")
         self.session.headers.update({'Authorization': f'Bearer {self.config.get("access_token")}'})
         try:
-            kwargs.setdefault('timeout', 15)
-            response = self.session.request(method, url, **kwargs)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            raise e
-
-    def is_configured(self):
-        return 'access_token' in self.config and self.config['access_token']
-
+            kwargs.setdefault('timeout', 15); response = self.session.request(method, url, **kwargs); response.raise_for_status(); return response.json()
+        except Exception as e: raise e
+    def is_configured(self): return 'access_token' in self.config and self.config['access_token']
     def get_seller_id(self): return self.config.get('user_id')
     def get_local_products(self):
         products = [];
         try:
-            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor()
-            cur.execute("SELECT ID, NOME, MELI_ID, QUANTIDADE_ESTOQUE FROM PRODUTOS ORDER BY NOME")
+            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor(); cur.execute("SELECT ID, NOME, MELI_ID, QUANTIDADE_ESTOQUE FROM PRODUTOS ORDER BY NOME")
             for row in cur.fetchall(): products.append({'id_local': row[0], 'nome': row[1], 'meli_id': row[2], 'estoque': row[3]})
             con.close()
         except Exception: pass
@@ -165,8 +97,7 @@ class MercadoLivreBackend:
     def get_linked_products(self):
         products = [];
         try:
-            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor()
-            cur.execute("SELECT ID, NOME, MELI_ID, QUANTIDADE_ESTOQUE FROM PRODUTOS WHERE MELI_ID IS NOT NULL ORDER BY NOME")
+            con = fdb.connect(**self.DB_CONFIG); cur = con.cursor(); cur.execute("SELECT ID, NOME, MELI_ID, QUANTIDADE_ESTOQUE FROM PRODUTOS WHERE MELI_ID IS NOT NULL ORDER BY NOME")
             for row in cur.fetchall(): products.append({'id_local': row[0], 'nome': row[1], 'meli_id': row[2], 'estoque': row[3]})
             con.close()
         except Exception: pass
@@ -203,17 +134,11 @@ class MercadoLivreBackend:
         except Exception: return None
     def get_vendas_hoje(self):
         try:
-            hoje = datetime.now(); date_from = hoje.strftime('%Y-%m-%dT00:00:00.000-03:00'); date_to = hoje.strftime('%Y-%m-%dT23:59:59.999-03:00')
-            url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&order.date_created.from={date_from}&order.date_created.to={date_to}"
-            pedidos = self._make_request('get', url).get('results', [])
-            return sum(p['total_amount'] for p in pedidos if p['status'] in ['paid', 'shipped', 'delivered'])
+            hoje = datetime.now(); date_from = hoje.strftime('%Y-%m-%dT00:00:00.000-03:00'); date_to = hoje.strftime('%Y-%m-%dT23:59:59.999-03:00'); url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&order.date_created.from={date_from}&order.date_created.to={date_to}"; pedidos = self._make_request('get', url).get('results', []); return sum(p['total_amount'] for p in pedidos if p['status'] in ['paid', 'shipped', 'delivered'])
         except Exception: return 0.0
     def get_vendas_mes(self):
         try:
-            hoje = datetime.now(); primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0); date_from = primeiro_dia_mes.strftime('%Y-%m-%dT%H:%M:%S.000-03:00'); date_to = hoje.strftime('%Y-%m-%dT%H:%M:%S.999-03:00')
-            url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&order.date_created.from={date_from}&order.date_created.to={date_to}"
-            pedidos = self._make_request('get', url).get('results', [])
-            return sum(p['total_amount'] for p in pedidos if p['status'] in ['paid', 'shipped', 'delivered'])
+            hoje = datetime.now(); primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0); date_from = primeiro_dia_mes.strftime('%Y-%m-%dT%H:%M:%S.000-03:00'); date_to = hoje.strftime('%Y-%m-%dT%H:%M:%S.999-03:00'); url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&order.date_created.from={date_from}&order.date_created.to={date_to}"; pedidos = self._make_request('get', url).get('results', []); return sum(p['total_amount'] for p in pedidos if p['status'] in ['paid', 'shipped', 'delivered'])
         except Exception: return 0.0
     def get_pedidos_pendentes(self):
         try:
@@ -235,11 +160,10 @@ class MercadoLivreBackend:
         except Exception: return []
 
 class VincularProdutosWindow(QMainWindow):
+    # (O código desta classe continua o mesmo, sem alterações)
     def __init__(self, backend):
         super().__init__(); self.backend = backend; self.setWindowTitle("Vincular Produtos com Mercado Livre")
-        screen_geometry = QApplication.desktop().availableGeometry()
-        self.setGeometry(int(screen_geometry.x() + screen_geometry.width() * 0.05), int(screen_geometry.y() + screen_geometry.height() * 0.05), int(screen_geometry.width() * 0.9), int(screen_geometry.height() * 0.9))
-        self.init_ui(); self.carregar_listas()
+        screen_geometry = QApplication.desktop().availableGeometry(); self.setGeometry(int(screen_geometry.x() + screen_geometry.width() * 0.05), int(screen_geometry.y() + screen_geometry.height() * 0.05), int(screen_geometry.width() * 0.9), int(screen_geometry.height() * 0.9)); self.init_ui(); self.carregar_listas()
     def init_ui(self):
         central_widget = QWidget(); self.setCentralWidget(central_widget); main_layout = QHBoxLayout(central_widget)
         local_panel = QFrame(); local_layout = QVBoxLayout(local_panel); local_label = QLabel("Produtos do seu Sistema"); local_label.setFont(QFont("Arial", 16, QFont.Bold))
@@ -276,6 +200,7 @@ class VincularProdutosWindow(QMainWindow):
             else: QMessageBox.critical(self, "Erro", "Não foi possível salvar o vínculo no banco de dados.")
 
 class SelecaoSincronizacaoWindow(QDialog):
+    # (O código desta classe continua o mesmo, sem alterações)
     def __init__(self, backend, parent=None):
         super().__init__(parent); self.backend = backend; self.produtos_selecionados = []
         self.setWindowTitle("Selecionar Produtos para Sincronizar"); self.setMinimumSize(800, 600)
@@ -309,15 +234,18 @@ class SelecaoSincronizacaoWindow(QDialog):
 
 class MercadoLivreWindow(QMainWindow):
     def __init__(self):
-        super().__init__(); self.janela_vincular = None
-        self.backend = MercadoLivreBackend()
-        self.init_ui(); self.check_auth_status(); self.showMaximized()
+        super().__init__(); self.janela_vincular = None; self.backend = MercadoLivreBackend(); self.init_ui(); self.check_auth_status(); self.showMaximized()
     
     def init_ui(self):
         self.setWindowTitle("Painel Mercado Livre"); self.setStyleSheet("background-color: #f8f9fa;")
         self.main_widget = QWidget(); self.setCentralWidget(self.main_widget); self.stacked_layout = QVBoxLayout(self.main_widget)
         self.connection_widget = self.create_connection_widget(); self.dashboard_widget = self.create_dashboard_widget()
         self.stacked_layout.addWidget(self.connection_widget); self.stacked_layout.addWidget(self.dashboard_widget)
+
+        ### NOVIDADE: Criar e configurar o timer de atualização ###
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.carregar_dados_reais) # Conecta o timer à função de carregar dados
+        # O timer será iniciado quando a janela ficar visível e parado quando ficar invisível
 
     def check_auth_status(self):
         if self.backend.is_configured():
@@ -357,15 +285,22 @@ class MercadoLivreWindow(QMainWindow):
         header_frame = QFrame(); header_frame.setFixedHeight(80); header_frame.setStyleSheet("QFrame { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #667eea, stop:1 #764ba2); border-radius: 15px; }")
         header_layout = QHBoxLayout(header_frame); header_layout.setContentsMargins(20, 15, 20, 15)
         titulo = QLabel("💰 Painel Mercado Livre"); titulo.setFont(QFont("Arial", 24, QFont.Bold)); titulo.setStyleSheet("color: white; background: transparent;")
+        btn_desconectar = QPushButton("🔌 Desconectar"); btn_desconectar.setFont(QFont("Arial", 12, QFont.Bold)); btn_desconectar.setStyleSheet("QPushButton { background-color: #dc3545; color: white; padding: 10px 15px; border-radius: 5px; border: 1px solid #c82333; } QPushButton:hover { background-color: #c82333; }"); btn_desconectar.setCursor(QCursor(Qt.PointingHandCursor)); btn_desconectar.clicked.connect(self.desconectar_conta)
         btn_sincronizar_estoque = QPushButton("🔄 Sincronizar Estoque"); btn_sincronizar_estoque.setFont(QFont("Arial", 12, QFont.Bold)); btn_sincronizar_estoque.setStyleSheet("QPushButton { background-color: #ffffff; color: #333; padding: 10px 15px; border-radius: 5px; border: 1px solid #ccc; } QPushButton:hover { background-color: #f0f0f0; }"); btn_sincronizar_estoque.setCursor(QCursor(Qt.PointingHandCursor)); btn_sincronizar_estoque.clicked.connect(self.abrir_dialogo_sincronizacao)
         btn_vincular_produtos = QPushButton("🔗 Vincular Produtos"); btn_vincular_produtos.setFont(QFont("Arial", 12, QFont.Bold)); btn_vincular_produtos.setStyleSheet("QPushButton { background-color: #ffffff; color: #333; padding: 10px 15px; border-radius: 5px; border: 1px solid #ccc; } QPushButton:hover { background-color: #f0f0f0; }"); btn_vincular_produtos.setCursor(QCursor(Qt.PointingHandCursor)); btn_vincular_produtos.clicked.connect(self.abrir_janela_vincular)
-        header_layout.addWidget(titulo); header_layout.addStretch(); header_layout.addWidget(btn_sincronizar_estoque); header_layout.addWidget(btn_vincular_produtos); layout_pai.addWidget(header_frame)
+        header_layout.addWidget(titulo); header_layout.addStretch(); header_layout.addWidget(btn_desconectar); header_layout.addWidget(btn_sincronizar_estoque); header_layout.addWidget(btn_vincular_produtos); layout_pai.addWidget(header_frame)
     
+    def desconectar_conta(self):
+        reply = QMessageBox.question(self, "Confirmar Desconexão", "Você tem certeza que deseja desconectar sua conta do Mercado Livre?\n\nSerá necessário autorizar o acesso novamente para usar as funcionalidades.", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            success, message = self.backend.logout()
+            if success: QMessageBox.information(self, "Sucesso", message); self.check_auth_status()
+            else: QMessageBox.critical(self, "Erro", message)
+
     def criar_resumo(self, layout_pai):
         resumo_frame = QFrame(); resumo_frame.setStyleSheet("background: transparent;"); resumo_layout = QHBoxLayout(resumo_frame); resumo_layout.setSpacing(20)
         card1, self.lbl_vendas_hoje = self.criar_card_resumo("Vendas Hoje", "R$ 0,00", "#28a745"); card2, self.lbl_vendas_mes = self.criar_card_resumo("Vendas do Mês", "R$ 0,00", "#17a2b8"); card3, self.lbl_pedidos_pendentes = self.criar_card_resumo("Pedidos Pendentes", "0", "#ffc107"); card4, self.lbl_produtos_online = self.criar_card_resumo("Produtos Online", "0", "#6f42c1")
         resumo_layout.addWidget(card1); resumo_layout.addWidget(card2); resumo_layout.addWidget(card3); resumo_layout.addWidget(card4); layout_pai.addWidget(resumo_frame)
-    
     def criar_card_resumo(self, titulo, valor, cor):
         card = QFrame(); card.setFixedSize(250, 100); card.setStyleSheet(f"QFrame {{ background-color: white; border-radius: 10px; border-left: 5px solid {cor}; }}")
         layout = QVBoxLayout(card); layout.setContentsMargins(15, 10, 15, 10); lbl_titulo = QLabel(titulo); lbl_titulo.setFont(QFont("Arial", 12)); lbl_titulo.setStyleSheet("color: #6c757d;"); lbl_valor = QLabel(valor); lbl_valor.setFont(QFont("Arial", 20, QFont.Bold)); lbl_valor.setStyleSheet(f"color: {cor};")
@@ -374,31 +309,51 @@ class MercadoLivreWindow(QMainWindow):
     def criar_tabela_vendas(self, layout_pai):
         table_frame = QFrame(); table_frame.setStyleSheet("QFrame { background-color: white; border-radius: 10px; border: 1px solid #dee2e6; }")
         table_layout = QVBoxLayout(table_frame); table_layout.setContentsMargins(15, 15, 15, 15); titulo_table = QLabel("📋 Últimas Vendas"); titulo_table.setFont(QFont("Arial", 16, QFont.Bold)); titulo_table.setStyleSheet("color: #495057; margin-bottom: 10px;")
-        self.tabela = QTableWidget(); self.tabela.setColumnCount(7); self.tabela.setHorizontalHeaderLabels(["Data", "Plataforma", "Produto", "Cliente", "Valor", "Status", "Ações"]); self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.tabela.setStyleSheet("QTableWidget { gridline-color: #dee2e6; border: none; } QTableWidget::item { padding: 10px; border-bottom: 1px solid #e9ecef; } QHeaderView::section { background-color: #f8f9fa; padding: 12px; border: none; border-bottom: 2px solid #dee2e6; font-weight: bold; color: #495057; }")
-        header = self.tabela.horizontalHeader(); header.setSectionResizeMode(2, QHeaderView.Stretch); header.setSectionResizeMode(3, QHeaderView.Stretch); table_layout.addWidget(titulo_table); table_layout.addWidget(self.tabela); layout_pai.addWidget(table_frame)
+        self.tabela = QTableWidget()
+        self.tabela.setColumnCount(6); self.tabela.setHorizontalHeaderLabels(["Data", "Plataforma", "Produto", "Cliente", "Valor", "Status"])
+        self.tabela.setEditTriggers(QTableWidget.NoEditTriggers); self.tabela.setSelectionMode(QTableWidget.NoSelection); self.tabela.setFocusPolicy(Qt.NoFocus)
+        self.tabela.setStyleSheet(""" QTableWidget { gridline-color: #dee2e6; border: none; } QTableWidget::item { padding: 12px; border-bottom: 1px solid #e9ecef; } QHeaderView::section { background-color: #f8f9fa; padding: 12px; border: none; border-bottom: 2px solid #dee2e6; font-weight: bold; color: #495057; } """)
+        header = self.tabela.horizontalHeader(); header.setSectionResizeMode(2, QHeaderView.Stretch); header.setSectionResizeMode(3, QHeaderView.Stretch)
+        table_layout.addWidget(titulo_table); table_layout.addWidget(self.tabela); layout_pai.addWidget(table_frame)
     
     def carregar_dados_reais(self):
+        print("Atualizando dados do Mercado Livre...") # Adicionado para debug
         self.setCursor(QCursor(Qt.WaitCursor))
         try:
             self.lbl_vendas_hoje.setText(f"R$ {self.backend.get_vendas_hoje():.2f}".replace('.',',')); self.lbl_vendas_mes.setText(f"R$ {self.backend.get_vendas_mes():.2f}".replace('.',',')); self.lbl_pedidos_pendentes.setText(str(self.backend.get_pedidos_pendentes())); self.lbl_produtos_online.setText(str(self.backend.get_produtos_online()))
             ultimas_vendas = self.backend.get_ultimas_vendas(); self.tabela.setRowCount(len(ultimas_vendas))
+            item_font = QFont("Arial", 11)
             for row, venda in enumerate(ultimas_vendas):
-                self.tabela.setItem(row, 0, QTableWidgetItem(venda['data'])); plataforma_item = QTableWidgetItem(venda['plataforma']); plataforma_item.setForeground(QColor("#000000")); plataforma_item.setBackground(QColor("#FFF159")); plataforma_item.setTextAlignment(Qt.AlignCenter); self.tabela.setItem(row, 1, plataforma_item)
-                self.tabela.setItem(row, 2, QTableWidgetItem(venda['produto'])); self.tabela.setItem(row, 3, QTableWidgetItem(venda['cliente'])); self.tabela.setItem(row, 4, QTableWidgetItem(venda['valor'])); self.tabela.setItem(row, 5, QTableWidgetItem(venda['status']))
-                btn_detalhes = QPushButton("👁️ Ver Detalhes"); btn_detalhes.setStyleSheet("QPushButton { background-color: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 3px; } QPushButton:hover { background-color: #5a6268; }"); btn_detalhes.setCursor(QCursor(Qt.PointingHandCursor)); btn_detalhes.clicked.connect(lambda checked, r=row: self.ver_detalhes(r)); self.tabela.setCellWidget(row, 6, btn_detalhes)
-        except ConnectionError as e: QMessageBox.critical(self, "Erro de Conexão", f"{e}\nSua sessão expirou. Por favor, reconecte sua conta."); self.backend.config = {}; self.check_auth_status()
-        except Exception as e: QMessageBox.critical(self, "Erro ao Carregar Dados", f"Ocorreu um erro inesperado: {e}")
-        finally: self.unsetCursor()
-
-    def ver_detalhes(self, row):
-        produto = self.tabela.item(row, 2).text(); cliente = self.tabela.item(row, 3).text()
-        QMessageBox.information(self, "Detalhes da Venda", f"Exibindo detalhes para o produto:\n\n{produto}\n\nVendido para: {cliente}")
-
+                data_item = QTableWidgetItem(venda['data']); plataforma_item = QTableWidgetItem(venda['plataforma']); produto_item = QTableWidgetItem(venda['produto']); cliente_item = QTableWidgetItem(venda['cliente']); valor_item = QTableWidgetItem(venda['valor']); status_item = QTableWidgetItem(venda['status'])
+                for item in [data_item, plataforma_item, produto_item, cliente_item, valor_item, status_item]: item.setFont(item_font)
+                plataforma_item.setForeground(QColor("#000000")); plataforma_item.setBackground(QColor("#FFF159")); plataforma_item.setTextAlignment(Qt.AlignCenter)
+                self.tabela.setItem(row, 0, data_item); self.tabela.setItem(row, 1, plataforma_item); self.tabela.setItem(row, 2, produto_item); self.tabela.setItem(row, 3, cliente_item); self.tabela.setItem(row, 4, valor_item); self.tabela.setItem(row, 5, status_item)
+        except ConnectionError as e:
+            QMessageBox.critical(self, "Erro de Conexão", f"{e}\nSua sessão expirou. Por favor, reconecte sua conta.")
+            self.update_timer.stop() # Para o timer se a conexão falhar
+            self.backend.config = {}; self.check_auth_status()
+        except Exception as e:
+            print(f"Erro ao carregar dados: {e}") # Debug
+        finally:
+            self.unsetCursor()
+    
+    ### NOVIDADE: Métodos para controlar o timer com a visibilidade da janela ###
+    def showEvent(self, event):
+        """Chamado quando a janela é mostrada."""
+        super().showEvent(event)
+        print("Janela do ML visível, iniciando timer de atualização.")
+        # Inicia o timer para rodar a cada 30 segundos (30000 ms)
+        self.update_timer.start(30000)
+    
+    def hideEvent(self, event):
+        """Chamado quando a janela é escondida ou fechada."""
+        super().hideEvent(event)
+        print("Janela do ML não visível, parando timer.")
+        self.update_timer.stop()
+        
     def abrir_janela_vincular(self):
         if self.janela_vincular is None or not self.janela_vincular.isVisible():
             self.janela_vincular = VincularProdutosWindow(self.backend); self.janela_vincular.show()
-
     def abrir_dialogo_sincronizacao(self):
         produtos_vinculados = self.backend.get_linked_products()
         if not produtos_vinculados: QMessageBox.information(self, "Nenhum Produto Vinculado", "Não há produtos vinculados para sincronizar. Vincule alguns produtos primeiro."); return
@@ -412,7 +367,6 @@ class MercadoLivreWindow(QMainWindow):
             if dialog.exec_() == QDialog.Accepted:
                 produtos_para_sincronizar = dialog.get_selecao()
                 if produtos_para_sincronizar: self.executar_sincronizacao(produtos_para_sincronizar)
-    
     def executar_sincronizacao(self, lista_de_produtos):
         if not lista_de_produtos: return
         total = len(lista_de_produtos)
@@ -436,8 +390,9 @@ class MercadoLivreWindow(QMainWindow):
         if self.janela_vincular and self.janela_vincular.isVisible(): self.janela_vincular.carregar_listas()
         self.carregar_dados_reais()
 
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MercadoLivreWindow()
+    # A linha abaixo foi removida do __main__ porque o show() já é chamado pelo seu sistema principal
+    # window.show()
     sys.exit(app.exec_())

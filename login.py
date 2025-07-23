@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.4.3"
+Versao = "Versão: v0.1.4.5"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
