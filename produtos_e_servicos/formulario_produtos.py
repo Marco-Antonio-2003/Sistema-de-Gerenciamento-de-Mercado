@@ -160,6 +160,10 @@ class FormularioProdutos(QWidget):
         self.parent = parent
         self.produto_original = None  # Armazenar referência ao produto original
         self.modo_alteracao = modo_alteracao  # Novo flag para indicar modo de alteração
+        
+        # NOVO: Inicializar a variável para o campo de lucro
+        self.lucro_real_input = None
+        
         self.initUI()
         
         # Carregar o próximo código disponível no modo de inclusão
@@ -239,83 +243,34 @@ class FormularioProdutos(QWidget):
         
         # Estilos
         label_style = "color: white; font-size: 14px;"
-        # Correção específica para o estilo dos ComboBoxes
         
-
         combobox_style = """
             QComboBox {
-                background-color: white;
-                border: 1px solid #cccccc;
-                padding: 5px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
+                background-color: white; border: 1px solid #cccccc; padding: 5px; font-size: 14px; border-radius: 4px; color: black;
             }
-            QComboBox::drop-down { 
-                border: none; 
-            }
-            QComboBox:hover { 
-                border: 1px solid #0078d7; 
-            }
-            QComboBox::down-arrow {
-                width: 14px;
-                height: 14px;
-            }
-            QComboBox QListView {
-                background-color: white;
-                color: black;
-                selection-background-color: #0078d7;
-                selection-color: white;
-                border: 1px solid #cccccc;
-            }
-            QComboBox QAbstractItemView {
-                background-color: white;
-                color: black;
-                selection-background-color: #0078d7;
-                selection-color: white;
-                border: 1px solid #cccccc;
-            }
-            QComboBox QAbstractItemView::item {
-                background-color: white;
-                color: black;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #0078d7;
-                color: white;
-            }
+            QComboBox::drop-down { border: none; }
+            QComboBox:hover { border: 1px solid #0078d7; }
+            QComboBox::down-arrow { width: 14px; height: 14px; }
+            QComboBox QListView { background-color: white; color: black; selection-background-color: #0078d7; selection-color: white; border: 1px solid #cccccc; }
+            QComboBox QAbstractItemView { background-color: white; color: black; selection-background-color: #0078d7; selection-color: white; border: 1px solid #cccccc; }
+            QComboBox QAbstractItemView::item { background-color: white; color: black; }
+            QComboBox QAbstractItemView::item:selected { background-color: #0078d7; color: white; }
         """
 
-        # Para garantir que o estilo seja aplicado, certifique-se de aplicar este estilo 
-        # tanto no FormularioProdutos quanto no GerenciadorItensDialog
         lineedit_style = """
             QLineEdit {
-                background-color: white;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
+                background-color: white; border: 1px solid #cccccc; padding: 10px; font-size: 14px; border-radius: 4px; color: black;
             }
             QLineEdit:focus { border: 1px solid #0078d7; }
         """
         readonly_lineedit_style = """
             QLineEdit {
-                background-color: #f0f0f0;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: #505050;
+                background-color: #f0f0f0; border: 1px solid #cccccc; padding: 10px; font-size: 14px; border-radius: 4px; color: #505050;
             }
         """
         spinbox_style = """
             QSpinBox {
-                background-color: white;
-                border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 4px;
-                color: black;
+                background-color: white; border: 1px solid #cccccc; padding: 10px; font-size: 14px; border-radius: 4px; color: black;
             }
             QSpinBox:focus { border: 1px solid #0078d7; }
         """
@@ -349,7 +304,6 @@ class FormularioProdutos(QWidget):
         linha2 = QHBoxLayout()
         linha2.setSpacing(20)
         
-        # Código de Barras
         barras_v = QVBoxLayout()
         barras_h = QHBoxLayout()
         barras_label = QLabel("Código de Barras:")
@@ -359,16 +313,7 @@ class FormularioProdutos(QWidget):
         barras_h.addWidget(self.barras_input, 1)
         btn_scan = QToolButton()
         btn_scan.setText("Scan")
-        btn_scan.setStyleSheet("""
-            QToolButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 4px;
-            }
-            QToolButton:hover { background-color: #003d5c; }
-        """)
+        btn_scan.setStyleSheet("QToolButton { background-color: #005079; color: white; border: none; padding: 10px; border-radius: 4px; } QToolButton:hover { background-color: #003d5c; }")
         btn_scan.clicked.connect(self.focar_scanner)
         barras_h.addWidget(btn_scan)
         barras_v.addLayout(barras_h)
@@ -377,7 +322,6 @@ class FormularioProdutos(QWidget):
         barras_v.addWidget(self.scan_info_label)
         linha2.addLayout(barras_v, 1)
         
-        # Grupo
         grupo_layout = QHBoxLayout()
         grupo_layout.setSpacing(5)
         grupo_layout.setContentsMargins(0, 0, 0, 0)
@@ -390,17 +334,13 @@ class FormularioProdutos(QWidget):
             from base.banco import listar_grupos
             items = listar_grupos() or []
             self.grupo_combo.addItem("Selecione um grupo")
-            for g in sorted(items):
-                self.grupo_combo.addItem(g)
+            for g in sorted(items): self.grupo_combo.addItem(g)
         except:
             self.grupo_combo.addItems(["Selecione um grupo","Alimentos","Bebidas","Limpeza","Higiene","Hortifruti","Eletrônicos","Vestuário","Outros"])
         btn_gg = QToolButton()
         btn_gg.setText("+")
         btn_gg.setToolTip("Gerenciar grupos")
-        btn_gg.setStyleSheet("""
-            QToolButton { background-color: #00c853; color: white; border: none; padding: 4px 8px; border-radius: 4px; }
-            QToolButton:hover { background-color: #009624; }
-        """)
+        btn_gg.setStyleSheet("QToolButton { background-color: #00c853; color: white; border: none; padding: 4px 8px; border-radius: 4px; } QToolButton:hover { background-color: #009624; }")
         btn_gg.clicked.connect(self.abrir_gerenciador_grupos)
         grupo_layout.addWidget(self.grupo_combo)
         grupo_layout.addWidget(btn_gg)
@@ -408,46 +348,9 @@ class FormularioProdutos(QWidget):
         
         main_layout.addLayout(linha2)
         
-        # Linha 3: Marca e preços
+        # MODIFICADO: Linha 3 agora contém os preços e o novo campo de lucro
         linha3 = QHBoxLayout()
         linha3.setSpacing(20)
-        
-        marca_layout = QHBoxLayout()
-        marca_layout.setSpacing(5)
-        marca_label = QLabel("Marca:")
-        marca_label.setStyleSheet(label_style)
-        marca_layout.addWidget(marca_label)
-        self.marca_combo = QComboBox()
-        self.marca_combo.setStyleSheet(combobox_style)
-        try:
-            from base.banco import listar_marcas
-            items = listar_marcas() or []
-            self.marca_combo.addItem("Selecione uma marca")
-            for m in sorted(items):
-                self.marca_combo.addItem(m)
-        except:
-            self.marca_combo.addItems(["Selecione uma marca","Nestlé","Unilever","Coca-Cola"])
-        btn_gm = QToolButton()
-        btn_gm.setText("+")
-        btn_gm.setToolTip("Gerenciar marcas")
-        btn_gm.setStyleSheet("""
-            QToolButton { background-color: #00c853; color: white; border: none; padding: 4px 8px; border-radius: 4px; }
-            QToolButton:hover { background-color: #009624; }
-        """)
-        btn_gm.clicked.connect(self.abrir_gerenciador_marcas)
-        marca_layout.addWidget(self.marca_combo)
-        marca_layout.addWidget(btn_gm)
-        linha3.addLayout(marca_layout, 1)
-        
-        # Preço de Venda
-        pv_layout = QHBoxLayout()
-        pv_label = QLabel("Preço de venda:")
-        pv_label.setStyleSheet(label_style)
-        pv_layout.addWidget(pv_label)
-        self.preco_venda_input = QLineEdit()
-        self.preco_venda_input.setStyleSheet(lineedit_style)
-        pv_layout.addWidget(self.preco_venda_input)
-        linha3.addLayout(pv_layout)
         
         # Preço de Compra
         pc_layout = QHBoxLayout()
@@ -459,12 +362,57 @@ class FormularioProdutos(QWidget):
         pc_layout.addWidget(self.preco_compra_input)
         linha3.addLayout(pc_layout)
         
+        # Preço de Venda
+        pv_layout = QHBoxLayout()
+        pv_label = QLabel("Preço de venda:")
+        pv_label.setStyleSheet(label_style)
+        pv_layout.addWidget(pv_label)
+        self.preco_venda_input = QLineEdit()
+        self.preco_venda_input.setStyleSheet(lineedit_style)
+        pv_layout.addWidget(self.preco_venda_input)
+        linha3.addLayout(pv_layout)
+        
+        # NOVO: Campo de Lucro Real
+        lucro_layout = QHBoxLayout()
+        lucro_label = QLabel("Lucro Real (R$):")
+        lucro_label.setStyleSheet(label_style)
+        lucro_layout.addWidget(lucro_label)
+        self.lucro_real_input = QLineEdit()
+        self.lucro_real_input.setReadOnly(True)  # Torna o campo apenas para leitura
+        self.lucro_real_input.setStyleSheet(readonly_lineedit_style)  # Estilo de campo bloqueado
+        self.lucro_real_input.setPlaceholderText("Cálculo automático")
+        lucro_layout.addWidget(self.lucro_real_input)
+        linha3.addLayout(lucro_layout)
+        
         main_layout.addLayout(linha3)
         
-        # Linha 4: Data e estoque
+        # Linha 4: Marca, Data e Estoque (Marca foi movida para cá)
         linha4 = QHBoxLayout()
         linha4.setSpacing(20)
-        
+
+        marca_layout = QHBoxLayout()
+        marca_layout.setSpacing(5)
+        marca_label = QLabel("Marca:")
+        marca_label.setStyleSheet(label_style)
+        marca_layout.addWidget(marca_label)
+        self.marca_combo = QComboBox()
+        self.marca_combo.setStyleSheet(combobox_style)
+        try:
+            from base.banco import listar_marcas
+            items = listar_marcas() or []
+            self.marca_combo.addItem("Selecione uma marca")
+            for m in sorted(items): self.marca_combo.addItem(m)
+        except:
+            self.marca_combo.addItems(["Selecione uma marca","Nestlé","Unilever","Coca-Cola"])
+        btn_gm = QToolButton()
+        btn_gm.setText("+")
+        btn_gm.setToolTip("Gerenciar marcas")
+        btn_gm.setStyleSheet("QToolButton { background-color: #00c853; color: white; border: none; padding: 4px 8px; border-radius: 4px; } QToolButton:hover { background-color: #009624; }")
+        btn_gm.clicked.connect(self.abrir_gerenciador_marcas)
+        marca_layout.addWidget(self.marca_combo)
+        marca_layout.addWidget(btn_gm)
+        linha4.addLayout(marca_layout, 1)
+
         data_layout = QHBoxLayout()
         data_label = QLabel("Data de Cadastro:")
         data_label.setStyleSheet(label_style)
@@ -472,10 +420,7 @@ class FormularioProdutos(QWidget):
         self.data_input = QDateEdit()
         self.data_input.setCalendarPopup(True)
         self.data_input.setDate(QDate.currentDate())
-        self.data_input.setStyleSheet("""
-            QDateEdit { background-color: white; border: 1px solid #cccccc; padding: 10px; border-radius: 4px; }
-            QDateEdit:hover { border: 1px solid #0078d7; }
-        """)
+        self.data_input.setStyleSheet("QDateEdit { background-color: white; border: 1px solid #cccccc; padding: 10px; border-radius: 4px; } QDateEdit:hover { border: 1px solid #0078d7; }")
         data_layout.addWidget(self.data_input)
         linha4.addLayout(data_layout)
         
@@ -492,7 +437,10 @@ class FormularioProdutos(QWidget):
         
         main_layout.addLayout(linha4)
         
-        #unidade_layout
+        # MODIFICADO: Linha 5 para unidade de medida
+        linha5 = QHBoxLayout()
+        linha5.setSpacing(20)
+
         unidade_layout = QHBoxLayout()
         unidade_label = QLabel("Unidade de Medida:")
         unidade_label.setStyleSheet(label_style)
@@ -501,20 +449,20 @@ class FormularioProdutos(QWidget):
         self.unidade_combo.setStyleSheet(combobox_style)
         self.unidade_combo.addItems(["Selecione uma unidade", "Un", "Kg", "g", "L", "ml", "m", "cm", "Pç"])
         unidade_layout.addWidget(self.unidade_combo)
-
-        linha4.addLayout(unidade_layout)
+        linha5.addLayout(unidade_layout)
+        linha5.addStretch(1) # Adiciona espaço flexível para empurrar a unidade para a esquerda
+        
+        main_layout.addLayout(linha5)
+        
+        # NOVO: Conectar sinais dos campos de preço para a função de cálculo
+        self.preco_venda_input.textChanged.connect(self._atualizar_lucro_real)
+        self.preco_compra_input.textChanged.connect(self._atualizar_lucro_real)
 
         # Botão Incluir
         self.btn_incluir = QPushButton("Incluir")
         self.btn_incluir.setStyleSheet("""
             QPushButton {
-                background-color: #00ff9d;
-                color: black;
-                border: none;
-                padding: 15px 0;
-                font-size: 16px;
-                border-radius: 4px;
-                margin: 20px 100px 0;
+                background-color: #00ff9d; color: black; border: none; padding: 15px 0; font-size: 16px; border-radius: 4px; margin: 20px 100px 0;
             }
             QPushButton:hover { background-color: #00e088; }
         """)
@@ -523,27 +471,50 @@ class FormularioProdutos(QWidget):
         
         main_layout.addStretch()
 
+    # NOVO: Função para calcular e atualizar o lucro real
+    def _atualizar_lucro_real(self):
+        """
+        Calcula o lucro com base nos preços de compra e venda e atualiza o campo de lucro.
+        """
+        try:
+            # Pega o texto dos campos de preço, removendo espaços e trocando vírgula por ponto
+            preco_venda_str = self.preco_venda_input.text().strip().replace(',', '.')
+            preco_compra_str = self.preco_compra_input.text().strip().replace(',', '.')
+
+            # Converte para float, tratando campos vazios como 0.0
+            preco_venda = float(preco_venda_str) if preco_venda_str else 0.0
+            preco_compra = float(preco_compra_str) if preco_compra_str else 0.0
+
+            # Calcula o lucro
+            lucro = preco_venda - preco_compra
+
+            # Formata o resultado para duas casas decimais e com vírgula
+            lucro_formatado = f"{lucro:.2f}".replace('.', ',')
+
+            # Atualiza o texto do campo de lucro
+            self.lucro_real_input.setText(lucro_formatado)
+
+        except ValueError:
+            # Se o usuário digitar algo que não seja um número, o campo de lucro fica vazio
+            self.lucro_real_input.setText("")
+
 
     def abrir_gerenciador_marcas(self):
         """Abre o gerenciador de marcas de forma segura"""
         try:
-            # Criar e mostrar o diálogo
             dialog = GerenciadorItensDialog(self, tipo="marca")
-            dialog.setWindowModality(Qt.ApplicationModal)  # Bloqueia a janela principal
+            dialog.setWindowModality(Qt.ApplicationModal)
             dialog.show()
         except Exception as e:
-            print(f"Erro ao abrir gerenciador de marcas: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao abrir gerenciador de marcas: {str(e)}")
 
     def abrir_gerenciador_grupos(self):
         """Abre o gerenciador de grupos de forma segura"""
         try:
-            # Criar e mostrar o diálogo
             dialog = GerenciadorItensDialog(self, tipo="grupo")
-            dialog.setWindowModality(Qt.ApplicationModal)  # Bloqueia a janela principal
+            dialog.setWindowModality(Qt.ApplicationModal)
             dialog.show()
         except Exception as e:
-            print(f"Erro ao abrir gerenciador de grupos: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao abrir gerenciador de grupos: {str(e)}")
 
     def focar_scanner(self):
@@ -551,8 +522,6 @@ class FormularioProdutos(QWidget):
         self.barras_input.setFocus()
         self.scan_info_label.setText("Pronto para escanear! Aproxime o leitor do código de barras.")
         self.scan_info_label.setStyleSheet("color: #4CAF50; font-size: 12px; font-weight: bold;")
-        
-        # Resetar a mensagem após 3 segundos se nenhum código for lido
         QTimer.singleShot(3000, self.resetar_mensagem_scanner)
     
     def resetar_mensagem_scanner(self):
@@ -562,234 +531,131 @@ class FormularioProdutos(QWidget):
     
     def codigo_barras_lido(self, codigo):
         """Manipula o evento de leitura de código de barras completa"""
-        # Verificar se o atributo modo_alteracao existe antes de usá-lo
         modo_alteracao = getattr(self, 'modo_alteracao', False)
-        
-        # Evitar processamento se estiver no modo de alteração
-        if modo_alteracao:
-            return
-            
+        if modo_alteracao: return
         self.scan_info_label.setText(f"Código de barras lido com sucesso: {codigo}")
         self.scan_info_label.setStyleSheet("color: #4CAF50; font-size: 12px; font-weight: bold;")
-        
-        # Buscar produto pelo código de barras se já existir
         self.buscar_produto_por_barras(codigo)
-        
-        # Resetar a mensagem após 3 segundos
         QTimer.singleShot(3000, self.resetar_mensagem_scanner)
     
     def buscar_produto_por_barras(self, codigo_barras):
         """Busca um produto pelo código de barras"""
         try:
-            # Verificar se o atributo modo_alteracao existe antes de usá-lo
             modo_alteracao = getattr(self, 'modo_alteracao', False)
-            
-            # Se já estivermos em modo de alteração, não perguntar novamente
-            if modo_alteracao:
-                return
-                
-            # Verificar se já existe um produto com este código de barras
+            if modo_alteracao: return
             produto = buscar_produto_por_barras(codigo_barras)
-            
             if produto:
-                # Produto encontrado, perguntar ao usuário se deseja carregá-lo
-                # Criar uma caixa de mensagem personalizada com estilo
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Question)
                 msg_box.setWindowTitle("Produto Encontrado")
                 msg_box.setText(f'O produto "{produto["nome"]}" com este código de barras já existe. Deseja carregá-lo?')
                 msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
                 msg_box.setDefaultButton(QMessageBox.Yes)
-                
-                # Personalizar os botões para Sim e Não
                 btn_sim = msg_box.button(QMessageBox.Yes)
                 btn_sim.setText("Sim")
                 btn_nao = msg_box.button(QMessageBox.No)
                 btn_nao.setText("Não")
-                
-                # Aplicar estilo personalizado
-                msg_box.setStyleSheet("""
-                    QMessageBox { 
-                        background-color: #043b57;
-                    }
-                    QLabel { 
-                        color: white;
-                        background-color: #043b57;
-                    }
-                    QPushButton {
-                        background-color: #005079;
-                        color: white;
-                        border: none;
-                        padding: 8px 20px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #003d5c;
-                    }
-                """)
-                
-                # Obter resposta
+                msg_box.setStyleSheet("QMessageBox { background-color: #043b57; } QLabel { color: white; background-color: #043b57; } QPushButton { background-color: #005079; color: white; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; } QPushButton:hover { background-color: #003d5c; }")
                 reply = msg_box.exec_()
-                
                 if reply == QMessageBox.Yes:
-                    # Carregar o produto encontrado para edição
                     self.set_produto_original(produto)
-                    # Preencher os campos com os dados do produto
                     self.preencher_campos_produto(produto)
-                    # Mudar o botão para Atualizar
                     self.btn_incluir.setText("Atualizar")
-        
         except Exception as e:
             print(f"Erro ao buscar produto por código de barras: {str(e)}")
-            # Se a função não existir ou ocorrer um erro, apenas ignorar
             pass
     
     def set_produto_original(self, produto):
         """Define o produto original para modo de edição"""
         if isinstance(produto, dict):
             self.produto_original = produto
-            
-            # Se estamos no modo de edição, preencher o campo código com o código do produto
-            if "codigo" in produto:
-                self.codigo_input.setText(str(produto["codigo"]))
+            if "codigo" in produto: self.codigo_input.setText(str(produto["codigo"]))
     
     def preencher_campos_produto(self, produto):
         """Preenche os campos com os dados do produto"""
-        # Esta função pode ser chamada quando um produto é encontrado pelo código de barras
         if isinstance(produto, dict):
-            # Preencher os campos com os dados do produto
-            if "codigo" in produto:
-                self.codigo_input.setText(str(produto["codigo"]))
-            if "nome" in produto:
-                self.nome_input.setText(produto["nome"])
-            if "barras" in produto:
-                self.barras_input.setText(produto["barras"])
+            if "codigo" in produto: self.codigo_input.setText(str(produto["codigo"]))
+            if "nome" in produto: self.nome_input.setText(produto["nome"])
+            if "barras" in produto: self.barras_input.setText(produto["barras"])
             if "marca" in produto:
-                # Encontrar o índice da marca no combobox
                 index = self.marca_combo.findText(produto["marca"])
-                if index >= 0:
-                    self.marca_combo.setCurrentIndex(index)
+                if index >= 0: self.marca_combo.setCurrentIndex(index)
             if "grupo" in produto:
-                # Encontrar o índice do grupo no combobox
                 index = self.grupo_combo.findText(produto["grupo"])
-                if index >= 0:
-                    self.grupo_combo.setCurrentIndex(index)
-            if "preco_venda" in produto:
-                self.preco_venda_input.setText(str(produto["preco_venda"]))
-            if "preco_compra" in produto:
-                self.preco_compra_input.setText(str(produto["preco_compra"]))
-            if "estoque" in produto:
-                self.estoque_input.setValue(int(produto["estoque"]))
+                if index >= 0: self.grupo_combo.setCurrentIndex(index)
+            if "preco_venda" in produto: self.preco_venda_input.setText(str(produto["preco_venda"]).replace('.', ','))
+            if "preco_compra" in produto: self.preco_compra_input.setText(str(produto["preco_compra"]).replace('.', ','))
+            if "estoque" in produto: self.estoque_input.setValue(int(produto["estoque"]))
+            # MODIFICADO: Atualiza o lucro ao preencher
+            self._atualizar_lucro_real()
     
     def voltar(self):
         """Ação do botão voltar"""
-        # Fechar a janela atual
-        if hasattr(self, 'parent_widget') and self.parent_widget and hasattr(self.parent_widget, 'form_window'):
-            self.parent_widget.form_window.close()
-        else:
-            # Se não encontrar a janela pai, tenta fechar a janela atual
-            parent_window = self.window()
-            if parent_window and parent_window != self:
-                parent_window.close()
-            else:
-                print("Voltar para a tela de produtos")
+        parent_window = self.window()
+        if parent_window:
+            parent_window.close()
     
     def incluir(self):
         """Inclui um novo produto ou salva alterações no banco de dados"""
-        # Validar campos obrigatórios
         codigo = self.codigo_input.text().strip()
         nome = self.nome_input.text().strip()
         grupo = self.grupo_combo.currentText() if self.grupo_combo.currentIndex() > 0 else ""
-        # Remova a linha que causa o primeiro erro (unidade_combo)
         preco_venda = self.preco_venda_input.text().strip()
         barras = self.barras_input.text().strip()
         marca = self.marca_combo.currentText() if self.marca_combo.currentIndex() > 0 else ""
         preco_compra = self.preco_compra_input.text().strip()
-        quantidade_estoque = self.estoque_input.value()  # Obtém o valor do campo de estoque
+        quantidade_estoque = self.estoque_input.value()
         
         if not codigo or not nome:
             self.mostrar_mensagem("Atenção", "Preencha pelo menos o código e o nome do produto!")
             return
         
-        # Verificar se é uma alteração (botão com texto "Atualizar")
         eh_alteracao = self.btn_incluir.text() == "Atualizar"
         
-        # Converter preços para float
-        preco_venda_float = 0.0
         try:
             preco_venda_float = float(preco_venda.replace(',', '.')) if preco_venda else 0.0
         except ValueError:
-            self.mostrar_mensagem("Erro", "Formato de preço de venda inválido. Use apenas números e vírgula.")
+            self.mostrar_mensagem("Erro", "Formato de preço de venda inválido.")
             return
                 
-        preco_compra_float = 0.0
         try:
             preco_compra_float = float(preco_compra.replace(',', '.')) if preco_compra else 0.0
         except ValueError:
-            self.mostrar_mensagem("Erro", "Formato de preço de compra inválido. Use apenas números e vírgula.")
+            self.mostrar_mensagem("Erro", "Formato de preço de compra inválido.")
             return
 
         try:
             if eh_alteracao:
-                # Modo de alteração - atualizar produto existente no banco de dados
                 if self.produto_original and "id" in self.produto_original:
-                    # Usar o ID do produto original para atualização
                     id_produto = self.produto_original["id"]
-                    
-                    # Atualizar produto no banco de dados
-                    resultado = atualizar_produto(
-                        id_produto, codigo, nome, barras, marca, grupo,
-                        preco_compra_float, preco_venda_float, quantidade_estoque
-                    )
-                    
+                    resultado = atualizar_produto(id_produto, codigo, nome, barras, marca, grupo, preco_compra_float, preco_venda_float, quantidade_estoque)
                     if resultado:
-                        # Se a atualização foi bem-sucedida
                         self.mostrar_mensagem("Sucesso", "Produto alterado com sucesso!")
-                        
-                        # Atualizar a tabela na tela principal
-                        # Modificado para usar self.parent em vez de self.parent_widget
-                        if hasattr(self.parent, 'carregar_produtos'):
-                            self.parent.carregar_produtos()
-                        
-                        # Voltar para a tela anterior
+                        if hasattr(self.parent, 'carregar_produtos'): self.parent.carregar_produtos()
                         self.voltar()
                     else:
-                        self.mostrar_mensagem("Erro", "Erro ao atualizar o produto no banco de dados.")
+                        self.mostrar_mensagem("Erro", "Erro ao atualizar o produto.")
                 else:
                     self.mostrar_mensagem("Erro", "Produto original não encontrado para atualização.")
             else:
-                # Modo de inclusão - criar novo produto no banco de dados
-                
-                # Inserir no banco de dados
-                resultado = criar_produto(
-                    codigo, nome, barras, marca, grupo,
-                    preco_compra_float, preco_venda_float, quantidade_estoque
-                )
-                
+                resultado = criar_produto(codigo, nome, barras, marca, grupo, preco_compra_float, preco_venda_float, quantidade_estoque)
                 if resultado:
-                    # Se a criação foi bem-sucedida
                     self.mostrar_mensagem("Sucesso", "Produto cadastrado com sucesso!")
+                    if hasattr(self.parent, 'carregar_produtos'): self.parent.carregar_produtos()
                     
-                    # Atualizar a tabela na tela principal
-                    # Modificado para usar self.parent em vez de self.parent_widget
-                    if hasattr(self.parent, 'carregar_produtos'):
-                        self.parent.carregar_produtos()
-                    
-                    # Limpar os campos para novo cadastro
                     self.nome_input.clear()
                     self.barras_input.clear()
                     self.marca_combo.setCurrentIndex(0)
                     self.preco_venda_input.clear()
                     self.preco_compra_input.clear()
                     self.grupo_combo.setCurrentIndex(0)
-                    self.estoque_input.setValue(0)  # Limpar campo de estoque
+                    self.estoque_input.setValue(0)
+                    # NOVO: Limpar campo de lucro
+                    self.lucro_real_input.clear()
                     
-                    # Atualizar o código para o próximo disponível
                     self.carregar_proximo_codigo()
                 else:
-                    self.mostrar_mensagem("Erro", "Erro ao cadastrar o produto no banco de dados.")
-                    
+                    self.mostrar_mensagem("Erro", "Erro ao cadastrar o produto.")
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao salvar produto: {str(e)}")
     
@@ -797,50 +663,15 @@ class FormularioProdutos(QWidget):
         """Exibe uma caixa de mensagem personalizada"""
         msg_box = QMessageBox()
         msg_box.setIcon(tipo)
-        
         msg_box.setWindowTitle(titulo)
         msg_box.setText(texto)
-        
-        # Aplicar estilo personalizado
-        msg_box.setStyleSheet("""
-            QMessageBox { 
-                background-color: #043b57;
-            }
-            QLabel { 
-                color: white;
-                background-color: #043b57;
-            }
-            QPushButton {
-                background-color: #005079;
-                color: white;
-                border: none;
-                padding: 8px 20px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #003d5c;
-            }
-        """)
-        
-        # Traduzir botões padrão para português
+        msg_box.setStyleSheet("QMessageBox { background-color: #043b57; } QLabel { color: white; background-color: #043b57; } QPushButton { background-color: #005079; color: white; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; } QPushButton:hover { background-color: #003d5c; }")
         for button in msg_box.buttons():
-            if msg_box.buttonRole(button) == QMessageBox.AcceptRole:
-                button.setText("OK")
-            elif msg_box.buttonRole(button) == QMessageBox.RejectRole:
-                button.setText("Cancelar")
-        
+            if msg_box.buttonRole(button) == QMessageBox.AcceptRole: button.setText("OK")
+            elif msg_box.buttonRole(button) == QMessageBox.RejectRole: button.setText("Cancelar")
         return msg_box.exec_()
 
-# Adicione as novas classes para gerenciar marcas e grupos
-# Coloque este código no início do arquivo formulario_produtos.py, após os imports
-
-# A correção está na classe GerenciadorItensDialog
-
-# A correção está na classe GerenciadorItensDialog
-
-# A correção está na classe GerenciadorItensDialog
-
+# ... (O restante do código, como a classe GerenciadorItensDialog e o bloco if __name__ == "__main__", permanece o mesmo)
 class GerenciadorItensDialog(QWidget):
     """Diálogo para gerenciar itens (marcas ou grupos)"""
     def __init__(self, parent=None, tipo="marca"):
@@ -1366,7 +1197,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = QMainWindow()
     window.setWindowTitle("Cadastro de Produtos")
-    window.setGeometry(100, 100, 800, 600)
+    window.setGeometry(100, 100, 950, 650) # Aumentei a largura da janela para caber o novo campo
     window.setStyleSheet("background-color: #043b57;")
     
     formulario_produtos_widget = FormularioProdutos(window)

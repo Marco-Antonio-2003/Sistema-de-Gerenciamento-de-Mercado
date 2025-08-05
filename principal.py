@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog,
                              QDockWidget) # <<< IMPORTADO
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal
+from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal, QTimer
 from PyQt5.QtGui import QDesktopServices
 # A importação do assistente foi movida para dentro do initUI para clareza
 # from assistente import adicionar_assistente_ao_sistema 
@@ -303,6 +303,66 @@ class MenuButton(QPushButton):
         """)
         self.setMenu(self.menu)
 
+class NotificationPopup(QDialog):
+    """Uma janela de notificação pop-up não-intrusiva."""
+    def __init__(self, title, message, parent=None):
+        super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+
+        self.layout = QVBoxLayout(self)
+        self.bg_frame = QFrame(self)
+        self.bg_frame.setObjectName("bg_frame")
+        self.layout.addWidget(self.bg_frame)
+        
+        self.bg_layout = QVBoxLayout(self.bg_frame)
+        self.bg_layout.setContentsMargins(20, 15, 20, 15)
+        self.bg_layout.setSpacing(5)
+
+        self.title_label = QLabel(title)
+        self.title_label.setObjectName("title")
+        self.message_label = QLabel(message)
+        self.message_label.setObjectName("message")
+        self.message_label.setWordWrap(True)
+
+        self.bg_layout.addWidget(self.title_label)
+        self.bg_layout.addWidget(self.message_label)
+        
+        self.setStyleSheet("""
+            #bg_frame {
+                background-color: rgba(30, 40, 50, 0.9);
+                border-radius: 10px;
+                border: 1px solid #00E676;
+            }
+            #title {
+                color: #00E676; /* Verde Neon */
+                font-size: 14px;
+                font-weight: bold;
+            }
+            #message {
+                color: white;
+                font-size: 12px;
+            }
+        """)
+
+        # Timer para fechar a notificação automaticamente
+        self.timer_close = QTimer(self)
+        self.timer_close.setSingleShot(True)
+        self.timer_close.timeout.connect(self.close)
+        self.timer_close.start(7000) # Fecha após 7 segundos
+
+    def mousePressEvent(self, event):
+        self.close()
+
+    def show_notification(self):
+        screen_geometry = QApplication.desktop().availableGeometry()
+        self.adjustSize() # Ajusta o tamanho ao conteúdo
+        self.move(
+            screen_geometry.right() - self.width() - 15,
+            screen_geometry.bottom() - self.height() - 15
+        )
+        self.show()
+
 class MainWindow(QMainWindow):
     logout_signal = pyqtSignal()
     
@@ -312,20 +372,28 @@ class MainWindow(QMainWindow):
         self.empresa = empresa if empresa else "Empresa"
         self.id_usuario = id_usuario
         self.id_funcionario = id_funcionario
+        self.id_ultima_venda_notificada = None
         
         self.permissoes = {}
         self.opened_windows = []
         self.contadores_labels = {}
+
+        self.id_ultima_venda_notificada_ml = None
+        self.ml_backend_para_notificacao = None
         
         # ### NOVIDADE: Inicializa o backend do ML se disponível ###
         self.ml_backend = None
         if ML_BACKEND_DISPONIVEL:
             try:
-                # Cria uma instância do backend que pode ser usada depois
-                self.ml_backend = MercadoLivreBackend()
+                # Cria uma instância separada do backend apenas para notificações
+                self.ml_backend_para_notificacao = MercadoLivreBackend()
+                if self.ml_backend_para_notificacao.is_configured():
+                    self.vendas_timer_ml = QTimer(self)
+                    self.vendas_timer_ml.timeout.connect(self.verificar_novas_vendas_ml)
+                    self.vendas_timer_ml.start(60000) # Verifica a cada 60 segundos
+                    QTimer.singleShot(5000, self.verificar_novas_vendas_ml)
             except Exception as e:
-                print(f"Não foi possível inicializar o backend do Mercado Livre: {e}")
-                self.ml_backend = None
+                print(f"Erro ao iniciar o monitor de vendas do ML: {e}")
 
         # O resto do seu método __init__ continua igual...
         self.tem_acesso_ecommerce = False
@@ -343,8 +411,110 @@ class MainWindow(QMainWindow):
         self.timer_syncthing = QTimer(self)
         self.timer_syncthing.timeout.connect(self.verificar_syncthing)
         self.timer_syncthing.start(60000)
+
+        if self.tem_acesso_ecommerce:
+            self.vendas_timer = QTimer(self)
+            self.vendas_timer.timeout.connect(self.verificar_novas_vendas_ml)
+            # Verifica a cada 60 segundos (60000 milissegundos)
+            self.vendas_timer.start(60000)
+            # Faz uma verificação inicial após 5 segundos do início
+            QTimer.singleShot(5000, self.verificar_novas_vendas_ml)
         
         self.showMaximized()
+
+    def verificar_novas_vendas_ml(self):
+        if not self.ml_backend_para_notificacao:
+            return
+
+        print("Timer Global: Verificando novas vendas do Mercado Livre...")
+        try:
+            vendas = self.ml_backend_para_notificacao.get_ultimas_vendas(limit=5)
+            if not vendas:
+                return
+            
+            # Pega o ID do pedido mais recente
+            id_mais_recente = vendas[0]['id_pedido']
+
+            # Se for a primeira verificação, apenas armazena o ID mais recente
+            if self.id_ultima_venda_notificada_ml is None:
+                self.id_ultima_venda_notificada_ml = id_mais_recente
+                print(f"Monitor de vendas iniciado. Venda mais recente ID: {id_mais_recente}")
+                return
+
+            # Verifica se há vendas mais recentes que a última notificada
+            for venda in reversed(vendas): # Itera do mais antigo para o mais novo
+                if venda['id_pedido'] > self.id_ultima_venda_notificada_ml:
+                    print(f"NOVA VENDA DETECTADA! ID: {venda['id_pedido']}")
+                    self.id_ultima_venda_notificada_ml = venda['id_pedido']
+                    
+                    # Chama a notificação
+                    mensagem = f"{venda['produto']}\nValor: {venda['valor']}"
+                    self.mostrar_notificacao("📦 Nova Venda no Mercado Livre!", mensagem)
+                    
+                    # ### NOVIDADE: Chama a baixa de estoque ###
+                    self.dar_baixa_estoque_ml(venda)
+
+        except Exception as e:
+            print(f"Erro no timer global de vendas: {e}")
+
+    def mostrar_notificacao(self, titulo, mensagem):
+        popup = NotificationPopup(titulo, mensagem, self)
+        popup.show_notification()
+        QApplication.alert(self) # Faz o ícone da barra de tarefas piscar
+
+    def dar_baixa_estoque_ml(self, dados_venda):
+        """Dá baixa no estoque local com base em uma venda do Mercado Livre."""
+        try:
+            # A venda já contém os itens, não precisamos de outra chamada de API
+            id_pedido = dados_venda.get('id_pedido')
+            if not id_pedido: return
+
+            # Importa a função de conexão local
+            from base.banco import get_connection 
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # Precisamos obter os itens do pedido. A API pode não retorná-los
+            # na busca geral, então faremos uma chamada específica se necessário.
+            detalhes_pedido = self.ml_backend_para_notificacao._make_request('get', f"https://api.mercadolibre.com/orders/{id_pedido}")
+            
+            for item in detalhes_pedido.get('order_items', []):
+                meli_id_produto = item['item']['id']
+                quantidade_vendida = item['quantity']
+                
+                print(f"Dando baixa de {quantidade_vendida} unidade(s) para o produto MELI_ID {meli_id_produto}")
+
+                # Procura o produto no banco local pelo MELI_ID
+                cursor.execute("SELECT ID, QUANTIDADE_ESTOQUE FROM PRODUTOS WHERE MELI_ID = ?", (meli_id_produto,))
+                produto_local = cursor.fetchone()
+
+                if produto_local:
+                    # Atualiza o estoque no banco de dados local
+                    cursor.execute(
+                        "UPDATE PRODUTOS SET QUANTIDADE_ESTOQUE = QUANTIDADE_ESTOQUE - ? WHERE MELI_ID = ?",
+                        (quantidade_vendida, meli_id_produto)
+                    )
+                    print(f"Produto {meli_id_produto} encontrado. Estoque atualizado.")
+                else:
+                    print(f"AVISO: Produto com MELI_ID {meli_id_produto} não encontrado no banco de dados local. A baixa não foi realizada.")
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("Processo de baixa de estoque para o pedido concluído.")
+            # Força a atualização dos contadores na tela principal
+            self.forcar_atualizacao_contadores()
+
+        except Exception as e:
+            print(f"Erro ao dar baixa no estoque local para venda do ML: {e}")
+    def mostrar_notificacao_venda(self, mensagem):
+        """Cria e exibe o pop-up e aciona o piscar do ícone."""
+        # Cria a notificação
+        popup = NotificationPopup("📦 Nova Venda no Mercado Livre!", mensagem, self)
+        popup.show_notification()
+        
+        # Aciona o piscar da barra de tarefas
+        QApplication.alert(self)
 
     # --- Métodos de Verificação e Permissão (sem alterações) ---
     def verificar_acesso_geral_modulos(self):
@@ -706,9 +876,11 @@ class MainWindow(QMainWindow):
 
     def obter_pedidos_pendentes_ml(self):
         """Busca o número de pedidos pendentes usando o backend do ML."""
-        if self.ml_backend and self.ml_backend.is_configured():
+        # ### MUDANÇA: Usar a instância correta do backend ###
+        if self.ml_backend_para_notificacao and self.ml_backend_para_notificacao.is_configured():
             try:
-                return self.ml_backend.get_pedidos_pendentes()
+                # A função get_pedidos_pendentes já busca o que precisamos (status 'paid')
+                return self.ml_backend_para_notificacao.get_pedidos_pendentes()
             except Exception as e:
                 print(f"Erro ao buscar pedidos pendentes do ML: {e}")
                 return 0
