@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.4.6"
+Versao = "Versão: v0.1.4.7"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
@@ -134,7 +134,7 @@ class LoadingWorker(QThread):
             self.progress.emit(100)
 
             # Emite o sinal de que tudo terminou com sucesso
-            self.finished.emit()
+            self.finished.emi
 
         except Exception as e:
             # Se ocorrer um erro durante o carregamento, podemos tratar aqui

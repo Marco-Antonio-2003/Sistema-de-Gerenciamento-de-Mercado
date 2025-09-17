@@ -604,7 +604,6 @@ SVG_ICONS = {
 class PDVWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.setWindowTitle("Sistema PDV")
         
         # Valores para desconto e acréscimo

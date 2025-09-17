@@ -1,5 +1,4 @@
-# Arquivo: base/banco_otimizado.py
-
+# Arquivo: base/banco.py
 # --- IMPORTS PADRÃO E DE OTIMIZAÇÃO ---
 import os
 import sys
@@ -18,7 +17,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
 from PyQt5.QtWidgets import QMessageBox
 
-print("Módulo 'banco_otimizado.py' sendo carregado...")
+print("Módulo 'banco.py' sendo carregado...")
 
 # --- CONFIGURAÇÃO INICIAL E VARIÁVEIS GLOBAIS ---
 SINCRONIZACAO_ATIVA = False
@@ -71,6 +70,7 @@ DB_PORT = 3050
 
 # --- OTIMIZAÇÃO: POOL DE CONEXÕES COM SQLAlchemy (O CORAÇÃO DA MELHORIA) ---
 engine = None
+DATABASE_URL = None
 try:
     DATABASE_URL = f"firebird+fdb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_PATH}?charset=UTF8"
     engine = create_engine(
@@ -87,36 +87,163 @@ except Exception as e:
     print(f"❌ ERRO CRÍTICO: Não foi possível criar o pool de conexões. {e}")
     engine = None
 
-# --- OTIMIZAÇÃO: NOVA FUNÇÃO execute_query ---
-def execute_query(query: str, params: tuple = None, commit=True): # Mantido 'commit' por compatibilidade
+# --- UTILITÁRIOS: GARANTIR EXISTÊNCIA DA TABELA CAIXA ---
+# NO ARQUIVO base/banco.py, SUBSTITUA A FUNÇÃO ANTIGA POR ESTA:
+
+def _ensure_caixa_table():
+    """
+    Verifica se a tabela CAIXA existe e a cria usando o método compatível
+    de Generator e Trigger, caso não exista.
+    """
+    if not engine:
+        print("⚠️  Engine não inicializada: não é possível verificar/criar tabela CAIXA.")
+        return
+
+    try:
+        with engine.connect() as conn:
+            # 1. Testa se a tabela CAIXA existe
+            try:
+                conn.execute(text("SELECT 1 FROM CAIXA WHERE 1=0"))
+                print("Tabela CAIXA já existe — OK.")
+                return # Se existe, não faz mais nada
+            except Exception:
+                print("Tabela CAIXA não encontrada — iniciando processo de criação.")
+
+            # 2. Se não existe, cria a tabela, o generator e o trigger
+            trans = conn.begin()
+            try:
+                # MUDANÇA 1: DDL sem a sintaxe 'IDENTITY'
+                ddl_create_table = """
+                CREATE TABLE CAIXA (
+                    CODIGO INTEGER NOT NULL PRIMARY KEY,
+                    ABERTURA TIMESTAMP,
+                    FECHAMENTO TIMESTAMP,
+                    USUARIO VARCHAR(50),
+                    ESTACAO VARCHAR(50),
+                    FUNDO_TROCO DECIMAL(10,2)
+                );
+                """
+                conn.execute(text(ddl_create_table))
+                print("-> Tabela CAIXA criada.")
+
+                # MUDANÇA 2: Cria o GENERATOR (sequência) para o ID
+                ddl_create_generator = "CREATE GENERATOR GEN_CAIXA_ID;"
+                conn.execute(text(ddl_create_generator))
+                print("-> Generator GEN_CAIXA_ID criado.")
+
+                # MUDANÇA 3: Cria o TRIGGER para auto-incrementar o CODIGO
+                ddl_create_trigger = """
+                CREATE TRIGGER CAIXA_BI FOR CAIXA
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.CODIGO IS NULL) THEN
+                        NEW.CODIGO = NEXT VALUE FOR GEN_CAIXA_ID;
+                END
+                """
+                conn.execute(text(ddl_create_trigger))
+                print("-> Trigger CAIXA_BI criado.")
+
+                trans.commit()
+                print("✅ Tabela CAIXA configurada com sucesso.")
+
+            except Exception as e_create:
+                print(f"❌ Erro durante a criação da estrutura da tabela CAIXA: {e_create}")
+                trans.rollback()
+
+    except Exception as e:
+        print(f"❌ Erro crítico ao conectar ao banco para garantir a tabela CAIXA: {e}")
+
+# --- OTIMIZAÇÃO: NOVA FUNÇÃO execute_query (ACEITA MAPPINGS E SEQUÊNCIAS) ---
+def execute_query(query: str, params=None, commit=True):
     """
     Executa uma query no banco de dados usando o pool de conexões.
-    É mais rápido, seguro e limpo.
+    Params pode ser:
+      - um dict com parâmetros nomeados (':nome' no SQL)
+      - uma tupla/lista de parâmetros posicionais
+      - None
+    Retorna lista de rows (list of sqlalchemy Row) ou [].
     """
     if not engine:
         raise ConnectionError("A conexão com o banco de dados não foi estabelecida.")
 
     with engine.connect() as connection:
+        trans = connection.begin()
         try:
-            trans = connection.begin()
-            # O placeholder '?' é padrão do fdb, SQLAlchemy o converte.
-            cursor_result = connection.execute(text(query), params or ())
-            
-            if cursor_result.returns_rows:
-                result = cursor_result.fetchall()
+            # params pode ser dict ou sequência; text() aceita ambos
+            result_proxy = connection.execute(text(query), params or {})
+            result = result_proxy.fetchall() if result_proxy.returns_rows else []
+            if commit:
+                trans.commit()
             else:
-                result = []
-
-            trans.commit()
+                trans.rollback()
             return result
         except Exception as e:
-            # O 'with' garante o rollback automático da transação em caso de erro.
-            print(f"❌ ERRO na execução da query: {query}\nParâmetros: {params}\nErro: {e}")
-            raise # Propaga o erro para a camada superior saber o que aconteceu.
+            trans.rollback()
+            print(f"❌ ERRO na execução da query:\nSQL: {query}\nParams: {params}\nErro: {e}")
+            raise
+
+# --- HELPERS PRÁTICOS PARA MÓDULO CAIXA ---
+def fetch_caixas(codigo=None, usuario=None, inicio=None, fim=None, limit=1000):
+    """
+    Retorna lista de tuplas com (CODIGO, ABERTURA, FECHAMENTO, ESTACAO, USUARIO)
+    Parâmetros:
+      - codigo: inteiro ou string
+      - usuario: string (busca LIKE)
+      - inicio/fim: string 'YYYY-MM-DD' ou datetime
+    """
+    query = "SELECT CODIGO, ABERTURA, FECHAMENTO, ESTACAO, USUARIO FROM CAIXA WHERE 1=1"
+    params = {}
+    if codigo is not None and str(codigo).strip() != "":
+        query += " AND CODIGO = :codigo"
+        params["codigo"] = int(codigo)
+    if usuario:
+        query += " AND USUARIO LIKE :usuario"
+        params["usuario"] = f"%{usuario}%"
+    if inicio:
+        query += " AND ABERTURA >= :inicio"
+        params["inicio"] = inicio if isinstance(inicio, str) else inicio.strftime("%Y-%m-%d")
+    if fim:
+        query += " AND ABERTURA <= :fim"
+        params["fim"] = fim if isinstance(fim, str) else fim.strftime("%Y-%m-%d")
+    query += " ORDER BY ABERTURA DESC"
+    if limit:
+        # Firebird aceita FIRST
+        query = query.replace("SELECT", f"SELECT FIRST {limit}", 1)
+    return execute_query(query, params or {})
+
+def abrir_caixa(usuario, estacao="ESTACAO_PADRAO", fundo_troco=0.0):
+    """
+    Insere um novo caixa e retorna o CODIGO (se possível).
+    """
+    # Firebird: usamos CURRENT_TIMESTAMP para ABERTURA
+    query = """
+    INSERT INTO CAIXA (ABERTURA, USUARIO, ESTACAO, FUNDO_TROCO)
+    VALUES (CURRENT_TIMESTAMP, :usuario, :estacao, :fundo)
+    """
+    execute_query(query, {"usuario": usuario, "estacao": estacao, "fundo": float(fundo_troco)}, commit=True)
+    # Tentamos retornar o último CODIGO inserido: em Firebird moderno poderia usar RETURNING,
+    # mas para compatibilidade, fazemos um SELECT do último registro por ABERTURA.
+    rows = execute_query("SELECT CODIGO FROM CAIXA ORDER BY ABERTURA DESC ROWS 1", {}, commit=False)
+    return rows[0][0] if rows else None
+
+def fechar_caixa(codigo):
+    """
+    Atualiza FECHAMENTO = CURRENT_TIMESTAMP para o CODIGO informado.
+    Retorna True se atualizou algo.
+    """
+    query = "UPDATE CAIXA SET FECHAMENTO = CURRENT_TIMESTAMP WHERE CODIGO = :codigo"
+    res = execute_query(query, {"codigo": int(codigo)}, commit=True)
+    # execute_query retorna [] para não-SELECT; perguntamos quantas linhas afetadas:
+    # Infelizmente fetchall não retorna affected_rows com text(). Então, para confirmar,
+    # executamos um SELECT simples para verificar se FECHAMENTO foi preenchido.
+    check = execute_query("SELECT FECHAMENTO FROM CAIXA WHERE CODIGO = :codigo", {"codigo": int(codigo)}, commit=False)
+    return bool(check and check[0][0] is not None)
 
 # --- FUNÇÃO DE DESLIGAMENTO ---
 def desligar_banco():
     """Fecha o pool de conexões de forma segura."""
+    global engine
     if engine:
         engine.dispose()
         print("🔌 Pool de conexões do banco de dados foi encerrado.")
@@ -459,7 +586,7 @@ def obter_estacao_atual():
         str: Nome da estação
     """
     try:
-        import socket
+        import socket   
         return socket.gethostname()
     except Exception as e:
         print(f"Erro ao obter nome da estação: {e}")
@@ -6126,402 +6253,402 @@ def get_usuario_logado():
 
 # Funções para o sistema de caixa
 
-def verificar_tabelas_caixa():
-    """
-    Verifica se as tabelas do sistema de caixa existem e as cria se não existirem
+# def verificar_tabelas_caixa():
+#     """
+#     Verifica se as tabelas do sistema de caixa existem e as cria se não existirem
     
-    Returns:
-        bool: True se as tabelas existem ou foram criadas com sucesso
-    """
-    try:
-        # Verificar se a tabela CAIXA_CONTROLE existe
-        query_check = """
-        SELECT COUNT(*) FROM RDB$RELATIONS 
-        WHERE RDB$RELATION_NAME = 'CAIXA_CONTROLE'
-        """
-        result = execute_query(query_check)
+#     Returns:
+#         bool: True se as tabelas existem ou foram criadas com sucesso
+#     """
+#     try:
+#         # Verificar se a tabela CAIXA_CONTROLE existe
+#         query_check = """
+#         SELECT COUNT(*) FROM RDB$RELATIONS 
+#         WHERE RDB$RELATION_NAME = 'CAIXA_CONTROLE'
+#         """
+#         result = execute_query(query_check)
         
-        # Se a tabela não existe, criar as tabelas
-        if result[0][0] == 0:
-            print("Tabelas do sistema de caixa não encontradas. Criando...")
+#         # Se a tabela não existe, criar as tabelas
+#         if result[0][0] == 0:
+#             print("Tabelas do sistema de caixa não encontradas. Criando...")
             
-            # Criar tabela CAIXA_CONTROLE
-            query_create_controle = """
-            CREATE TABLE CAIXA_CONTROLE (
-                ID INTEGER NOT NULL PRIMARY KEY,
-                CODIGO VARCHAR(10) NOT NULL,
-                DATA_ABERTURA DATE NOT NULL,
-                HORA_ABERTURA TIME NOT NULL,
-                DATA_FECHAMENTO DATE,
-                HORA_FECHAMENTO TIME,
-                VALOR_ABERTURA DECIMAL(15,2) DEFAULT 0 NOT NULL,
-                VALOR_FECHAMENTO DECIMAL(15,2),
-                ESTACAO VARCHAR(20) NOT NULL,
-                ID_USUARIO INTEGER NOT NULL,
-                USUARIO VARCHAR(50) NOT NULL,
-                STATUS CHAR(1) DEFAULT 'A' NOT NULL,
-                OBSERVACAO_ABERTURA VARCHAR(200),
-                OBSERVACAO_FECHAMENTO VARCHAR(200)
-            )
-            """
-            execute_query(query_create_controle)
-            print("Tabela CAIXA_CONTROLE criada com sucesso.")
+#             # Criar tabela CAIXA_CONTROLE
+#             query_create_controle = """
+#             CREATE TABLE CAIXA_CONTROLE (
+#                 ID INTEGER NOT NULL PRIMARY KEY,
+#                 CODIGO VARCHAR(10) NOT NULL,
+#                 DATA_ABERTURA DATE NOT NULL,
+#                 HORA_ABERTURA TIME NOT NULL,
+#                 DATA_FECHAMENTO DATE,
+#                 HORA_FECHAMENTO TIME,
+#                 VALOR_ABERTURA DECIMAL(15,2) DEFAULT 0 NOT NULL,
+#                 VALOR_FECHAMENTO DECIMAL(15,2),
+#                 ESTACAO VARCHAR(20) NOT NULL,
+#                 ID_USUARIO INTEGER NOT NULL,
+#                 USUARIO VARCHAR(50) NOT NULL,
+#                 STATUS CHAR(1) DEFAULT 'A' NOT NULL,
+#                 OBSERVACAO_ABERTURA VARCHAR(200),
+#                 OBSERVACAO_FECHAMENTO VARCHAR(200)
+#             )
+#             """
+#             execute_query(query_create_controle)
+#             print("Tabela CAIXA_CONTROLE criada com sucesso.")
             
-            # Criar gerador de IDs para CAIXA_CONTROLE
-            try:
-                query_generator = """
-                CREATE GENERATOR GEN_CAIXA_CONTROLE_ID
-                """
-                execute_query(query_generator)
-                print("Gerador de IDs para CAIXA_CONTROLE criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Gerador pode já existir: {e}")
-                pass
+#             # Criar gerador de IDs para CAIXA_CONTROLE
+#             try:
+#                 query_generator = """
+#                 CREATE GENERATOR GEN_CAIXA_CONTROLE_ID
+#                 """
+#                 execute_query(query_generator)
+#                 print("Gerador de IDs para CAIXA_CONTROLE criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Gerador pode já existir: {e}")
+#                 pass
             
-            # Criar trigger para CAIXA_CONTROLE
-            try:
-                query_trigger = """
-                CREATE TRIGGER CAIXA_CONTROLE_BI FOR CAIXA_CONTROLE
-                ACTIVE BEFORE INSERT POSITION 0
-                AS
-                BEGIN
-                    IF (NEW.ID IS NULL) THEN
-                        NEW.ID = GEN_ID(GEN_CAIXA_CONTROLE_ID, 1);
-                END
-                """
-                execute_query(query_trigger)
-                print("Trigger para CAIXA_CONTROLE criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Trigger pode já existir: {e}")
-                pass
+#             # Criar trigger para CAIXA_CONTROLE
+#             try:
+#                 query_trigger = """
+#                 CREATE TRIGGER CAIXA_CONTROLE_BI FOR CAIXA_CONTROLE
+#                 ACTIVE BEFORE INSERT POSITION 0
+#                 AS
+#                 BEGIN
+#                     IF (NEW.ID IS NULL) THEN
+#                         NEW.ID = GEN_ID(GEN_CAIXA_CONTROLE_ID, 1);
+#                 END
+#                 """
+#                 execute_query(query_trigger)
+#                 print("Trigger para CAIXA_CONTROLE criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Trigger pode já existir: {e}")
+#                 pass
             
-            # Criar tabela CAIXA_MOVIMENTOS
-            query_create_movimentos = """
-            CREATE TABLE CAIXA_MOVIMENTOS (
-                ID INTEGER NOT NULL PRIMARY KEY,
-                ID_CAIXA INTEGER NOT NULL,
-                TIPO CHAR(1) NOT NULL,
-                DATA DATE NOT NULL,
-                HORA TIME NOT NULL,
-                VALOR DECIMAL(15,2) NOT NULL,
-                MOTIVO VARCHAR(50) NOT NULL,
-                ID_USUARIO INTEGER NOT NULL,
-                USUARIO VARCHAR(50) NOT NULL,
-                OBSERVACAO VARCHAR(200)
-            )
-            """
-            execute_query(query_create_movimentos)
-            print("Tabela CAIXA_MOVIMENTOS criada com sucesso.")
+#             # Criar tabela CAIXA_MOVIMENTOS
+#             query_create_movimentos = """
+#             CREATE TABLE CAIXA_MOVIMENTOS (
+#                 ID INTEGER NOT NULL PRIMARY KEY,
+#                 ID_CAIXA INTEGER NOT NULL,
+#                 TIPO CHAR(1) NOT NULL,
+#                 DATA DATE NOT NULL,
+#                 HORA TIME NOT NULL,
+#                 VALOR DECIMAL(15,2) NOT NULL,
+#                 MOTIVO VARCHAR(50) NOT NULL,
+#                 ID_USUARIO INTEGER NOT NULL,
+#                 USUARIO VARCHAR(50) NOT NULL,
+#                 OBSERVACAO VARCHAR(200)
+#             )
+#             """
+#             execute_query(query_create_movimentos)
+#             print("Tabela CAIXA_MOVIMENTOS criada com sucesso.")
             
-            # Criar gerador de IDs para CAIXA_MOVIMENTOS
-            try:
-                query_generator = """
-                CREATE GENERATOR GEN_CAIXA_MOVIMENTOS_ID
-                """
-                execute_query(query_generator)
-                print("Gerador de IDs para CAIXA_MOVIMENTOS criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Gerador pode já existir: {e}")
-                pass
+#             # Criar gerador de IDs para CAIXA_MOVIMENTOS
+#             try:
+#                 query_generator = """
+#                 CREATE GENERATOR GEN_CAIXA_MOVIMENTOS_ID
+#                 """
+#                 execute_query(query_generator)
+#                 print("Gerador de IDs para CAIXA_MOVIMENTOS criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Gerador pode já existir: {e}")
+#                 pass
             
-            # Criar trigger para CAIXA_MOVIMENTOS
-            try:
-                query_trigger = """
-                CREATE TRIGGER CAIXA_MOVIMENTOS_BI FOR CAIXA_MOVIMENTOS
-                ACTIVE BEFORE INSERT POSITION 0
-                AS
-                BEGIN
-                    IF (NEW.ID IS NULL) THEN
-                        NEW.ID = GEN_ID(GEN_CAIXA_MOVIMENTOS_ID, 1);
-                END
-                """
-                execute_query(query_trigger)
-                print("Trigger para CAIXA_MOVIMENTOS criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Trigger pode já existir: {e}")
-                pass
+#             # Criar trigger para CAIXA_MOVIMENTOS
+#             try:
+#                 query_trigger = """
+#                 CREATE TRIGGER CAIXA_MOVIMENTOS_BI FOR CAIXA_MOVIMENTOS
+#                 ACTIVE BEFORE INSERT POSITION 0
+#                 AS
+#                 BEGIN
+#                     IF (NEW.ID IS NULL) THEN
+#                         NEW.ID = GEN_ID(GEN_CAIXA_MOVIMENTOS_ID, 1);
+#                 END
+#                 """
+#                 execute_query(query_trigger)
+#                 print("Trigger para CAIXA_MOVIMENTOS criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Trigger pode já existir: {e}")
+#                 pass
             
-            # Criar chave estrangeira para relacionar CAIXA_MOVIMENTOS com CAIXA_CONTROLE
-            try:
-                query_fk = """
-                ALTER TABLE CAIXA_MOVIMENTOS
-                ADD CONSTRAINT FK_CAIXA_MOVIMENTOS_CAIXA_CONTROLE
-                FOREIGN KEY (ID_CAIXA) REFERENCES CAIXA_CONTROLE(ID)
-                ON DELETE CASCADE
-                """
-                execute_query(query_fk)
-                print("Chave estrangeira para CAIXA_MOVIMENTOS criada com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Chave estrangeira pode já existir: {e}")
-                pass
+#             # Criar chave estrangeira para relacionar CAIXA_MOVIMENTOS com CAIXA_CONTROLE
+#             try:
+#                 query_fk = """
+#                 ALTER TABLE CAIXA_MOVIMENTOS
+#                 ADD CONSTRAINT FK_CAIXA_MOVIMENTOS_CAIXA_CONTROLE
+#                 FOREIGN KEY (ID_CAIXA) REFERENCES CAIXA_CONTROLE(ID)
+#                 ON DELETE CASCADE
+#                 """
+#                 execute_query(query_fk)
+#                 print("Chave estrangeira para CAIXA_MOVIMENTOS criada com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Chave estrangeira pode já existir: {e}")
+#                 pass
             
-            # Criar índices para melhorar a performance
-            try:
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_CODIGO ON CAIXA_CONTROLE (CODIGO)")
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_DATA_ABERTURA ON CAIXA_CONTROLE (DATA_ABERTURA)")
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_STATUS ON CAIXA_CONTROLE (STATUS)")
-                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_ID_CAIXA ON CAIXA_MOVIMENTOS (ID_CAIXA)")
-                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_DATA ON CAIXA_MOVIMENTOS (DATA)")
-                print("Índices criados com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Alguns índices podem já existir: {e}")
-                pass
+#             # Criar índices para melhorar a performance
+#             try:
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_CODIGO ON CAIXA_CONTROLE (CODIGO)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_DATA_ABERTURA ON CAIXA_CONTROLE (DATA_ABERTURA)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_STATUS ON CAIXA_CONTROLE (STATUS)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_ID_CAIXA ON CAIXA_MOVIMENTOS (ID_CAIXA)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_DATA ON CAIXA_MOVIMENTOS (DATA)")
+#                 print("Índices criados com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Alguns índices podem já existir: {e}")
+#                 pass
             
-            return True
-        else:
-            print("Tabelas do sistema de caixa já existem.")
+#             return True
+#         else:
+#             print("Tabelas do sistema de caixa já existem.")
         
-        return True
-    except Exception as e:
-        print(f"Erro ao verificar/criar tabelas de caixa: {e}")
-        raise Exception(f"Erro ao verificar/criar tabelas de caixa: {str(e)}")
+#         return True
+#     except Exception as e:
+#         print(f"Erro ao verificar/criar tabelas de caixa: {e}")
+#         raise Exception(f"Erro ao verificar/criar tabelas de caixa: {str(e)}")
 
-def abrir_caixa(codigo, data_abertura, hora_abertura, valor_abertura, estacao, observacao=None):
-    """
-    Registra a abertura de um caixa
+# def abrir_caixa(codigo, data_abertura, hora_abertura, valor_abertura, estacao, observacao=None):
+#     """
+#     Registra a abertura de um caixa
     
-    Args:
-        codigo (str): Código do caixa
-        data_abertura (str): Data de abertura no formato DD/MM/YYYY
-        hora_abertura (str): Hora de abertura no formato HH:MM
-        valor_abertura (float): Valor inicial do caixa
-        estacao (str): Nome da estação/terminal
-        observacao (str, optional): Observação opcional
+#     Args:
+#         codigo (str): Código do caixa
+#         data_abertura (str): Data de abertura no formato DD/MM/YYYY
+#         hora_abertura (str): Hora de abertura no formato HH:MM
+#         valor_abertura (float): Valor inicial do caixa
+#         estacao (str): Nome da estação/terminal
+#         observacao (str, optional): Observação opcional
         
-    Returns:
-        int: ID do caixa aberto
-    """
-    try:
-        # Verificar se o usuário está logado
-        if not usuario_logado["id"]:
-            raise Exception("Nenhum usuário logado. Faça login antes de abrir o caixa.")
+#     Returns:
+#         int: ID do caixa aberto
+#     """
+#     try:
+#         # Verificar se o usuário está logado
+#         if not usuario_logado["id"]:
+#             raise Exception("Nenhum usuário logado. Faça login antes de abrir o caixa.")
         
-        # Verificar se já existe um caixa aberto com o mesmo código
-        query_check = """
-        SELECT ID FROM CAIXA_CONTROLE 
-        WHERE CODIGO = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_check, (codigo,))
+#         # Verificar se já existe um caixa aberto com o mesmo código
+#         query_check = """
+#         SELECT ID FROM CAIXA_CONTROLE 
+#         WHERE CODIGO = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_check, (codigo,))
         
-        if result and len(result) > 0:
-            raise Exception(f"Já existe um caixa aberto com o código {codigo}.")
+#         if result and len(result) > 0:
+#             raise Exception(f"Já existe um caixa aberto com o código {codigo}.")
         
-        # Converter data para o formato do banco (YYYY-MM-DD)
-        data_parts = data_abertura.split('/')
-        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+#         # Converter data para o formato do banco (YYYY-MM-DD)
+#         data_parts = data_abertura.split('/')
+#         data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
         
-        # Inserir registro de abertura de caixa
-        query_insert = """
-        INSERT INTO CAIXA_CONTROLE (
-            CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
-            ESTACAO, ID_USUARIO, USUARIO, STATUS, OBSERVACAO_ABERTURA
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A', ?)
-        """
-        execute_query(query_insert, (
-            codigo, data_iso, hora_abertura, valor_abertura,
-            estacao, usuario_logado["id"], usuario_logado["nome"], observacao
-        ))
+#         # Inserir registro de abertura de caixa
+#         query_insert = """
+#         INSERT INTO CAIXA_CONTROLE (
+#             CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+#             ESTACAO, ID_USUARIO, USUARIO, STATUS, OBSERVACAO_ABERTURA
+#         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A', ?)
+#         """
+#         execute_query(query_insert, (
+#             codigo, data_iso, hora_abertura, valor_abertura,
+#             estacao, usuario_logado["id"], usuario_logado["nome"], observacao
+#         ))
         
-        # Obter o ID do caixa recém-aberto
-        query_id = """
-        SELECT MAX(ID) FROM CAIXA_CONTROLE 
-        WHERE CODIGO = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_id, (codigo,))
+#         # Obter o ID do caixa recém-aberto
+#         query_id = """
+#         SELECT MAX(ID) FROM CAIXA_CONTROLE 
+#         WHERE CODIGO = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_id, (codigo,))
         
-        if result and len(result) > 0 and result[0][0]:
-            caixa_id = result[0][0]
+#         if result and len(result) > 0 and result[0][0]:
+#             caixa_id = result[0][0]
             
-            # Registrar a entrada inicial como movimento
-            if valor_abertura > 0:
-                registrar_movimento(
-                    id_caixa=caixa_id,
-                    tipo='E',  # Entrada
-                    data=data_abertura,
-                    hora=hora_abertura,
-                    valor=valor_abertura,
-                    motivo="Abertura de Caixa",
-                    observacao=observacao
-                )
+#             # Registrar a entrada inicial como movimento
+#             if valor_abertura > 0:
+#                 registrar_movimento(
+#                     id_caixa=caixa_id,
+#                     tipo='E',  # Entrada
+#                     data=data_abertura,
+#                     hora=hora_abertura,
+#                     valor=valor_abertura,
+#                     motivo="Abertura de Caixa",
+#                     observacao=observacao
+#                 )
             
-            return caixa_id
-        else:
-            raise Exception("Erro ao obter o ID do caixa aberto.")
-    except Exception as e:
-        print(f"Erro ao abrir caixa: {e}")
-        raise Exception(f"Erro ao abrir caixa: {str(e)}")
+#             return caixa_id
+#         else:
+#             raise Exception("Erro ao obter o ID do caixa aberto.")
+#     except Exception as e:
+#         print(f"Erro ao abrir caixa: {e}")
+#         raise Exception(f"Erro ao abrir caixa: {str(e)}")
 
-def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, observacao=None):
-    """
-    Registra o fechamento de um caixa
+# def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, observacao=None):
+#     """
+#     Registra o fechamento de um caixa
     
-    Args:
-        id_caixa (int): ID do caixa a ser fechado
-        data_fechamento (str): Data de fechamento no formato DD/MM/YYYY
-        hora_fechamento (str): Hora de fechamento no formato HH:MM
-        valor_fechamento (float): Valor final do caixa
-        observacao (str, optional): Observação opcional
+#     Args:
+#         id_caixa (int): ID do caixa a ser fechado
+#         data_fechamento (str): Data de fechamento no formato DD/MM/YYYY
+#         hora_fechamento (str): Hora de fechamento no formato HH:MM
+#         valor_fechamento (float): Valor final do caixa
+#         observacao (str, optional): Observação opcional
         
-    Returns:
-        bool: True se o caixa foi fechado com sucesso
-    """
-    try:
-        # Verificar se o usuário está logado
-        if not usuario_logado["id"]:
-            raise Exception("Nenhum usuário logado. Faça login antes de fechar o caixa.")
+#     Returns:
+#         bool: True se o caixa foi fechado com sucesso
+#     """
+#     try:
+#         # Verificar se o usuário está logado
+#         if not usuario_logado["id"]:
+#             raise Exception("Nenhum usuário logado. Faça login antes de fechar o caixa.")
         
-        # Verificar se o caixa existe e está aberto
-        query_check = """
-        SELECT ID, CODIGO, VALOR_ABERTURA FROM CAIXA_CONTROLE 
-        WHERE ID = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_check, (id_caixa,))
+#         # Verificar se o caixa existe e está aberto
+#         query_check = """
+#         SELECT ID, CODIGO, VALOR_ABERTURA FROM CAIXA_CONTROLE 
+#         WHERE ID = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_check, (id_caixa,))
         
-        if not result or len(result) == 0:
-            raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
+#         if not result or len(result) == 0:
+#             raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
         
-        codigo_caixa = result[0][1]
-        valor_abertura = float(result[0][2])  # Convertendo para float
+#         codigo_caixa = result[0][1]
+#         valor_abertura = float(result[0][2])  # Convertendo para float
         
-        # Converter data para o formato do banco (YYYY-MM-DD)
-        data_parts = data_fechamento.split('/')
-        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+#         # Converter data para o formato do banco (YYYY-MM-DD)
+#         data_parts = data_fechamento.split('/')
+#         data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
         
-        # Atualizar registro para fechar o caixa
-        query_update = """
-        UPDATE CAIXA_CONTROLE SET
-            DATA_FECHAMENTO = ?,
-            HORA_FECHAMENTO = ?,
-            VALOR_FECHAMENTO = ?,
-            STATUS = 'F',
-            OBSERVACAO_FECHAMENTO = ?
-        WHERE ID = ?
-        """
-        execute_query(query_update, (
-            data_iso, hora_fechamento, valor_fechamento,
-            observacao, id_caixa
-        ))
+#         # Atualizar registro para fechar o caixa
+#         query_update = """
+#         UPDATE CAIXA_CONTROLE SET
+#             DATA_FECHAMENTO = ?,
+#             HORA_FECHAMENTO = ?,
+#             VALOR_FECHAMENTO = ?,
+#             STATUS = 'F',
+#             OBSERVACAO_FECHAMENTO = ?
+#         WHERE ID = ?
+#         """
+#         execute_query(query_update, (
+#             data_iso, hora_fechamento, valor_fechamento,
+#             observacao, id_caixa
+#         ))
         
-        # Registrar o fechamento como movimento (se houver diferença)
-        diferenca = valor_fechamento - valor_abertura
+#         # Registrar o fechamento como movimento (se houver diferença)
+#         diferenca = valor_fechamento - valor_abertura
         
-        if diferenca != 0:
-            tipo = 'E' if diferenca > 0 else 'S'  # Entrada ou Saída
-            valor_movimento = abs(diferenca)
-            motivo = "Fechamento de Caixa"
+#         if diferenca != 0:
+#             tipo = 'E' if diferenca > 0 else 'S'  # Entrada ou Saída
+#             valor_movimento = abs(diferenca)
+#             motivo = "Fechamento de Caixa"
             
-            registrar_movimento(
-                id_caixa=id_caixa,
-                tipo=tipo,
-                data=data_fechamento,
-                hora=hora_fechamento,
-                valor=valor_movimento,
-                motivo=motivo,
-                observacao=observacao
-            )
+#             registrar_movimento(
+#                 id_caixa=id_caixa,
+#                 tipo=tipo,
+#                 data=data_fechamento,
+#                 hora=hora_fechamento,
+#                 valor=valor_movimento,
+#                 motivo=motivo,
+#                 observacao=observacao
+#             )
         
-        return True
-    except Exception as e:
-        print(f"Erro ao fechar caixa: {e}")
-        raise Exception(f"Erro ao fechar caixa: {str(e)}")
+#         return True
+#     except Exception as e:
+#         print(f"Erro ao fechar caixa: {e}")
+#         raise Exception(f"Erro ao fechar caixa: {str(e)}")
 
-def obter_turno_ativo():
-    """Retorna o turno ativo (sem data de fechamento)"""
-    try:
-        query = """
-        SELECT ID, CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
-               ESTACAO, USUARIO, ID_USUARIO
-        FROM CAIXA_CONTROLE 
-        WHERE DATA_FECHAMENTO IS NULL 
-        ORDER BY ID DESC 
-        LIMIT 1
-        """
+# def obter_turno_ativo():
+#     """Retorna o turno ativo (sem data de fechamento)"""
+#     try:
+#         query = """
+#         SELECT ID, CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+#                ESTACAO, USUARIO, ID_USUARIO
+#         FROM CAIXA_CONTROLE 
+#         WHERE DATA_FECHAMENTO IS NULL 
+#         ORDER BY ID DESC 
+#         LIMIT 1
+#         """
         
-        result = execute_query(query)
+#         result = execute_query(query)
         
-        if result and len(result) > 0:
-            turno = result[0]
-            return {
-                'id': turno[0],
-                'codigo': turno[1],
-                'data_abertura': turno[2],
-                'hora_abertura': turno[3],
-                'valor_abertura': float(turno[4]) if turno[4] else 0.0,
-                'estacao': turno[5],
-                'usuario': turno[6],
-                'usuario_id': turno[7]
-            }
+#         if result and len(result) > 0:
+#             turno = result[0]
+#             return {
+#                 'id': turno[0],
+#                 'codigo': turno[1],
+#                 'data_abertura': turno[2],
+#                 'hora_abertura': turno[3],
+#                 'valor_abertura': float(turno[4]) if turno[4] else 0.0,
+#                 'estacao': turno[5],
+#                 'usuario': turno[6],
+#                 'usuario_id': turno[7]
+#             }
         
-        return None
+#         return None
         
-    except Exception as e:
-        print(f"Erro ao obter turno ativo: {e}")
-        return None
+#     except Exception as e:
+#         print(f"Erro ao obter turno ativo: {e}")
+#         return None
 
-def registrar_venda_caixa(turno_id, numero_venda, valor_total, forma_pagamento, operador_id=None):
-    """Registra uma venda no controle de caixa"""
-    try:
-        if not operador_id:
-            usuario = get_usuario_logado()
-            operador_id = usuario.get("id") if usuario else None
+# def registrar_venda_caixa(turno_id, numero_venda, valor_total, forma_pagamento, operador_id=None):
+#     """Registra uma venda no controle de caixa"""
+#     try:
+#         if not operador_id:
+#             usuario = get_usuario_logado()
+#             operador_id = usuario.get("id") if usuario else None
             
-        if not operador_id:
-            operador_id = 1  # ID padrão se não conseguir obter
+#         if not operador_id:
+#             operador_id = 1  # ID padrão se não conseguir obter
         
-        # Data e hora atuais
-        from datetime import datetime
-        agora = datetime.now()
-        data_venda = agora.strftime("%d/%m/%Y")
-        hora_venda = agora.strftime("%H:%M")
+#         # Data e hora atuais
+#         from datetime import datetime
+#         agora = datetime.now()
+#         data_venda = agora.strftime("%d/%m/%Y")
+#         hora_venda = agora.strftime("%H:%M")
         
-        # Registrar venda na tabela CAIXA_VENDAS (se existir)
-        try:
-            query_venda = """
-            INSERT INTO CAIXA_VENDAS 
-            (TURNO_ID, NUMERO_VENDA, VALOR_TOTAL, FORMA_PAGAMENTO, 
-             DATA_VENDA, HORA_VENDA, OPERADOR_ID)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
+#         # Registrar venda na tabela CAIXA_VENDAS (se existir)
+#         try:
+#             query_venda = """
+#             INSERT INTO CAIXA_VENDAS 
+#             (TURNO_ID, NUMERO_VENDA, VALOR_TOTAL, FORMA_PAGAMENTO, 
+#              DATA_VENDA, HORA_VENDA, OPERADOR_ID)
+#             VALUES (?, ?, ?, ?, ?, ?, ?)
+#             """
             
-            params_venda = (
-                turno_id, numero_venda, valor_total, forma_pagamento,
-                data_venda, hora_venda, operador_id
-            )
+#             params_venda = (
+#                 turno_id, numero_venda, valor_total, forma_pagamento,
+#                 data_venda, hora_venda, operador_id
+#             )
             
-            execute_query(query_venda, params_venda)
-            print(f"✅ Venda registrada na tabela CAIXA_VENDAS")
+#             execute_query(query_venda, params_venda)
+#             print(f"✅ Venda registrada na tabela CAIXA_VENDAS")
             
-        except Exception as e:
-            print(f"⚠️ Tabela CAIXA_VENDAS não existe ou erro: {e}")
+#         except Exception as e:
+#             print(f"⚠️ Tabela CAIXA_VENDAS não existe ou erro: {e}")
         
-        # Registrar como movimentação na tabela CAIXA_MOVIMENTACOES (se existir)
-        try:
-            query_mov = """
-            INSERT INTO CAIXA_MOVIMENTACOES 
-            (TURNO_ID, TIPO, FORMA_PAGAMENTO, VALOR, MOTIVO, OBSERVACAO, 
-             DATA_MOVIMENTO, HORA_MOVIMENTO, USUARIO_ID)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
+#         # Registrar como movimentação na tabela CAIXA_MOVIMENTACOES (se existir)
+#         try:
+#             query_mov = """
+#             INSERT INTO CAIXA_MOVIMENTACOES 
+#             (TURNO_ID, TIPO, FORMA_PAGAMENTO, VALOR, MOTIVO, OBSERVACAO, 
+#              DATA_MOVIMENTO, HORA_MOVIMENTO, USUARIO_ID)
+#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+#             """
             
-            params_mov = (
-                turno_id, "venda", forma_pagamento, valor_total,
-                f"Venda Nº {numero_venda}", None,
-                data_venda, hora_venda, operador_id
-            )
+#             params_mov = (
+#                 turno_id, "venda", forma_pagamento, valor_total,
+#                 f"Venda Nº {numero_venda}", None,
+#                 data_venda, hora_venda, operador_id
+#             )
             
-            execute_query(query_mov, params_mov)
-            print(f"✅ Movimentação registrada na tabela CAIXA_MOVIMENTACOES")
+#             execute_query(query_mov, params_mov)
+#             print(f"✅ Movimentação registrada na tabela CAIXA_MOVIMENTACOES")
             
-        except Exception as e:
-            print(f"⚠️ Tabela CAIXA_MOVIMENTACOES não existe ou erro: {e}")
+#         except Exception as e:
+#             print(f"⚠️ Tabela CAIXA_MOVIMENTACOES não existe ou erro: {e}")
         
-        print(f"✅ Venda {numero_venda} registrada no controle de caixa - Turno {turno_id}")
-        return True
+#         print(f"✅ Venda {numero_venda} registrada no controle de caixa - Turno {turno_id}")
+#         return True
         
-    except Exception as e:
-        print(f"❌ Erro ao registrar venda no caixa: {e}")
-        # NÃO propagar o erro - não quebrar a venda
-        return False
+#     except Exception as e:
+#         print(f"❌ Erro ao registrar venda no caixa: {e}")
+#         # NÃO propagar o erro - não quebrar a venda
+#         return False
 
 # Função auxiliar se não existir
 def get_usuario_logado():

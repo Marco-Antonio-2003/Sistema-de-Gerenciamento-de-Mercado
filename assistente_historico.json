@@ -1,5 +1,5 @@
 {
-  "ultima_atualizacao": "2025-07-04T09:50:31.230513",
+  "ultima_atualizacao": "2025-08-26T12:01:05.197519",
   "conversas": [
     {
       "role": "user",
@@ -8,6 +8,14 @@
     {
       "role": "assistant",
       "content": "Aqui está um resumo geral do sistema 📊:\n\n**Clientes:**\n- Total de clientes cadastrados: [Número de clientes]\n\n**Produtos:**\n- Total de produtos cadastrados: [Número de produtos]\n- Produtos com estoque baixo: [Número de produtos com estoque baixo]\n\n**Financeiro:**\n- Valor total a receber: R$ [Valor total a receber]\n- Recebimentos pendentes: [Número de recebimentos pendentes]\n\n**Vendas:**\n- Total de pedidos de venda: [Número de pedidos de venda]\n- Valor total em vendas: R$ [Valor total em vendas]\n\n**Caixa:**\n- Situação do caixa: [Status do caixa]\n\nPara mais detalhes, acesse os módulos específicos no menu. 🏢📦💰"
+    },
+    {
+      "role": "user",
+      "content": "Quantos clientes tenho?"
+    },
+    {
+      "role": "assistant",
+      "content": "📊 Você tem **4 clientes** cadastrados no sistema."
     }
   ]
 }

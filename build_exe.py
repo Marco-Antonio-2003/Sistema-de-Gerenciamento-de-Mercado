@@ -65,7 +65,8 @@ def main():
         'PyQt5.QtSvg', 'PyQt5.QtPrintSupport', # <-- Adicionado da correção anterior
         'reportlab.pdfgen.canvas', 'reportlab.lib.pagesizes', 
         'reportlab.platypus', 'escpos.printer', 'win32api', 'win32print',
-        'dotenv', 'webbrowser', 'fdb', 'matplotlib.backends.backend_qtagg' # <-- Adicionado Matplotlib
+        'dotenv', 'webbrowser', 'fdb', 'matplotlib.backends.backend_qtagg',
+        'pytz' 
     ]
     # Se seu sistema importa módulos de subpastas (ex: from mercado_livre import main_final),
     # é uma boa prática adicioná-los aqui também para garantir.

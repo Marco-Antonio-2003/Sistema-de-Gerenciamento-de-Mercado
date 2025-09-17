@@ -1,6 +1,8 @@
 # main_final.py - VERSÃO FINAL COM AJUSTE DE ESPAÇAMENTO NAS LINHAS
 
 import sys
+import pytz
+from datetime import datetime, timezone
 import webbrowser
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -172,14 +174,44 @@ class MercadoLivreBackend:
         except Exception: return 0
     def get_ultimas_vendas(self, limit=50):
         try:
-            url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&sort=date_desc&limit={limit}"; pedidos = self._make_request('get', url).get('results', []); vendas_formatadas = []
+            url = f"{self.base_url}/orders/search?seller={self.get_seller_id()}&sort=date_desc&limit={limit}"
+            pedidos = self._make_request('get', url).get('results', [])
+            vendas_formatadas = []
+
+            # ### NOVIDADE: Define os fusos horários ###
+            fuso_utc = pytz.utc
+            fuso_local = pytz.timezone('America/Sao_Paulo') # Fuso horário de Brasília
+
             for pedido in pedidos:
                 if not pedido['order_items']: continue
-                primeiro_item = pedido['order_items'][0]['item']; status_envio = pedido.get('shipping', {}).get('status', pedido.get('status', 'N/A'))
-                venda = {'id_pedido': pedido['id'], 'data': datetime.fromisoformat(pedido['date_created']).strftime('%d/%m/%Y %H:%M'), 'produto': primeiro_item['title'], 'cliente': pedido['buyer']['nickname'], 'valor': f"R$ {pedido['total_amount']:.2f}".replace('.',','), 'status': self._traduzir_status(status_envio)}
+                primeiro_item = pedido['order_items'][0]['item']
+                status_envio = pedido.get('shipping', {}).get('status', pedido.get('status', 'N/A'))
+                
+                # ### NOVIDADE: Lógica de conversão de fuso horário ###
+                # 1. Pega a data da API em formato de texto
+                data_api_texto = pedido['date_created']
+                # 2. Converte o texto para um objeto datetime
+                data_obj_utc = datetime.fromisoformat(data_api_texto.replace('Z', '+00:00'))
+                # 3. Garante que o objeto datetime está ciente de que é UTC
+                data_obj_utc = data_obj_utc.replace(tzinfo=fuso_utc)
+                # 4. Converte o objeto para o fuso horário local
+                data_obj_local = data_obj_utc.astimezone(fuso_local)
+                # 5. Formata o objeto de data local para o texto que será exibido
+                data_formatada = data_obj_local.strftime('%d/%m/%Y %H:%M')
+
+                venda = {
+                    'id_pedido': pedido['id'],
+                    'data': data_formatada, # Usa a data já convertida e formatada
+                    'produto': primeiro_item['title'],
+                    'cliente': pedido['buyer']['nickname'],
+                    'valor': f"R$ {pedido['total_amount']:.2f}".replace('.',','),
+                    'status': self._traduzir_status(status_envio)
+                }
                 vendas_formatadas.append(venda)
             return vendas_formatadas
-        except Exception: return []
+        except Exception as e:
+            print(f"Erro ao buscar últimas vendas: {e}")
+            return []
     def get_sales_for_chart(self, meses=6):
         print(f"Buscando dados de vendas para o gráfico dos últimos {meses} meses...")
         sales_data = {}; today = datetime.now()
@@ -351,6 +383,33 @@ class MercadoLivreWindow(QMainWindow):
         self.connection_widget = self.create_connection_widget(); self.dashboard_widget = self.create_dashboard_widget()
         self.stacked_layout.addWidget(self.connection_widget); self.stacked_layout.addWidget(self.dashboard_widget)
         self.update_timer = QTimer(self); self.update_timer.timeout.connect(self.carregar_dados_reais)
+
+    def converter_utc_para_local(self, utc_string):
+        """
+        Converte uma string de data/hora do formato UTC (padrão de APIs)
+        para o fuso horário local do computador do usuário.
+        """
+        if not utc_string:
+            return ""
+        try:
+            # O formato da API do ML geralmente termina com 'Z' (Zulu time = UTC)
+            # Substituímos 'Z' por '+00:00' que o Python entende nativamente
+            if utc_string.endswith('Z'):
+                utc_string = utc_string[:-1] + '+00:00'
+            
+            # 1. Converte a string para um objeto datetime "ciente" do seu fuso (UTC)
+            utc_dt = datetime.fromisoformat(utc_string)
+            
+            # 2. Converte o objeto datetime para o fuso horário local do sistema
+            local_dt = utc_dt.astimezone(None)
+            
+            # 3. Formata a data e hora locais para uma string amigável
+            return local_dt.strftime('%d/%m/%Y %H:%M:%S') # Use o formato que preferir
+            
+        except Exception as e:
+            print(f"Erro ao converter data UTC '{utc_string}': {e}")
+            # Se falhar, retorna a string original para não quebrar a aplicação
+            return utc_string
 
     def check_auth_status(self):
         if self.backend.is_configured(): self.connection_widget.hide(); self.dashboard_widget.show(); self.carregar_dados_reais()
