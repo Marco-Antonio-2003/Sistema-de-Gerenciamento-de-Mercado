@@ -411,26 +411,35 @@ class MainWindow(QMainWindow):
     def get_db_connection(self):
         """Retorna uma conexão com o banco Firebird e erro se houver"""
         try:
-            # Como o banco está em \base\banco, vamos usar a mesma lógica do seu banco.py
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # Determina o diretório base da aplicação
+            if getattr(sys, 'frozen', False):
+                # Se for um executável compilado (.exe)
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                # Se for um script Python normal
+                # O arquivo main.py está na raiz, então pegamos o diretório dele
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # O banco sempre estará em base/banco relativo ao diretório da aplicação
             db_path = os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB")
-           
-            # Se não encontrar, tenta outros caminhos
+            
+            # Verifica se o arquivo existe
             if not os.path.isfile(db_path):
-                # Tenta a partir do diretório do executável (se compilado)
-                if getattr(sys, 'frozen', False):
-                    base_dir = os.path.dirname(sys.executable)
+                # Tenta um nível acima (caso o script esteja em uma subpasta)
+                base_dir_alt = os.path.dirname(base_dir)
+                db_path_alt = os.path.join(base_dir_alt, "base", "banco", "MBDATA_NOVO.FDB")
+                
+                if os.path.isfile(db_path_alt):
+                    db_path = db_path_alt
                 else:
-                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-               
-                db_path = os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB")
-           
-            if not os.path.isfile(db_path):
-                print(f"ERRO: Banco não encontrado em: {db_path}")
-                return None, f"Banco não encontrado em: {db_path}"
-               
+                    print(f"ERRO: Banco não encontrado!")
+                    print(f"  Tentativa 1: {db_path}")
+                    print(f"  Tentativa 2: {db_path_alt}")
+                    print(f"  Diretório atual: {os.getcwd()}")
+                    return None, f"Banco de dados não encontrado"
+            
             print(f"Conectando ao banco: {db_path}")
-           
+            
             conexao = fdb.connect(
                 database=db_path,
                 user='SYSDBA',
@@ -438,10 +447,11 @@ class MainWindow(QMainWindow):
                 charset='UTF8'
             )
             return conexao, None
-           
+            
         except Exception as e:
             print(f"Erro ao conectar com banco: {e}")
             return None, str(e)
+    
     def caixa_esta_aberto(self):
         """Verifica se existe caixa aberto para o usuário atual"""
         conexao, error = self.get_db_connection()
@@ -1187,14 +1197,17 @@ class MainWindow(QMainWindow):
                 background-color: transparent;
             }
             QPushButton {
-                background-color: #F0F0F0;  /* Cor de gelo */
-                color: black;
+                background-color: #004766;  /* Mudança aqui */
+                color: white;                /* Mudança aqui */
                 padding: 5px 15px;
-                border: 1px solid #CCCCCC;
+                border: 1px solid #003555;   /* Borda mais escura */
                 border-radius: 3px;
             }
             QPushButton:hover {
-                background-color: #E8E8E8;
+                background-color: #005580;   /* Tom mais claro no hover */
+            }
+            QPushButton:pressed {
+                background-color: #003344;   /* Tom mais escuro ao clicar */
             }
         """)
         
