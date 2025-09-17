@@ -457,7 +457,6 @@ class MainWindow(QMainWindow):
         conexao, error = self.get_db_connection()
         if error:
             msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Warning) # Define o ícone de aviso
             msg_box.setWindowTitle("Erro")
             msg_box.setText(f"Não foi possível conectar ao banco de dados!\nDetalhes: {error}")
             self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
@@ -496,34 +495,35 @@ class MainWindow(QMainWindow):
             if conexao:
                 conexao.close()
             return False
+        
     def abrir_caixa(self, fundo_troco):
         """Abre um novo caixa para o usuário atual"""
         conexao, error = self.get_db_connection()
         if error:
             QMessageBox.warning(self, "Erro", f"Não foi possível conectar ao banco de dados!\nDetalhes: {error}")
             return False
-           
+        
         try:
             cursor = conexao.cursor()
-           
+        
             # Verifica se a tabela CAIXA existe, se não existir, cria
             cursor.execute("""
                 SELECT COUNT(*) FROM RDB$RELATIONS
                 WHERE RDB$RELATION_NAME = 'CAIXA' AND RDB$SYSTEM_FLAG = 0
             """)
-           
+        
             if cursor.fetchone()[0] == 0:
                 # Cria a tabela CAIXA
                 self.criar_estrutura_caixa(cursor)
-           
+        
             # Insere novo caixa
             cursor.execute("""
                 INSERT INTO CAIXA (DATA_ABERTURA, HORA_ABERTURA, USUARIO, FUNDO_TROCO, STATUS)
                 VALUES (CURRENT_DATE, CURRENT_TIME, ?, ?, 'ABERTO')
             """, [self.usuario, float(fundo_troco)])
-           
+        
             conexao.commit()
-           
+        
             # Pega o código do caixa criado com SELECT ao invés de CURRENT_VALUE
             cursor.execute("""
                 SELECT CODIGO FROM CAIXA
@@ -531,21 +531,24 @@ class MainWindow(QMainWindow):
                 ORDER BY CODIGO DESC
                 ROWS 1
             """, [self.usuario])
-           
+        
             resultado = cursor.fetchone()
             codigo = resultado[0] if resultado else "N/A"
-           
+        
             cursor.close()
             conexao.close()
-           
+        
+            # MODIFICADO: Criar e estilizar o QMessageBox manualmente em vez de usar QMessageBox.information
             msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Information)
             msg_box.setWindowTitle("Caixa Aberto")
             msg_box.setText(f"Caixa #{codigo} aberto com sucesso!\nFundo de troco: R$ {fundo_troco:.2f}")
+            # Remover o ícone!
+            msg_box.setIcon(QMessageBox.NoIcon)  # Isso remove o ícone de exclamação
             self.aplicar_estilo_aviso(msg_box)
             msg_box.exec_()
+            
             return True
-           
+        
         except Exception as e:
             print(f"Erro ao abrir caixa: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao abrir caixa: {str(e)}")
@@ -553,31 +556,42 @@ class MainWindow(QMainWindow):
                 conexao.rollback()
                 conexao.close()
             return False
+    
     def fechar_caixa(self):
         """Fecha o caixa aberto do usuário atual"""
         conexao, error = self.get_db_connection()
         if error:
-            QMessageBox.warning(self, "Erro", f"Não foi possível conectar ao banco de dados!\nDetalhes: {error}")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("Erro")
+            msg_box.setText(f"Não foi possível conectar ao banco de dados!\nDetalhes: {error}")
+            self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
+            msg_box.exec_()
             return False
-           
+        
         try:
             cursor = conexao.cursor()
-           
+        
             # Verifica se existe caixa aberto
             cursor.execute("""
                 SELECT CODIGO FROM CAIXA
                 WHERE USUARIO = ? AND DATA_FECHAMENTO IS NULL
             """, [self.usuario])
-           
+        
             resultado = cursor.fetchone()
             if not resultado:
-                QMessageBox.warning(self, "Aviso", "Não há caixa aberto para fechar!")
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Warning)
+                msg_box.setWindowTitle("Aviso")
+                msg_box.setText("Não há caixa aberto para fechar!")
+                self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
+                msg_box.exec_()
                 cursor.close()
                 conexao.close()
                 return False
-           
+        
             codigo_caixa = resultado[0]
-           
+        
             # Fecha o caixa
             cursor.execute("""
                 UPDATE CAIXA
@@ -586,24 +600,32 @@ class MainWindow(QMainWindow):
                     STATUS = 'FECHADO'
                 WHERE CODIGO = ?
             """, [codigo_caixa])
-           
+        
             conexao.commit()
             cursor.close()
             conexao.close()
-           
-            QMessageBox.information(
-                self, "Caixa Fechado",
-                f"Caixa #{codigo_caixa} fechado com sucesso!"
-            )
+        
+            # Substitua o QMessageBox.information por uma instância explícita
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Caixa Fechado")
+            msg_box.setText(f"Caixa #{codigo_caixa} fechado com sucesso!")
+            self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
+            msg_box.exec_()
             return True
-           
+        
         except Exception as e:
             print(f"Erro ao fechar caixa: {e}")
-            QMessageBox.warning(self, "Erro", f"Erro ao fechar caixa: {str(e)}")
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("Erro")
+            msg_box.setText(f"Erro ao fechar caixa: {str(e)}")
+            self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
+            msg_box.exec_()
             if conexao:
                 conexao.rollback()
                 conexao.close()
             return False
+        
     def criar_estrutura_caixa(self, cursor):
         """Cria a estrutura da tabela CAIXA se não existir"""
         try:
@@ -1064,51 +1086,75 @@ class MainWindow(QMainWindow):
         }
 
     def aplicar_estilo_aviso(self, widget):
-        """Aplica o estilo de fundo branco e botões de gelo a um QMessageBox ou QInputDialog."""
+        """Aplica o estilo de fundo branco e botões azuis a um QMessageBox ou QInputDialog."""
         style = """
-            /* Estilo para a janela (QMessageBox ou QInputDialog) */
-            QDialog { /* QDialog é a classe base para ambos */
-                background-color: #ffffff; /* Fundo branco */
-                color: #000000; /* Cor do texto padrão */
+            /* Estilo para a janela */
+            QDialog, QMessageBox, QInputDialog {
+                background-color: #ffffff;
+                color: #000000;
                 border: 1px solid #c0c0c0;
                 border-radius: 8px;
             }
 
             /* Estilo para QLabel dentro */
-            QDialog QLabel {
-                color: #000000; /* Texto preto */
+            QDialog QLabel, QMessageBox QLabel {
+                color: #000000;
+                background-color: transparent;
             }
+            
+            /* Estilo específico para o texto da mensagem */
             QMessageBox QLabel#qt_msgbox_label {
-                color: #000000; /* Força o texto da mensagem principal para preto */
+                color: #000000;
             }
 
-            /* Estilo para QLineEdit dentro de QInputDialog */
+            /* Estilo para QLineEdit em QInputDialog */
             QInputDialog QLineEdit {
-                background-color: #f0f8ff; /* Fundo de gelo para o campo de texto */
-                color: #000000; /* Texto preto */
+                background-color: #f0f8ff;
+                color: #000000;
                 border: 1px solid #c0d9ec;
                 border-radius: 4px;
                 padding: 2px;
             }
 
-            /* Estilo para os botões */
-            QPushButton { /* Aplica a todos os QPushButton dentro do QDialog */
-                background-color: #f0f8ff; /* Cor de gelo */
-                color: #000000; /* Texto preto */
-                border: 1px solid #c0d9ec; /* Borda sutil */
-                border-radius: 6px;
-                padding: 6px 12px;
-                min-width: 80px;
+            /* Força o estilo para TODOS os botões */
+            QPushButton {
+                background-color: #004766 !important;
+                color: white !important;
+                border: 1px solid #003555 !important;
+                border-radius: 6px !important;
+                padding: 6px 12px !important;
+                min-width: 80px !important;
+                font-weight: normal !important;
             }
             QPushButton:hover {
-                background-color: #e0f2f7;
-                border-color: #a0c4e2;
+                background-color: #005580 !important;
+                border-color: #006699 !important;
             }
             QPushButton:pressed {
-                background-color: #add8e6;
+                background-color: #003344 !important;
+            }
+            QPushButton:focus {
+                outline: none !important;
+                border: 2px solid #0077aa !important;
             }
         """
         widget.setStyleSheet(style)
+        
+        # Traduzir os botões para português
+        buttons = widget.findChildren(QPushButton)
+        for button in buttons:
+            if button.text() == "&Yes":
+                button.setText("Sim")
+            elif button.text() == "&No":
+                button.setText("Não")
+            elif button.text() == "Yes":
+                button.setText("Sim")
+            elif button.text() == "No":
+                button.setText("Não")
+            elif button.text() == "&OK":
+                button.setText("OK")
+            elif button.text() == "&Cancel":
+                button.setText("Cancelar")
 
     # Adicione este novo método dentro da classe MainWindow
     def obter_pedidos_pendentes_ml(self):
@@ -1226,11 +1272,11 @@ class MainWindow(QMainWindow):
         # Verificar se o caixa está aberto para este usuário/estação
         if not self.caixa_esta_aberto():
             msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Question)
+            # msg_box.setIcon(QMessageBox.Question)  # REMOVA ou comente esta linha
             msg_box.setWindowTitle("Abrir Caixa")
             msg_box.setText("O caixa não está aberto. Deseja abrir agora?")
             msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            msg_box.setDefaultButton(QMessageBox.No) # Opcional: define o botão padrão
+            msg_box.setDefaultButton(QMessageBox.No)
             self.aplicar_estilo_aviso(msg_box)
             resposta = msg_box.exec_()
             if resposta == QMessageBox.Yes:
@@ -1241,7 +1287,25 @@ class MainWindow(QMainWindow):
                 input_dialog.setDoubleMinimum(0.0)
                 input_dialog.setDoubleMaximum(999999.99)
                 input_dialog.setDoubleDecimals(2)
-                self.aplicar_estilo_aviso(input_dialog) # Aplica o estilo aqui
+                self.aplicar_estilo_aviso(input_dialog) # Isso não é suficiente para os botões
+                
+                # Adicione esta parte para forçar o estilo nos botões:
+                input_dialog.setStyleSheet(input_dialog.styleSheet() + """
+                    QDialogButtonBox > QPushButton {
+                        background-color: #004766 !important;
+                        color: white !important;
+                        border: 1px solid #003555 !important;
+                        border-radius: 6px !important;
+                        padding: 6px 12px !important;
+                        min-width: 80px !important;
+                    }
+                    QDialogButtonBox > QPushButton:hover {
+                        background-color: #005580 !important;
+                    }
+                    QDialogButtonBox > QPushButton:pressed {
+                        background-color: #003344 !important;
+                    }
+                """)
 
                 ok = input_dialog.exec_()
                 fundo_troco = input_dialog.doubleValue() if ok else 0.0 # Obtém o valor apenas se 'OK' foi clicado
@@ -1281,8 +1345,13 @@ class MainWindow(QMainWindow):
             original_close = win.closeEvent
             def new_close(event):
                 if self.caixa_esta_aberto():
-                    resposta = QMessageBox.question(self, "Fechar Caixa", "Deseja fechar o caixa ao sair do PDV?",
-                                                    QMessageBox.Yes | QMessageBox.No)
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle("Fechar Caixa")
+                    msg_box.setText("Deseja fechar o caixa ao sair do PDV?")
+                    msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                    msg_box.setDefaultButton(QMessageBox.No)
+                    self.aplicar_estilo_aviso(msg_box) # Aplica o estilo
+                    resposta = msg_box.exec_()
                     if resposta == QMessageBox.Yes:
                         self.fechar_caixa()
                 if original_close:
@@ -1534,23 +1603,23 @@ if __name__ == "__main__":
         QMessageBox QLabel#qt_msgbox_label {
             color: #000000; /* Força o texto da mensagem principal para preto */
         }
-        /* Estilo para os botões dentro de QMessageBox */
+        /* Estilo para botões dentro de QMessageBox */
         QMessageBox QPushButton {
-            background-color: #f0f8ff; /* Cor de gelo para o fundo do botão */
-            color: #000000; /* Texto preto do botão */
-            border: 1px solid #c0d9ec; /* Borda sutil para o botão */
-            border-radius: 6px; /* Cantos arredondados para o botão */
-            padding: 6px 12px; /* Espaçamento interno do botão */
-            min-width: 80px; /* Largura mínima para botões */
+            background-color: #004766;  /* Mudança aqui */
+            color: white;                /* Mudança aqui */
+            border: 1px solid #003555;
+            border-radius: 6px;
+            padding: 6px 12px;
+            min-width: 80px;
         }
         QMessageBox QPushButton:hover {
-            background-color: #e0f2f7; /* Cor ao passar o mouse */
-            border-color: #a0c4e2; /* Borda mais destacada no hover */
+            background-color: #005580;   /* Tom mais claro no hover */
+            border-color: #006699;
         }
         QMessageBox QPushButton:pressed {
-            background-color: #add8e6; /* Cor ao clicar */
+            background-color: #003344;   /* Tom mais escuro ao clicar */
         }
-        /* Estilo para a janela QInputDialog em geral */
+            /* Estilo para a janela QInputDialog em geral */
         QInputDialog {
             background-color: #ffffff; /* Fundo branco para o QInputDialog */
             color: #000000; /* Cor do texto padrão */
@@ -1571,19 +1640,19 @@ if __name__ == "__main__":
         }
         /* Estilo para botões dentro de QInputDialog */
         QInputDialog QPushButton {
-            background-color: #f0f8ff; /* Cor de gelo para o fundo do botão */
-            color: #000000; /* Texto preto do botão */
-            border: 1px solid #c0d9ec;
+            background-color: #004766;  /* Mudança aqui */
+            color: white;                /* Mudança aqui */
+            border: 1px solid #003555;
             border-radius: 6px;
             padding: 6px 12px;
             min-width: 80px;
         }
         QInputDialog QPushButton:hover {
-            background-color: #e0f2f7;
-            border-color: #a0c4e2;
+            background-color: #005580;   /* Tom mais claro no hover */
+            border-color: #006699;
         }
         QInputDialog QPushButton:pressed {
-            background-color: #add8e6;
+            background-color: #003344;   /* Tom mais escuro ao clicar */
         }
     """)
     window = MainWindow(usuario="Marco", empresa="MB Sistemas")
