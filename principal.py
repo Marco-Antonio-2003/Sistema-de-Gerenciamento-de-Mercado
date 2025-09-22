@@ -3,6 +3,7 @@ import os
 import firebird.driver as fdb  # <-- Changed from 'import fdb'
 import importlib.util
 import unicodedata
+import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFrame, QAction,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog,
@@ -366,6 +367,10 @@ class MainWindow(QMainWindow):
         self.id_usuario = id_usuario
         self.id_funcionario = id_funcionario
         self.id_ultima_venda_notificada = None
+        self.btn_gerenciar_favoritos = None
+
+        self.favorites = self.load_favorites()
+        self.favorite_buttons = []
        
         self.permissoes = {}
         self.opened_windows = []
@@ -410,6 +415,119 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(5000, self.verificar_novas_vendas_ml)
        
         self.showMaximized()
+
+    def get_favorites_file(self):
+        """Retorna o caminho completo do arquivo de favoritos."""
+        # Garante que o arquivo de configuração fique na mesma pasta do script principal
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        config_dir = os.path.join(base_dir, "config")
+        os.makedirs(config_dir, exist_ok=True) # Cria a pasta 'config' se não existir
+        return os.path.join(config_dir, "favorites.json")
+    
+    def create_favorite_button(self, action_name):
+        """Cria um botão de favorito estilizado."""
+        button = QPushButton(action_name)
+        button.setMinimumSize(160, 45)
+        button.setCursor(QCursor(Qt.PointingHandCursor))
+        button.setStyleSheet("""
+            QPushButton {
+                background-color: #003d5c;
+                color: white;
+                border: none;
+                border-radius: 22px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #005079; }
+            QPushButton:pressed { background-color: #00283d; }
+        """)
+        button.clicked.connect(lambda: self.menu_action_triggered(action_name))
+        return button
+
+    def update_favorites_display(self):
+        """Limpa e recria os botões de favoritos na tela."""
+        # Limpa layout antigo
+        while self.favorites_layout.count():
+            child = self.favorites_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        # Adiciona um espaçador no início
+        self.favorites_layout.addStretch()
+
+        # Cria botões para os favoritos atuais
+        for favorite in sorted(self.favorites):
+            button = self.create_favorite_button(favorite)
+            self.favorites_layout.addWidget(button)
+
+        # # Cria e adiciona o botão de gerenciar
+        # self.btn_gerenciar_favoritos = QPushButton("+")
+        # self.btn_gerenciar_favoritos.setFixedSize(45, 45)
+        # self.btn_gerenciar_favoritos.setToolTip("Adicionar ou remover favoritos")
+        # self.btn_gerenciar_favoritos.setCursor(QCursor(Qt.PointingHandCursor))
+        # self.btn_gerenciar_favoritos.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: rgba(255, 255, 255, 0.2);
+        #         color: white;
+        #         border: 1px solid rgba(255, 255, 255, 0.4);
+        #         border-radius: 22px;
+        #         font-size: 24px;
+        #     }
+        #     QPushButton:hover { background-color: rgba(255, 255, 255, 0.3); }
+        # """)
+        # self.btn_gerenciar_favoritos.clicked.connect(self.abrir_seletor_favoritos)
+        # self.favorites_layout.addWidget(self.btn_gerenciar_favoritos)
+
+        # Adiciona um espaçador no final
+        self.favorites_layout.addStretch()
+
+    def abrir_seletor_favoritos(self):
+        """Abre a janela para o usuário selecionar seus módulos favoritos."""
+        try:
+            # --- CORREÇÃO AQUI ---
+            # Importa a classe do novo arquivo 'favoritos.py' dentro da pasta 'ferramentas'
+            from ferramentas.favoritos import SeletorModulosEstilizado
+            
+            # Pega todos os módulos que podem ser abertos
+            modulos_disponiveis = self.action_to_py_file.keys()
+            
+            seletor = SeletorModulosEstilizado(
+                modulos_disponiveis=modulos_disponiveis, 
+                favoritos_atuais=self.favorites,
+                parent=self
+            )
+            
+            if seletor.exec_() == QDialog.Accepted:
+                self.favorites = seletor.get_selecao_final()
+                self.save_favorites()
+                self.update_favorites_display()
+                
+        except ImportError:
+            # --- CORREÇÃO AQUI ---
+            # Atualiza a mensagem de erro para refletir o novo nome do arquivo
+            QMessageBox.warning(self, "Erro", "O arquivo 'ferramentas/favoritos.py' não foi encontrado ou contém erros.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro Inesperado", f"Ocorreu um erro ao abrir o seletor de favoritos:\n{e}")
+    def load_favorites(self):
+        """Carrega a lista de favoritos do arquivo JSON."""
+        favorites_file = self.get_favorites_file()
+        if not os.path.exists(favorites_file):
+            return [] # Retorna lista vazia se o arquivo não existe
+        try:
+            with open(favorites_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"Erro ao carregar favoritos: {e}")
+            return [] # Retorna lista vazia em caso de erro
+
+    def save_favorites(self):
+        """Salva a lista atual de favoritos no arquivo JSON."""
+        try:
+            with open(self.get_favorites_file(), 'w', encoding='utf-8') as f:
+                json.dump(self.favorites, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Erro ao salvar favoritos: {e}")  
+
     def get_db_connection(self):
         """Retorna uma conexão com o banco Firebird e erro se houver"""
         try:
@@ -861,7 +979,7 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
        
-        # --- Barra de Menus (sem alterações) ---
+        # --- 1. BARRA DE MENUS ---
         menu_frame = QFrame()
         menu_frame.setStyleSheet("background-color: #272525;")
         menu_layout = QHBoxLayout(menu_frame)
@@ -882,21 +1000,41 @@ class MainWindow(QMainWindow):
         self.add_menu_actions_with_permission(btn_vendas, ["Pedido de vendas"], self)
         self.add_menu_actions_with_permission(btn_financeiro, ["Recebimento de clientes", "Gerar lançamento Financeiro", "Controle de caixa (PDV)", "Conta corrente", "Classes financeiras"], self)
         self.add_menu_actions_with_permission(btn_relatorios, ["Relatório de Vendas de Produtos"], self)
-        self.add_menu_actions_with_permission(btn_ferramentas, ["Configuração de estação", "Configuração do Sistema"], self)
+        self.add_menu_actions_with_permission(btn_ferramentas, ["Configuração de estação", "Configuração do Sistema", "Adicionar Favoritos"], self)
         self.add_menu_actions_with_permission(self.btn_mercado_livre, ["Ver Dashboard do Mercado livre"], self)
        
         for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas, btn_financeiro, btn_relatorios, btn_ferramentas, self.btn_mercado_livre):
             menu_layout.addWidget(btn)
         main_layout.addWidget(menu_frame)
         self.atualizar_visibilidade_modulos()
-       
-        # --- Tela Principal (sem alterações) ---
-        # BLOCO NOVO E CORRIGIDO
+
+        # --- 2. TELA PRINCIPAL (HOME SCREEN) ---
         home_screen = QWidget()
         home_screen.setStyleSheet("background-color: #005079;")
+        # CRIA O LAYOUT DA HOME SCREEN AQUI
         home_layout = QVBoxLayout(home_screen)
         home_layout.setAlignment(Qt.AlignCenter)
-       
+
+        # --- 3. ÁREA DE FAVORITOS (AGORA ADICIONADA AO home_layout) ---
+        self.favorites_container = QFrame()
+        self.favorites_container.setMaximumWidth(1100)
+        self.favorites_container.setStyleSheet("""
+            QFrame {
+                background-color: rgba(1, 47, 74, 0.7);
+                border-radius: 25px;
+            }
+        """)
+        self.favorites_container.setMinimumHeight(100)
+        favorites_main_layout = QVBoxLayout(self.favorites_container)
+        favorites_main_layout.setContentsMargins(15, 15, 15, 15)
+        self.favorites_layout = QHBoxLayout()
+        self.favorites_layout.setSpacing(15)
+        self.favorites_layout.setAlignment(Qt.AlignCenter)
+        favorites_main_layout.addLayout(self.favorites_layout)
+        # Adiciona o container de favoritos ao layout da home
+        home_layout.addWidget(self.favorites_container)
+
+        # --- 4. LOGO ---
         logo_label = QLabel()
         logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "logo.png")
         logo_pixmap = QPixmap(logo_path)
@@ -906,14 +1044,12 @@ class MainWindow(QMainWindow):
             logo_label.setText("erro logo")
         home_layout.addWidget(logo_label, alignment=Qt.AlignCenter)
        
-        # --- Seção do Título e Botão de Atualizar ---
-        # Usamos um widget como container para um layout horizontal
+        # --- 5. TÍTULO E BOTÃO DE ATUALIZAR ---
         title_section_widget = QWidget()
         title_section_layout = QHBoxLayout(title_section_widget)
         title_section_layout.setContentsMargins(0,0,0,0)
         title_section_layout.setSpacing(20)
         title_section_layout.setAlignment(Qt.AlignCenter)
-        # Layout vertical apenas para o texto (título + subtítulo)
         text_layout = QVBoxLayout()
         text_layout.setSpacing(0)
        
@@ -929,9 +1065,8 @@ class MainWindow(QMainWindow):
         system_subtitle.setAlignment(Qt.AlignCenter)
         text_layout.addWidget(system_subtitle)
        
-        # Adiciona o texto (agrupado verticalmente) ao layout da seção
         title_section_layout.addLayout(text_layout)
-        # Botão de Atualizar
+        
         self.btn_atualizar = QPushButton(self)
         self.btn_atualizar.setFixedSize(40, 40)
         self.btn_atualizar.setCursor(QCursor(Qt.PointingHandCursor))
@@ -947,17 +1082,11 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: rgba(255, 255, 255, 0.1); }
             QPushButton:pressed { background-color: rgba(255, 255, 255, 0.2); }
         """)
-       
-        # Conecta o clique à função de atualização
         self.btn_atualizar.clicked.connect(self.atualizar_contadores)
-       
-        # Adiciona o botão ao lado do texto
         title_section_layout.addWidget(self.btn_atualizar)
-        # Adiciona a seção inteira (título + subtítulo + botão) ao layout principal
         home_layout.addWidget(title_section_widget)
        
-        # --- O resto do código (criação das caixas de info) continua aqui --
-       
+        # --- 6. CAIXAS DE INFORMAÇÃO ---
         info_frame = QFrame()
         info_frame.setMaximumHeight(180)
         info_layout = QHBoxLayout(info_frame)
@@ -967,13 +1096,11 @@ class MainWindow(QMainWindow):
         self.criar_caixa_info(info_layout, "Clientes", "user.png", self.obter_contagem_pessoas())
         self.criar_caixa_info(info_layout, "Produtos", "product.png", self.obter_contagem_produtos())
         self.criar_caixa_info(info_layout, "Vendas", "sales.png", self.obter_contagem_vendas())
-        # ### NOVIDADE: Criar a caixa de info do Mercado Livre ###
-        # Só cria a caixa se o módulo estiver disponível e o usuário tiver acesso.
         if self.tem_acesso_ecommerce:
              self.criar_caixa_info(info_layout, "ML Envios", "mercado-livre.png", self.obter_pedidos_pendentes_ml())
-       
         home_layout.addWidget(info_frame)
        
+        # --- 7. INFORMAÇÕES DO USUÁRIO E DESENVOLVEDOR ---
         user_info = QLabel(f"Usuário: {self.usuario} | Empresa: {self.empresa}")
         user_info.setFont(QFont("Arial", 14))
         user_info.setStyleSheet("color: #cccccc; margin-top: 10px;")
@@ -986,17 +1113,16 @@ class MainWindow(QMainWindow):
         dev_info.setAlignment(Qt.AlignCenter)
         home_layout.addWidget(dev_info)
        
+        # Adiciona a tela principal (com tudo dentro) ao layout geral
         main_layout.addWidget(home_screen, 1)
        
-        # --- Criação dos Botões Flutuantes ---
+        # --- 8. BOTÕES FLUTUANTES E FIXOS ---
         self.botao_whatsapp = QPushButton(self)
         self.btn_assistente = QPushButton("💬", self)
-       
-        # --- Criação dos Botões Fixos ---
         self.pdv_button = QPushButton("Acesso ao\nPDV", self)
         self.logout_button = QPushButton("Deslogar", self)
        
-        # --- Configuração do Botão WhatsApp ---
+        # Configuração do Botão WhatsApp
         whatsapp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")
         if os.path.exists(whatsapp_path):
             self.botao_whatsapp.setIcon(QIcon(whatsapp_path))
@@ -1007,12 +1133,13 @@ class MainWindow(QMainWindow):
         self.botao_whatsapp.setCursor(QCursor(Qt.PointingHandCursor)); self.botao_whatsapp.setToolTip("Clique para ver os contatos")
         self.botao_whatsapp.clicked.connect(self.abrir_janela_contatos)
        
-        # --- Configuração do Botão Assistente ---
+        # Configuração do Botão Assistente
         self.btn_assistente.setFixedSize(60, 60)
         self.btn_assistente.setStyleSheet("QPushButton { background-color: #005079; color: white; border: 2px solid white; border-radius: 30px; font-size: 24px; } QPushButton:hover { background-color: #0066a0; }")
         self.btn_assistente.setToolTip("Assistente Virtual")
         self.btn_assistente.clicked.connect(self.toggle_assistente_dock)
-        # --- Integração do DockWidget do Assistente ---
+        
+        # Integração do DockWidget do Assistente
         try:
             from assistente import ChatbotDockWidget
             self.chatbot_dock = ChatbotDockWidget(self)
@@ -1022,8 +1149,9 @@ class MainWindow(QMainWindow):
             self.chatbot_dock.navegar_para_main.connect(self.navegar_para_modulo)
         except Exception as e:
             print(f"Erro ao carregar Assistente: {e}")
-            self.btn_assistente.hide() # Esconde o botão se o assistente não carregar
-        # --- Configuração do Botão PDV ---
+            self.btn_assistente.hide()
+            
+        # Configuração do Botão PDV
         self.pdv_button.setFixedSize(180, 80)
         self.pdv_button.setStyleSheet("QPushButton { background-color: #2E8B57; color: white; border-radius: 10px; font-weight: bold; text-align: center; padding: 5px; font-size: 18px; } QPushButton:hover { background-color: #1D6F42; }")
         pdv_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "caixa.png")
@@ -1032,7 +1160,7 @@ class MainWindow(QMainWindow):
         sombra_pdv = QGraphicsDropShadowEffect(self.pdv_button); sombra_pdv.setBlurRadius(15); sombra_pdv.setColor(Qt.black); self.pdv_button.setGraphicsEffect(sombra_pdv)
         self.pdv_button.setCursor(QCursor(Qt.PointingHandCursor)); self.pdv_button.clicked.connect(self.abrir_pdv)
 
-        # --- Configuração do Botão Logout ---
+        # Configuração do Botão Logout
         self.logout_button.setFixedSize(180, 80)
         self.logout_button.setStyleSheet("QPushButton { background-color: #c0392b; color: white; border-radius: 10px; font-weight: bold; text-align: center; padding: 5px; font-size: 18px; } QPushButton:hover { background-color: #a93226; }")
         logout_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "logout.png")
@@ -1040,17 +1168,19 @@ class MainWindow(QMainWindow):
             self.logout_button.setIcon(QIcon(logout_icon_path)); self.logout_button.setIconSize(QSize(30, 30))
         sombra_logout = QGraphicsDropShadowEffect(self.logout_button); sombra_logout.setBlurRadius(15); sombra_logout.setColor(Qt.black); self.logout_button.setGraphicsEffect(sombra_logout)
         self.logout_button.setCursor(QCursor(Qt.PointingHandCursor)); self.logout_button.clicked.connect(self.handle_logout)
-        # --- Habilitar Aninhamento de Docks ---
+        
         self.setDockNestingEnabled(True)
        
-        # --- Gerenciamento de Evento de Redimensionamento ---
         self._original_resizeEvent = self.resizeEvent
         self.resizeEvent = self._novo_resizeEvent
-        # --- Chamada Inicial para Posicionamento ---
+        
         QTimer.singleShot(0, self.posicionar_botoes_fixos)
         QTimer.singleShot(0, self.posicionar_botoes_flutuantes)
+
+        # Atualiza a exibição inicial dos favoritos
+        self.update_favorites_display()
        
-        # --- Mapeamentos de Módulos (sem alterações) ---
+        # --- 9. MAPEAMENTOS DE MÓDULOS ---
         self.action_to_py_file = {
             "Cadastro de empresa": os.path.join("geral", "cadastro_empresa.py"),
             "Cadastro de Clientes": os.path.join("geral", "cadastro_pessoa.py"),
@@ -1070,6 +1200,7 @@ class MainWindow(QMainWindow):
             "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"),
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
+            "Adicionar Favoritos": os.path.join("ferramentas", "favoritos.py"),
             "Ver Dashboard do Mercado livre": os.path.join("mercado_livre", "main_final.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
         }
@@ -1083,10 +1214,9 @@ class MainWindow(QMainWindow):
             "Controle de caixa (PDV)": "ControleCaixaWindow", "Conta corrente": "ContaCorrenteWindow",
             "Classes financeiras": "ClassesFinanceirasWindow", "Fiscal NF-e, SAT, NFC-e": "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos": "RelatorioVendasWindow", "Configuração de estação": "ConfiguracaoImpressoraWindow",
-            "Configuração do Sistema": "ConfiguracaoSistemaWindow", "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
+            "Configuração do Sistema": "ConfiguracaoSistemaWindow","Adicionar Favoritos": "SeletorModulosEstilizado", "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
             "PDV - Ponto de Venda": "PDVWindow"
         }
-
     def aplicar_estilo_aviso(self, widget):
         """Aplica o estilo de fundo branco e botões azuis a um QMessageBox ou QInputDialog."""
         style = """
@@ -1228,7 +1358,7 @@ class MainWindow(QMainWindow):
             ("financeiro", "recebimento_clientes"): "Recebimento de clientes", ("financeiro", "lancamento_financeiro"): "Gerar lançamento Financeiro",
             ("financeiro", "controle_caixa"): "Controle de caixa (PDV)", ("financeiro", "conta_corrente"): "Conta corrente",
             ("financeiro", "classes_financeiras"): "Classes financeiras", ("relatorios", "relatorio_vendas_produtos"): "Relatório de Vendas de Produtos",
-            ("ferramentas", "configuracao_impressora"): "Configuração de estação", ("ferramentas", "configuracao_sistema"): "Configuração do Sistema"
+            ("ferramentas", "configuracao_impressora"): "Configuração de estação", ("ferramentas", "configuracao_sistema"): "Configuração do Sistema", ("ferramentas", "Adicionar Favoritos"): "Adicionar Favoritos"
         }
         chave = (modulo, acao)
         if chave in mapa_navegacao:
@@ -1551,6 +1681,12 @@ class MainWindow(QMainWindow):
             spec.loader.exec_module(module); return getattr(module, class_name, None)
         except Exception as e: print(f"Erro ao carregar dinamicamente {module_path}: {e}"); return None
     def menu_action_triggered(self, action_title):
+        # --- NOVO: Verificação para o caso especial dos favoritos ---
+        if action_title == "Adicionar Favoritos":
+            self.abrir_seletor_favoritos()
+            return # Interrompe a execução para não usar o código genérico abaixo
+
+        # O resto do método continua como antes...
         if not self.verificar_permissao(action_title) and self.id_funcionario:
             QMessageBox.warning(self, "Acesso Negado", f"Você não tem permissão para acessar o módulo: {action_title}")
             return
@@ -1574,7 +1710,7 @@ class MainWindow(QMainWindow):
             WindowClass = getattr(module, cls_name, None)
             if not WindowClass: raise ImportError(f"Classe {cls_name} não encontrada")
                
-            win = WindowClass()
+            win = WindowClass() # <-- O problema estava aqui para os favoritos
             if hasattr(win, 'set_janela_principal'): win.set_janela_principal(self)
             if hasattr(win, 'set_credentials'): win.set_credentials(self.usuario, self.empresa, self.id_funcionario)
             win.setWindowTitle(action_title)
@@ -1587,6 +1723,7 @@ class MainWindow(QMainWindow):
             win.closeEvent = novo_close_event
             self.opened_windows.append(win)
         except Exception as e:
+            # A mensagem de erro agora mostrará o erro de argumentos que você viu
             QMessageBox.warning(self, "Erro de Módulo", f"Não foi possível abrir a janela '{action_title}':\n{e}")
     def closeEvent(self, event):
         try:

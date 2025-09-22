@@ -151,14 +151,12 @@ class LoadingWorker(QThread):
             self.finished.emi
 
         except Exception as e:
-            # Se ocorrer um erro durante o carregamento, podemos tratar aqui
-            # Por exemplo, emitindo um sinal de erro (implementação mais avançada)
-            print(f"Erro crítico durante a inicialização: {e}")
-            # Por enquanto, vamos apenas finalizar para não travar
-            self.status.emit(f"Erro na inicialização!")
+            print(f"Erro durante a inicialização: {e}")
+            # Se o erro foi apenas um aviso, pode emitir um status mais amigável:
+            self.status.emit("Inicialização concluída com avisos.")
             self.progress.emit(100)
-            time.sleep(2) # Pausa para o usuário ver o erro
-            self.finished.emit() # Finaliza mesmo com erro para fechar a splash
+            time.sleep(2)
+            self.finished.emit()
     
     def startup_tasks(self):
         """Tarefas de inicialização do programa"""
