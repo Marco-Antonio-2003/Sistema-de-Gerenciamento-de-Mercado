@@ -449,14 +449,16 @@ class ControleCaixaWindow(QMainWindow):
             QMessageBox.warning(self, "Aviso", "Este caixa já está fechado!")
             return
         
-        # Confirmação
-        reply = QMessageBox.question(
-            self, 'Confirmação', 
-            f'Deseja realmente fechar o caixa #{codigo}?',
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
+        # Confirmação com botões "Sim" e "Não"
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Confirmação')
+        msg_box.setText(f'Deseja realmente fechar o caixa #{codigo}?')
+        btn_sim = msg_box.addButton('Sim', QMessageBox.YesRole)
+        btn_nao = msg_box.addButton('Não', QMessageBox.NoRole)
+        msg_box.setDefaultButton(btn_nao)
+        msg_box.exec_()
 
-        if reply == QMessageBox.Yes:
+        if msg_box.clickedButton() == btn_sim:
             try:
                 cursor = self.conexao.cursor()
                 

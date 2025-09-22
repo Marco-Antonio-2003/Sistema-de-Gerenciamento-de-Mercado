@@ -11,9 +11,6 @@ from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal, QTimer
 from PyQt5.QtGui import QDesktopServices
 from base.banco import execute_query
-# A importação do assistente foi movida para dentro do initUI para clareza
-# from assistente import adicionar_assistente_ao_sistema
-# ### NOVIDADE: Importar o backend do Mercado Livre ###
 try:
     # Esta estrutura de importação funciona tanto em dev quanto no .exe
     from mercado_livre.main_final import MercadoLivreBackend
@@ -22,6 +19,11 @@ except ImportError:
     print("AVISO: Módulo do Mercado Livre não encontrado. A funcionalidade será desativada.")
     ML_BACKEND_DISPONIVEL = False
     MercadoLivreBackend = None
+
+from app_setup import get_app
+
+app = get_app()
+
 class ContatosWhatsAppDialog(QDialog):
     # ... (Seu código da classe ContatosWhatsAppDialog - sem alterações) ...
     """Janela de contatos do WhatsApp com design melhorado"""
@@ -902,7 +904,7 @@ class MainWindow(QMainWindow):
             logo_label.setPixmap(logo_pixmap.scaled(400, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             logo_label.setText("erro logo")
-        home_layout.addWidget(logo_label)
+        home_layout.addWidget(logo_label, alignment=Qt.AlignCenter)
        
         # --- Seção do Título e Botão de Atualizar ---
         # Usamos um widget como container para um layout horizontal
@@ -1288,6 +1290,24 @@ class MainWindow(QMainWindow):
                 input_dialog.setDoubleMaximum(999999.99)
                 input_dialog.setDoubleDecimals(2)
                 self.aplicar_estilo_aviso(input_dialog) # Isso não é suficiente para os botões
+                from PyQt5.QtWidgets import QDoubleSpinBox, QSpinBox, QLineEdit
+                for spin in input_dialog.findChildren((QDoubleSpinBox, QSpinBox)):
+                    spin.setStyleSheet("""
+                        background-color: #ffffff !important;
+                        color: #000000 !important;
+                        border: 1px solid #c0d9ec !important;
+                        border-radius: 4px !important;
+                        padding: 2px !important;
+                    """)
+                    le = spin.findChild(QLineEdit)
+                    if le:
+                        le.setStyleSheet("""
+                            background-color: #ffffff !important;
+                            color: #000000 !important;
+                            border: 1px solid #c0d9ec !important;
+                            border-radius: 4px !important;
+                            padding: 2px !important;
+                        """)
                 
                 # Adicione esta parte para forçar o estilo nos botões:
                 input_dialog.setStyleSheet(input_dialog.styleSheet() + """
@@ -1584,75 +1604,30 @@ class MainWindow(QMainWindow):
         except Exception as e: print(f"Erro no closeEvent: {e}")
         event.accept()
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    # ESTILOS GLOBAIS PARA QMessageBox E QInputDialog
-    app.setStyleSheet("""
-        /* Estilo para a janela QMessageBox em geral */
-        QMessageBox {
-            background-color: #ffffff; /* Fundo branco para a caixa de mensagem */
-            color: #000000; /* Cor do texto padrão da caixa de mensagem */
-            border: 1px solid #c0c0c0; /* Borda sutil */
-            border-radius: 8px; /* Cantos arredondados */
-        }
+    import ctypes
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(u"mbsistema.unique.id.v1")
+    except Exception:
+        pass
 
-        /* Estilo para os QLabel dentro de QMessageBox (incluindo o texto principal) */
-        QMessageBox QLabel {
-            color: #000000; /* Texto preto para todos os QLabel */
-        }
-        /* Estilo específico para o label da mensagem, se o tema padrão o estiver sobrescrevendo */
-        QMessageBox QLabel#qt_msgbox_label {
-            color: #000000; /* Força o texto da mensagem principal para preto */
-        }
-        /* Estilo para botões dentro de QMessageBox */
-        QMessageBox QPushButton {
-            background-color: #004766;  /* Mudança aqui */
-            color: white;                /* Mudança aqui */
-            border: 1px solid #003555;
-            border-radius: 6px;
-            padding: 6px 12px;
-            min-width: 80px;
-        }
-        QMessageBox QPushButton:hover {
-            background-color: #005580;   /* Tom mais claro no hover */
-            border-color: #006699;
-        }
-        QMessageBox QPushButton:pressed {
-            background-color: #003344;   /* Tom mais escuro ao clicar */
-        }
-            /* Estilo para a janela QInputDialog em geral */
-        QInputDialog {
-            background-color: #ffffff; /* Fundo branco para o QInputDialog */
-            color: #000000; /* Cor do texto padrão */
-            border: 1px solid #c0c0c0;
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    app.setStyleSheet("""
+        QMessageBox, QDialog, QInputDialog {
+            background-color: #ffffff;
+            color: #000000;
             border-radius: 8px;
         }
-        /* Estilo para QLabel dentro de QInputDialog */
-        QInputDialog QLabel {
-            color: #000000; /* Texto preto */
-        }
-        /* Estilo para QLineEdit (campo de entrada) dentro de QInputDialog */
-        QInputDialog QLineEdit {
-            background-color: #f0f8ff; /* Fundo de gelo para o campo de texto */
-            color: #000000; /* Texto preto */
-            border: 1px solid #c0d9ec;
-            border-radius: 4px;
-            padding: 2px;
-        }
-        /* Estilo para botões dentro de QInputDialog */
-        QInputDialog QPushButton {
-            background-color: #004766;  /* Mudança aqui */
-            color: white;                /* Mudança aqui */
+        QPushButton {
+            background-color: #004766;
+            color: white;
             border: 1px solid #003555;
             border-radius: 6px;
             padding: 6px 12px;
             min-width: 80px;
         }
-        QInputDialog QPushButton:hover {
-            background-color: #005580;   /* Tom mais claro no hover */
-            border-color: #006699;
-        }
-        QInputDialog QPushButton:pressed {
-            background-color: #003344;   /* Tom mais escuro ao clicar */
+        QPushButton:hover {
+            background-color: #005580;
         }
     """)
     window = MainWindow(usuario="Marco", empresa="MB Sistemas")

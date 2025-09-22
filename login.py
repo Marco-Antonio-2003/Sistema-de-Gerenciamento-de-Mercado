@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.4.8"
+Versao = "Versão: v0.1.4.9"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
@@ -44,6 +44,7 @@ def verificar_e_aplicar_atualizacao():
         if confirm_reply == QMessageBox.No:
             return False
 
+
         # --- A MUDANÇA ESTÁ AQUI ---
         # Mostramos nosso aviso ANTES de criar e executar o script de atualização.
         aviso_box = QMessageBox()
@@ -57,7 +58,20 @@ def verificar_e_aplicar_atualizacao():
         )
         aviso_box.setStandardButtons(QMessageBox.Ok)
         aviso_box.exec_()
+   
+        # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
+        try:
+            backup_dir = os.path.join(app_dir, 'backup')
+            os.makedirs(backup_dir, exist_ok=True)
 
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            backup_filename = f'MBSistema_{timestamp}.exe'
+            backup_path = os.path.join(backup_dir, backup_filename)
+
+            shutil.copy2(current_exe, backup_path)
+            print(f'Backup do executável salvo em: {backup_path}')
+        except Exception as backup_err:
+            print(f'Falha ao criar backup do executável: {backup_err}')
 
         # O resto do código continua como antes
         updater_script_path = os.path.join(app_dir, 'updater.bat')
