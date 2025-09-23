@@ -1182,6 +1182,62 @@ def verificar_acesso_ecommerce(usuario, empresa=None):
         # Por segurança, negar acesso em caso de erro
         return False, "Erro ao verificar permissões de acesso ao e-commerce"
 
+def alterar_acesso_ecommerce(usuario_id, permitir_acesso, empresa=None):
+    """
+    Altera o acesso ao e-commerce para um usuário específico
+    
+    Args:
+        usuario_id (int): ID do usuário
+        permitir_acesso (bool): True para permitir, False para bloquear
+        empresa (str, optional): Nome da empresa (para validação adicional)
+        
+    Returns:
+        bool: True se a alteração foi bem-sucedida
+    """
+    try:
+        acesso_valor = 'S' if permitir_acesso else 'N'
+        
+        query = """
+        UPDATE USUARIOS 
+        SET ACESSO_ECOMMERCE = ?
+        WHERE ID = ?
+        """
+        params = [acesso_valor, usuario_id]
+        
+        # Validação adicional por empresa se fornecida
+        if empresa:
+            query += " AND EMPRESA = ?"
+            params.append(empresa)
+        
+        execute_query(query, tuple(params))
+        
+        acao = "habilitado" if permitir_acesso else "bloqueado"
+        print(f"Acesso ao e-commerce {acao} para usuário ID {usuario_id}")
+        return True
+        
+    except Exception as e:
+        print(f"Erro ao alterar acesso ao e-commerce: {e}")
+        return False
+
+def listar_usuarios_sem_acesso_ecommerce():
+    """
+    Lista todos os usuários que não têm acesso ao e-commerce
+    
+    Returns:
+        list: Lista de usuários bloqueados (ID, USUARIO, EMPRESA)
+    """
+    try:
+        query = """
+        SELECT ID, USUARIO, EMPRESA, ACESSO_ECOMMERCE
+        FROM USUARIOS
+        WHERE ACESSO_ECOMMERCE = 'N' OR ACESSO_ECOMMERCE IS NULL
+        ORDER BY EMPRESA, USUARIO
+        """
+        return execute_query(query)
+    except Exception as e:
+        print(f"Erro ao listar usuários sem acesso: {e}")
+        return []
+
 # Função removida: criar_usuario_padrao()
 
 def listar_usuarios():

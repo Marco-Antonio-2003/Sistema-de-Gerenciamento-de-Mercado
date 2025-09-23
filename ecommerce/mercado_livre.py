@@ -24,6 +24,7 @@ class MercadoLivreWindow(QWidget):
         self.usuario = None
         self.empresa = None
         self.id_funcionario = None
+        self.janela_principal = None  # Referência à janela principal
         self.init_ui()
         
     def set_credentials(self, usuario, empresa, id_funcionario):
@@ -34,6 +35,10 @@ class MercadoLivreWindow(QWidget):
         
         # Verificar acesso ao e-commerce após definir credenciais
         self.verificar_acesso()
+        
+    def set_janela_principal(self, janela_principal):
+        """Define a referência à janela principal"""
+        self.janela_principal = janela_principal
         
     def verificar_acesso(self):
         """Verifica se o usuário tem acesso ao módulo e-commerce"""

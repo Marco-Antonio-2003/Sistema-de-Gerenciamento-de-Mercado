@@ -756,6 +756,7 @@ class MainWindow(QMainWindow):
             ("financeiro", "conta_corrente"): "Conta corrente",
             ("financeiro", "classes_financeiras"): "Classes financeiras",
             ("relatorios", "relatorio_vendas_produtos"): "Relatório de Vendas de Produtos",
+            ("ecommerce", "mercado_livre"): "Mercado Livre - E-commerce",
             ("ferramentas", "configuracao_impressora"): "Configuração de estação",
             ("ferramentas", "configuracao_sistema"): "Configuração do Sistema"
         }
