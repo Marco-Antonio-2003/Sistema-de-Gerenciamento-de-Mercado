@@ -412,6 +412,7 @@ class MainWindow(QMainWindow):
         btn_compras = MenuButton("COMPRAS")
         btn_vendas = MenuButton("VENDAS")
         btn_financeiro = MenuButton("FINANCEIRO")
+        btn_ecommerce = MenuButton("MERCADO\nLIVRE")
         btn_relatorios = MenuButton("RELATÓRIOS")
         btn_ferramentas = MenuButton("FERRAMENTAS")
         
@@ -437,6 +438,10 @@ class MainWindow(QMainWindow):
             "Classes financeiras"
         ], self)
         
+        self.add_menu_actions_with_permission(btn_ecommerce, [
+            "Mercado Livre - E-commerce"
+        ], self)
+        
         self.add_menu_actions_with_permission(btn_relatorios, [
             "Relatório de Vendas de Produtos"
         ], self)
@@ -447,7 +452,7 @@ class MainWindow(QMainWindow):
         ], self)
         
         for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas,
-                    btn_financeiro, btn_relatorios, btn_ferramentas):
+                    btn_financeiro, btn_ecommerce, btn_relatorios, btn_ferramentas):
             menu_layout.addWidget(btn)
         main_layout.addWidget(menu_frame)
         
@@ -682,6 +687,7 @@ class MainWindow(QMainWindow):
             "Classes financeiras": os.path.join("financeiro", "classes_financeiras.py"),
             #"Fiscal NF-e, SAT, NFC-e": os.path.join("relatorios", "relatorio_fiscal.py"),
             "Relatório de Vendas de Produtos": os.path.join("relatorios", "relatorio_vendas_produtos.py"), 
+            "Mercado Livre - E-commerce": os.path.join("ecommerce", "mercado_livre.py"),
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
@@ -711,6 +717,8 @@ class MainWindow(QMainWindow):
             # RELATÓRIOS
             "Fiscal NF-e, SAT, NFC-e":      "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos":                      "RelatorioVendasWindow",
+            # E-COMMERCE
+            "Mercado Livre - E-commerce":   "MercadoLivreWindow",
             # FERRAMENTAS
             "Configuração de estação":      "ConfiguracaoImpressoraWindow",
             "Configuração do Sistema": "ConfiguracaoSistemaWindow",
@@ -1343,6 +1351,26 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Acesso Negado", 
                                f"Você não tem permissão para acessar o módulo: {action_title}")
             return
+        
+        # Verificar acesso especial para módulo de e-commerce
+        if action_title == "Mercado Livre - E-commerce":
+            from base.banco import verificar_acesso_ecommerce
+            try:
+                tem_acesso, motivo = verificar_acesso_ecommerce(self.usuario, self.empresa)
+                if not tem_acesso:
+                    QMessageBox.critical(
+                        self, 
+                        "Acesso Bloqueado", 
+                        f"Acesso ao módulo Mercado Livre negado.\n\n{motivo}\n\nEntre em contato com o administrador."
+                    )
+                    return
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Erro",
+                    f"Erro ao verificar permissões de acesso ao e-commerce:\n{str(e)}"
+                )
+                return
         
         # Tratamento especial para módulos conhecidos com problemas de importação
         special_modules = ["Fiscal NF-e, SAT, NFC-e", "Configuração de estação", "Relatório de Vendas de Produtos"]

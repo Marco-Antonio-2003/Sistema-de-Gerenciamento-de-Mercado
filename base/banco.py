@@ -1035,7 +1035,8 @@ def verificar_tabela_usuarios():
                 ID INTEGER NOT NULL PRIMARY KEY,
                 USUARIO VARCHAR(50) NOT NULL,
                 SENHA VARCHAR(200) NOT NULL,
-                EMPRESA VARCHAR(50) NOT NULL
+                EMPRESA VARCHAR(50) NOT NULL,
+                ACESSO_ECOMMERCE CHAR(1) DEFAULT 'S'
             )
             """
             execute_query(query_create)
@@ -1074,11 +1075,112 @@ def verificar_tabela_usuarios():
             return True
         else:
             print("Tabela USUARIOS já existe.")
+            # Verificar se a coluna ACESSO_ECOMMERCE existe
+            verificar_e_adicionar_campo_ecommerce()
         
         return True
     except Exception as e:
         print(f"Erro ao verificar/criar tabela: {e}")
         raise Exception(f"Erro ao verificar/criar tabela de usuários: {str(e)}")
+
+def verificar_e_adicionar_campo_ecommerce():
+    """
+    Verifica se o campo ACESSO_ECOMMERCE existe na tabela USUARIOS
+    e o adiciona se não existir
+    """
+    try:
+        # Verificar se a coluna ACESSO_ECOMMERCE existe
+        query_check_column = """
+        SELECT COUNT(*) FROM RDB$RELATION_FIELDS 
+        WHERE RDB$RELATION_NAME = 'USUARIOS' 
+        AND RDB$FIELD_NAME = 'ACESSO_ECOMMERCE'
+        """
+        result = execute_query(query_check_column)
+        
+        # Se a coluna não existe, adicionar
+        if result[0][0] == 0:
+            print("Campo ACESSO_ECOMMERCE não encontrado na tabela USUARIOS. Adicionando...")
+            query_add_column = """
+            ALTER TABLE USUARIOS 
+            ADD ACESSO_ECOMMERCE CHAR(1) DEFAULT 'S'
+            """
+            execute_query(query_add_column)
+            print("Campo ACESSO_ECOMMERCE adicionado com sucesso.")
+            
+            # Atualizar registros existentes para ter acesso por padrão
+            query_update_existing = """
+            UPDATE USUARIOS 
+            SET ACESSO_ECOMMERCE = 'S' 
+            WHERE ACESSO_ECOMMERCE IS NULL
+            """
+            execute_query(query_update_existing)
+            print("Registros existentes atualizados com acesso ao e-commerce habilitado.")
+        else:
+            print("Campo ACESSO_ECOMMERCE já existe na tabela USUARIOS.")
+            
+        return True
+    except Exception as e:
+        print(f"Erro ao verificar/adicionar campo ACESSO_ECOMMERCE: {e}")
+        # Não levantar exceção para não quebrar a inicialização do sistema
+        return False
+
+def verificar_acesso_ecommerce(usuario, empresa=None):
+    """
+    Verifica se um usuário tem acesso ao módulo de e-commerce
+    
+    Args:
+        usuario (str): Nome do usuário
+        empresa (str, optional): Nome da empresa
+        
+    Returns:
+        tuple: (bool, str) - (tem_acesso, motivo_bloqueio)
+    """
+    try:
+        where_clause = "WHERE USUARIO = ?"
+        params = [usuario]
+        
+        if empresa:
+            where_clause += " AND EMPRESA = ?"
+            params.append(empresa)
+        
+        query = f"""
+        SELECT ACESSO_ECOMMERCE, USUARIO_MASTER
+        FROM USUARIOS
+        {where_clause}
+        """
+        
+        result = execute_query(query, tuple(params))
+        
+        if not result or len(result) == 0:
+            return False, "Usuário não encontrado"
+            
+        acesso_ecommerce, usuario_master = result[0]
+        
+        # Verificar se o usuário atual tem acesso bloqueado
+        if acesso_ecommerce and acesso_ecommerce.upper() == 'N':
+            return False, "Acesso ao módulo Mercado Livre (e-commerce) está bloqueado para este usuário"
+            
+        # Se for um usuário vinculado a um master, verificar se o master tem acesso
+        if usuario_master:
+            query_master = """
+            SELECT ACESSO_ECOMMERCE
+            FROM USUARIOS
+            WHERE ID = ?
+            """
+            
+            result_master = execute_query(query_master, (usuario_master,))
+            
+            if result_master and len(result_master) > 0:
+                acesso_ecommerce_master = result_master[0][0]
+                
+                if acesso_ecommerce_master and acesso_ecommerce_master.upper() == 'N':
+                    return False, "Acesso ao módulo Mercado Livre (e-commerce) está bloqueado para a conta principal"
+        
+        return True, ""
+    except Exception as e:
+        print(f"Erro ao verificar acesso ao e-commerce: {e}")
+        # Por segurança, negar acesso em caso de erro
+        return False, "Erro ao verificar permissões de acesso ao e-commerce"
 
 # Função removida: criar_usuario_padrao()
 
