@@ -29,10 +29,17 @@ class MercadoLivreBackend:
     # (O código do backend permanece o mesmo da versão anterior, com a função get_sales_for_chart)
     def __init__(self):
         self.base_url = "https://api.mercadolibre.com"; self.redirect_uri = "https://callbackmbsistema.netlify.app/"; self.config = {}; self.session = requests.Session(); self.session.proxies = {'http': None, 'https': None}
-        if getattr(sys, 'frozen', False): application_path = os.path.dirname(sys.executable)
-        else: application_path = os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, 'frozen', False):
+            application_path = os.path.dirname(sys.executable)
+        else:
+            application_path = os.path.dirname(os.path.abspath(__file__))
         db_full_path = os.path.join(application_path, 'base', 'banco', 'MBDATA_NOVO.FDB')
-        self.DB_CONFIG = {'dsn': f'localhost:{db_full_path}', 'user': 'SYSDBA', 'password': 'masterkey'}; self._load_config()
+        # Verificação adicional
+        if not os.path.exists(db_full_path):
+            print(f"Erro: O arquivo de banco de dados não foi encontrado em {db_full_path}")
+            db_full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'base', 'banco', 'MBDATA_NOVO.FDB'))
+        self.DB_CONFIG = {'dsn': f'localhost:{db_full_path}', 'user': 'SYSDBA', 'password': 'masterkey'}
+        
     def logout(self):
         try:
             con = fdb.connect(**self.DB_CONFIG); cur = con.cursor()

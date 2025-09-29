@@ -445,7 +445,7 @@ class MainWindow(QMainWindow):
         return button
 
     def update_favorites_display(self):
-        """Limpa e recria os botões de favoritos na tela."""
+        """Limpa e recria os botões de favoritos na tela, filtrando por permissões."""
         # Limpa layout antigo
         while self.favorites_layout.count():
             child = self.favorites_layout.takeAt(0)
@@ -455,45 +455,41 @@ class MainWindow(QMainWindow):
         # Adiciona um espaçador no início
         self.favorites_layout.addStretch()
 
-        # Cria botões para os favoritos atuais
-        for favorite in sorted(self.favorites):
+        # --- MODIFICADO: Re-filtra os favoritos antes de exibir ---
+        favoritos_filtrados = self.filtrar_favoritos_com_permissao(self.favorites)
+        
+        # Se houve mudanças na lista de favoritos (alguns foram removidos), salva a nova lista
+        if len(favoritos_filtrados) != len(self.favorites):
+            self.favorites = favoritos_filtrados
+            self.save_favorites()
+
+        # Cria botões para os favoritos filtrados
+        for favorite in sorted(favoritos_filtrados):
             button = self.create_favorite_button(favorite)
             self.favorites_layout.addWidget(button)
-
-        # # Cria e adiciona o botão de gerenciar
-        # self.btn_gerenciar_favoritos = QPushButton("+")
-        # self.btn_gerenciar_favoritos.setFixedSize(45, 45)
-        # self.btn_gerenciar_favoritos.setToolTip("Adicionar ou remover favoritos")
-        # self.btn_gerenciar_favoritos.setCursor(QCursor(Qt.PointingHandCursor))
-        # self.btn_gerenciar_favoritos.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: rgba(255, 255, 255, 0.2);
-        #         color: white;
-        #         border: 1px solid rgba(255, 255, 255, 0.4);
-        #         border-radius: 22px;
-        #         font-size: 24px;
-        #     }
-        #     QPushButton:hover { background-color: rgba(255, 255, 255, 0.3); }
-        # """)
-        # self.btn_gerenciar_favoritos.clicked.connect(self.abrir_seletor_favoritos)
-        # self.favorites_layout.addWidget(self.btn_gerenciar_favoritos)
-
-        # Adiciona um espaçador no final
         self.favorites_layout.addStretch()
 
     def abrir_seletor_favoritos(self):
         """Abre a janela para o usuário selecionar seus módulos favoritos."""
         try:
-            # --- CORREÇÃO AQUI ---
-            # Importa a classe do novo arquivo 'favoritos.py' dentro da pasta 'ferramentas'
+            # --- CORREÇÃO AQUI: Usando 'self.id_usuario' que é o nome correto ---
+            # Verifica se a informação do usuário logado existe.
+            if not hasattr(self, 'id_usuario') or self.id_usuario is None:
+                QMessageBox.critical(self, "Erro de Autenticação", 
+                                    "Não foi possível identificar o ID do usuário logado. Por favor, reinicie o sistema.")
+                return
+
+            # Importa a classe do arquivo 'favoritos.py'
             from ferramentas.favoritos import SeletorModulosEstilizado
             
             # Pega todos os módulos que podem ser abertos
             modulos_disponiveis = self.action_to_py_file.keys()
             
+            # --- CORREÇÃO AQUI: Passando a variável correta para o seletor ---
             seletor = SeletorModulosEstilizado(
                 modulos_disponiveis=modulos_disponiveis, 
                 favoritos_atuais=self.favorites,
+                usuario_id=self.id_usuario,  
                 parent=self
             )
             
@@ -503,22 +499,96 @@ class MainWindow(QMainWindow):
                 self.update_favorites_display()
                 
         except ImportError:
-            # --- CORREÇÃO AQUI ---
-            # Atualiza a mensagem de erro para refletir o novo nome do arquivo
-            QMessageBox.warning(self, "Erro", "O arquivo 'ferramentas/favoritos.py' não foi encontrado ou contém erros.")
+            QMessageBox.warning(self, "Erro de Importação", "O arquivo 'ferramentas/favoritos.py' não foi encontrado ou contém erros.")
         except Exception as e:
             QMessageBox.critical(self, "Erro Inesperado", f"Ocorreu um erro ao abrir o seletor de favoritos:\n{e}")
+
+
     def load_favorites(self):
-        """Carrega a lista de favoritos do arquivo JSON."""
+        """Carrega a lista de favoritos do arquivo JSON, filtrando por permissões."""
         favorites_file = self.get_favorites_file()
         if not os.path.exists(favorites_file):
-            return [] # Retorna lista vazia se o arquivo não existe
+            return []  # Retorna lista vazia se o arquivo não existe
         try:
             with open(favorites_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                favoritos_salvos = json.load(f)
+            
+            # --- NOVO: Filtra os favoritos baseado nas permissões do usuário ---
+            return self.filtrar_favoritos_com_permissao(favoritos_salvos)
         except (json.JSONDecodeError, Exception) as e:
             print(f"Erro ao carregar favoritos: {e}")
-            return [] # Retorna lista vazia em caso de erro
+            return []  # Retorna lista vazia em caso de erro
+        
+    def filtrar_favoritos_com_permissao(self, favoritos_lista):
+        """
+        Filtra uma lista de favoritos, removendo aqueles para os quais
+        o usuário não tem permissão.
+        """
+        # --- NOVO: Lista de módulos que exigem permissão especial ---
+        modulos_com_restricao = {
+            "Ver Dashboard do Mercado livre": "ACESSO_ECOMMERCE",
+            "Dashboard Mercado Livre": "ACESSO_ECOMMERCE"
+        }
+        
+        favoritos_permitidos = []
+        
+        for modulo in favoritos_lista:
+            # Se o módulo não tem restrição, permite
+            if modulo not in modulos_com_restricao:
+                favoritos_permitidos.append(modulo)
+                continue
+            
+            # Se tem restrição, verifica a permissão
+            campo_permissao = modulos_com_restricao[modulo]
+            
+            if self.verificar_permissao_especifica(campo_permissao):
+                favoritos_permitidos.append(modulo)
+            else:
+                print(f"Módulo '{modulo}' removido dos favoritos: sem permissão de acesso.")
+        
+        return favoritos_permitidos
+    
+    def verificar_permissao_especifica(self, campo_permissao):
+        """
+        Verifica se o usuário tem uma permissão específica no banco de dados.
+        
+        Args:
+            campo_permissao (str): Nome do campo de permissão no banco (ex: "ACESSO_ECOMMERCE")
+        
+        Returns:
+            bool: True se tem permissão, False caso contrário
+        """
+        if not self.id_usuario:
+            return False  # Se não houver ID de usuário, nega por segurança
+
+        try:
+            from base.banco import execute_query
+            
+            # 1. Descobrir se o usuário é master ou funcionário
+            query_user_info = f"SELECT USUARIO_MASTER FROM USUARIOS WHERE ID = {self.id_usuario}"
+            result = execute_query(query_user_info)
+            
+            if not result or not result[0]:
+                print(f"Aviso: Usuário com ID {self.id_usuario} não encontrado no banco.")
+                return False
+
+            usuario_master_id = result[0][0]
+            
+            # Se o usuário não tem um mestre (é NULL), ele é o próprio mestre.
+            id_para_verificar = usuario_master_id if usuario_master_id is not None else self.id_usuario
+
+            # 2. Verificar a permissão específica do usuário mestre
+            query_permissao = f"SELECT {campo_permissao} FROM USUARIOS WHERE ID = {id_para_verificar}"
+            permissao_result = execute_query(query_permissao)
+
+            if permissao_result and permissao_result[0] and permissao_result[0][0] == 'S':
+                return True  # Acesso permitido
+            else:
+                return False  # Acesso negado
+
+        except Exception as e:
+            print(f"Erro ao verificar permissão {campo_permissao}: {e}")
+            return False  # Em caso de erro, nega o acesso por segurança
 
     def save_favorites(self):
         """Salva a lista atual de favoritos no arquivo JSON."""
@@ -1120,7 +1190,7 @@ class MainWindow(QMainWindow):
         self.botao_whatsapp = QPushButton(self)
         self.btn_assistente = QPushButton("💬", self)
         self.pdv_button = QPushButton("Acesso ao\nPDV", self)
-        self.logout_button = QPushButton("Deslogar", self)
+        self.logout_button = QPushButton("Sair do Sistema", self)
        
         # Configuração do Botão WhatsApp
         whatsapp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ico-img", "whatsapp2.png")
@@ -1323,19 +1393,52 @@ class MainWindow(QMainWindow):
         # Chama as funções de posicionamento
         self.posicionar_botoes_fixos()
         self.posicionar_botoes_flutuantes()
+
     # --- Demais Métodos da Classe (sem alterações) ---
     def handle_logout(self):
         msg_box = QMessageBox()
-        msg_box.setWindowTitle('Confirmação de Logout')
-        msg_box.setText('Você tem certeza que deseja deslogar?')
-        msg_box.setInformativeText('Isso fechará a tela principal e voltará para a tela de login.')
+        msg_box.setWindowTitle('Confirmação')
+        msg_box.setText('Você tem certeza que deseja sair?')
+        msg_box.setInformativeText('Isso fechará o sistema por completo!.')
         msg_box.setIcon(QMessageBox.Question)
         msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         btn_sim = msg_box.button(QMessageBox.Yes); btn_sim.setText('Sim')
         btn_nao = msg_box.button(QMessageBox.No); btn_nao.setText('Não')
         msg_box.setDefaultButton(btn_nao)
+        self.aplicar_estilo_aviso(msg_box)
+        
         resposta = msg_box.exec_()
         if resposta == QMessageBox.Yes:
+            # Primeiro, fechar todas as janelas abertas
+            for window in self.opened_windows[:]:  # Cria uma cópia da lista para evitar problemas durante iteração
+                if window and window.isVisible():
+                    try:
+                        print(f"Fechando janela: {window.windowTitle()}")
+                        window.close()
+                    except Exception as e:
+                        print(f"Erro ao fechar janela: {e}")
+            
+            # Limpar a lista de janelas abertas
+            self.opened_windows.clear()
+            
+            # Parar todos os timers ativos
+            if hasattr(self, 'timer_atualizacao'): 
+                self.timer_atualizacao.stop()
+            if hasattr(self, 'timer_syncthing'): 
+                self.timer_syncthing.stop()
+            if hasattr(self, 'vendas_timer_ml'): 
+                self.vendas_timer_ml.stop()
+            if hasattr(self, 'vendas_timer'): 
+                self.vendas_timer.stop()
+                
+            # Fechar o syncthing se necessário
+            try:
+                from base.banco import fechar_syncthing
+                fechar_syncthing()
+            except Exception as e:
+                print(f"Erro ao encerrar Syncthing: {e}")
+                
+            # Agora que todas as janelas filhas foram fechadas, emitir o sinal e fechar a janela principal
             self.logout_signal.emit()
             self.close()
    
@@ -1680,66 +1783,201 @@ class MainWindow(QMainWindow):
             spec = importlib.util.spec_from_file_location("mod", module_path); module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module); return getattr(module, class_name, None)
         except Exception as e: print(f"Erro ao carregar dinamicamente {module_path}: {e}"); return None
+
     def menu_action_triggered(self, action_title):
+        # --- NOVO: Verificação adicional para módulos com restrição especial ---
+        modulos_com_restricao = {
+            "Ver Dashboard do Mercado livre": "ACESSO_ECOMMERCE",
+            "Dashboard Mercado Livre": "ACESSO_ECOMMERCE"
+        }
+        
+        # Verifica se é um módulo com restrição especial
+        if action_title in modulos_com_restricao:
+            campo_permissao = modulos_com_restricao[action_title]
+            if not self.verificar_permissao_especifica(campo_permissao):
+                QMessageBox.warning(self, "Acesso Bloqueado", 
+                                f"Seu usuário não tem permissão para acessar: {action_title}.\n\n"
+                                "Entre em contato com o administrador da sua empresa para liberar o acesso.")
+                return    
+
         # --- NOVO: Verificação para o caso especial dos favoritos ---
         if action_title == "Adicionar Favoritos":
             self.abrir_seletor_favoritos()
-            return # Interrompe a execução para não usar o código genérico abaixo
+            return
 
         # O resto do método continua como antes...
         if not self.verificar_permissao(action_title) and self.id_funcionario:
             QMessageBox.warning(self, "Acesso Negado", f"Você não tem permissão para acessar o módulo: {action_title}")
             return
-       
-        self.opened_windows = [w for w in self.opened_windows if w.isVisible()]
+    
+        # MELHORIA: Limpar janelas inválidas da lista antes de verificar
+        self.opened_windows = [w for w in self.opened_windows if w and w.isVisible()]
+        
+        # Verifica se a janela já está aberta
         for w in self.opened_windows:
-            if w.windowTitle() == action_title:
-                w.setWindowState(w.windowState() & ~Qt.WindowMinimized); w.activateWindow(); return
-       
-        if action_title not in self.action_to_py_file: return
-       
+            try:
+                if hasattr(w, 'windowTitle') and w.windowTitle() == action_title:
+                    w.setWindowState(w.windowState() & ~Qt.WindowMinimized)
+                    w.activateWindow()
+                    w.raise_()  # Traz para frente
+                    return
+            except Exception as e:
+                print(f"Erro ao verificar janela: {e}")
+    
+        if action_title not in self.action_to_py_file:
+            print(f"Ação '{action_title}' não encontrada no mapeamento")
+            return
+    
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.action_to_py_file[action_title])
-        if not os.path.exists(path): return
-           
+        if not os.path.exists(path):
+            QMessageBox.warning(self, "Erro", f"Arquivo não encontrado: {path}")
+            return
+        
         cls_name = self.action_to_class.get(action_title, ''.join(c for c in self.normalize_text(action_title) if c.isalnum()) + "Window")
-           
+        
         try:
+            print(f"Tentando abrir: {action_title} -> {path} -> {cls_name}")
+            
             spec = importlib.util.spec_from_file_location(cls_name, path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             WindowClass = getattr(module, cls_name, None)
-            if not WindowClass: raise ImportError(f"Classe {cls_name} não encontrada")
-               
-            win = WindowClass() # <-- O problema estava aqui para os favoritos
-            if hasattr(win, 'set_janela_principal'): win.set_janela_principal(self)
-            if hasattr(win, 'set_credentials'): win.set_credentials(self.usuario, self.empresa, self.id_funcionario)
+            
+            if not WindowClass:
+                raise ImportError(f"Classe {cls_name} não encontrada no módulo")
+            
+            # Cria a instância da janela
+            win = WindowClass()
+            
+            # Configura a janela
+            if hasattr(win, 'set_janela_principal'):
+                win.set_janela_principal(self)
+            if hasattr(win, 'set_credentials'):
+                win.set_credentials(self.usuario, self.empresa, self.id_funcionario)
+            
             win.setWindowTitle(action_title)
-            win.show()
-           
+            
+            # MELHORIA: Conecta o evento de fechamento ANTES de mostrar a janela
             original_close_event = getattr(win, 'closeEvent', None)
             def novo_close_event(event):
-                if original_close_event: original_close_event(event)
-                self.atualizar_contadores()
+                try:
+                    # Remove da lista de janelas abertas ao fechar
+                    if win in self.opened_windows:
+                        self.opened_windows.remove(win)
+                        print(f"Janela '{action_title}' removida da lista de janelas abertas")
+                    
+                    # Chama o evento original se existir
+                    if original_close_event:
+                        original_close_event(event)
+                    
+                    # Atualiza contadores após fechar
+                    self.atualizar_contadores()
+                    
+                except Exception as e:
+                    print(f"Erro no closeEvent personalizado: {e}")
+                    if original_close_event:
+                        original_close_event(event)
+            
             win.closeEvent = novo_close_event
+            
+            # Adiciona à lista de janelas abertas ANTES de mostrar
             self.opened_windows.append(win)
+            print(f"Janela '{action_title}' adicionada à lista. Total de janelas: {len(self.opened_windows)}")
+            
+            # Mostra a janela
+            win.show()
+            win.raise_()
+            win.activateWindow()
+            
         except Exception as e:
-            # A mensagem de erro agora mostrará o erro de argumentos que você viu
-            QMessageBox.warning(self, "Erro de Módulo", f"Não foi possível abrir a janela '{action_title}':\n{e}")
+            error_msg = f"Não foi possível abrir a janela '{action_title}':\n{str(e)}"
+            print(f"ERRO: {error_msg}")
+            QMessageBox.warning(self, "Erro de Módulo", error_msg)
+
     def closeEvent(self, event):
+        print("Iniciando processo de fechamento da aplicação...")
+        
         try:
-            for window in self.opened_windows:
-                if window and window.isVisible() and window.windowTitle() != "PDV - Ponto de Venda":
-                    window.close()
-           
-            self.opened_windows = [w for w in self.opened_windows if w and w.isVisible() and w.windowTitle() == "PDV - Ponto de Venda"]
-           
-            if hasattr(self, 'timer_atualizacao'): self.timer_atualizacao.stop()
-            if hasattr(self, 'timer_syncthing'): self.timer_syncthing.stop()
-           
-            try: from base.banco import fechar_syncthing; fechar_syncthing()
-            except Exception as e: print(f"Erro ao encerrar Syncthing: {e}")
-        except Exception as e: print(f"Erro no closeEvent: {e}")
+            # 1. FECHAR TODAS AS JANELAS FILHAS PRIMEIRO
+            # Pega todas as janelas filhas da aplicação
+            all_widgets = QApplication.allWidgets()
+            janelas_para_fechar = []
+            
+            for widget in all_widgets:
+                # Verifica se é uma janela (não é a principal) e está visível
+                if (isinstance(widget, (QMainWindow, QDialog, QWidget)) and 
+                    widget != self and 
+                    widget.isWindow() and 
+                    widget.isVisible() and
+                    hasattr(widget, 'windowTitle')):
+                    
+                    janelas_para_fechar.append(widget)
+                    print(f"Janela encontrada para fechar: {widget.windowTitle()}")
+            
+            # Fecha todas as janelas encontradas
+            for janela in janelas_para_fechar:
+                try:
+                    print(f"Fechando janela: {janela.windowTitle()}")
+                    janela.close()
+                    QApplication.processEvents()  # Processa eventos pendentes
+                except Exception as e:
+                    print(f"Erro ao fechar janela {janela}: {e}")
+            
+            # 2. FECHAR JANELAS DA LISTA DE CONTROLE
+            if hasattr(self, 'opened_windows'):
+                print(f"Fechando {len(self.opened_windows)} janelas da lista de controle...")
+                for window in self.opened_windows[:]:  # Cria uma cópia da lista
+                    if window and hasattr(window, 'close'):
+                        try:
+                            if window.isVisible():
+                                print(f"Fechando janela da lista: {getattr(window, 'windowTitle', lambda: 'Sem título')()}")
+                                window.close()
+                            QApplication.processEvents()
+                        except Exception as e:
+                            print(f"Erro ao fechar janela da lista: {e}")
+                
+                # Limpa a lista
+                self.opened_windows.clear()
+            
+            # 3. PARAR TODOS OS TIMERS ATIVOS
+            timers_para_parar = ['timer_atualizacao', 'timer_syncthing', 'vendas_timer_ml', 'vendas_timer']
+            for timer_name in timers_para_parar:
+                if hasattr(self, timer_name):
+                    timer = getattr(self, timer_name)
+                    if timer and hasattr(timer, 'stop'):
+                        try:
+                            timer.stop()
+                            print(f"Timer {timer_name} parado")
+                        except Exception as e:
+                            print(f"Erro ao parar timer {timer_name}: {e}")
+            
+            # 4. FECHAR DOCK DO ASSISTENTE
+            if hasattr(self, 'chatbot_dock'):
+                try:
+                    self.chatbot_dock.close()
+                    print("Dock do assistente fechado")
+                except Exception as e:
+                    print(f"Erro ao fechar dock do assistente: {e}")
+            
+            # 5. FECHAR SYNCTHING
+            try:
+                from base.banco import fechar_syncthing
+                fechar_syncthing()
+                print("Syncthing encerrado")
+            except Exception as e:
+                print(f"Erro ao encerrar Syncthing: {e}")
+            
+            # 6. PROCESSAR EVENTOS FINAIS
+            QApplication.processEvents()
+            
+            print("Processo de fechamento concluído com sucesso")
+            
+        except Exception as e:
+            print(f"Erro no closeEvent: {e}")
+        
+        # Aceita o evento de fechamento
         event.accept()
+
 if __name__ == "__main__":
     import ctypes
     try:

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
@@ -20,6 +19,54 @@ except ImportError:
     # Caso o módulo não esteja no path, tentamos adicionar o diretório pai
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import base.banco as banco
+
+# --- NOVO: Variável global para armazenar o status de acesso ---
+# Esta variável guardará 'S' ou 'N' após o login bem-sucedido.
+ACESSO_ECOMMERCE_PERMITIDO = None
+
+def verificar_permissao_ecommerce_login(usuario_id):
+    """
+    Verifica a permissão de acesso ao e-commerce durante o login.
+    Esta função deve ser chamada APÓS o login ser validado.
+
+    Ela verifica se o usuário logado (ou seu mestre) tem a flag
+    'ACESSO_ECOMMERCE' como 'S'. O resultado é armazenado na variável
+    global ACESSO_ECOMMERCE_PERMITIDO.
+
+    Args:
+        usuario_id (int): O ID do usuário que acabou de fazer login.
+    """
+    global ACESSO_ECOMMERCE_PERMITIDO
+    try:
+        from base.banco import execute_query
+        # Primeiro, descobrimos se o usuário é master ou funcionário
+        query_user_info = f"SELECT USUARIO_MASTER FROM USUARIOS WHERE ID = {usuario_id}"
+        result = execute_query(query_user_info)
+
+        if not result or not result[0]:
+            raise Exception("Usuário não encontrado.")
+
+        usuario_master_id = result[0][0]
+
+        # Se o usuário não tem um mestre, ele é o próprio mestre.
+        id_para_verificar = usuario_master_id if usuario_master_id is not None else usuario_id
+
+        # Agora, verificamos a permissão do usuário mestre
+        query_permissao = f"SELECT ACESSO_ECOMMERCE FROM USUARIOS WHERE ID = {id_para_verificar}"
+        permissao_result = execute_query(query_permissao)
+
+        if permissao_result and permissao_result[0]:
+            # Armazena 'S' ou 'N' na variável global
+            ACESSO_ECOMMERCE_PERMITIDO = permissao_result[0][0]
+        else:
+            # Padrão é não permitir se houver algum erro ou o campo for nulo
+            ACESSO_ECOMMERCE_PERMITIDO = 'N'
+
+    except Exception as e:
+        print(f"Erro ao verificar permissão de e-commerce: {e}")
+        # Em caso de qualquer erro, o acesso é negado por segurança.
+        ACESSO_ECOMMERCE_PERMITIDO = 'N'
+
 
 class CriarUsuarioApp:
     """
@@ -210,13 +257,12 @@ class CriarUsuarioApp:
             variable=self.usuario_master_var,
             font=self.label_font,
             bg="#f0f0f0",
-            command=self.toggle_master_fields # <-- CORREÇÃO: Chamar a função com o nome novo
+            command=self.toggle_master_fields
         )
         self.usuario_master_check.grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
-        self.usuario_master_check.config(command=self.toggle_master_fields)
         row += 1
 
-        # <<< ADICIONE ESTE NOVO CHECKBOX AQUI >>>
+        # Checkbox para acesso ao E-commerce
         self.acesso_ecommerce_var = tk.BooleanVar()
         self.acesso_ecommerce_check = tk.Checkbutton(
             form_frame,
@@ -396,7 +442,6 @@ class CriarUsuarioApp:
         yscrollbar.pack(side="right", fill="y")
         xscrollbar.pack(side="bottom", fill="x")
         
-        # --- CORREÇÃO AQUI: Criar o action_frame ANTES de usá-lo ---
         # Frame para botões de ação, posicionado ABAIXO da tabela
         action_frame = tk.Frame(main_frame, bg="#f0f0f0", pady=10)
         action_frame.pack(fill="x")
@@ -440,7 +485,7 @@ class CriarUsuarioApp:
         )
         self.renovar_button.pack(side=tk.LEFT, padx=10)
 
-        # Adicionando o NOVO botão ao action_frame que agora existe
+        # Botão para gerenciar o acesso ao E-commerce
         self.gerenciar_ecommerce_button = tk.Button(
             action_frame,
             text="Gerenciar E-commerce",
@@ -1019,34 +1064,34 @@ class CriarUsuarioApp:
         """Verifica se os campos adicionais existem na tabela de usuários"""
         try:
             # Verificar se os campos necessários existem
-            query = """
-            SELECT COUNT(*) FROM RDB$RELATION_FIELDS 
-            WHERE RDB$RELATION_NAME = 'USUARIOS' 
-            AND RDB$FIELD_NAME = 'BLOQUEADO'
-            """
             from base.banco import execute_query
-            result = execute_query(query)
             
-            # Se o campo não existe, adicionar os campos necessários
-            if result[0][0] == 0:
-                self.status_var.set("Adicionando campos necessários à tabela de usuários...")
-                
-                # Adicionar campos
-                queries = [
-                    "ALTER TABLE USUARIOS ADD BLOQUEADO CHAR(1) DEFAULT 'N'",
-                    "ALTER TABLE USUARIOS ADD DATA_BLOQUEIO DATE",
-                    "ALTER TABLE USUARIOS ADD MOTIVO_BLOQUEIO VARCHAR(100)",
-                    "ALTER TABLE USUARIOS ADD USUARIO_MASTER INTEGER",
-                    "ALTER TABLE USUARIOS ADD DATA_EXPIRACAO DATE"
-                ]
-                
-                for query in queries:
-                    execute_query(query)
-                
-                self.status_var.set("Campos adicionados com sucesso.")
+            # Lista de campos a verificar e adicionar
+            campos = {
+                'BLOQUEADO': "ALTER TABLE USUARIOS ADD BLOQUEADO CHAR(1) DEFAULT 'N'",
+                'DATA_BLOQUEIO': "ALTER TABLE USUARIOS ADD DATA_BLOQUEIO DATE",
+                'MOTIVO_BLOQUEIO': "ALTER TABLE USUARIOS ADD MOTIVO_BLOQUEIO VARCHAR(100)",
+                'USUARIO_MASTER': "ALTER TABLE USUARIOS ADD USUARIO_MASTER INTEGER",
+                'DATA_EXPIRACAO': "ALTER TABLE USUARIOS ADD DATA_EXPIRACAO DATE",
+                'ACESSO_ECOMMERCE': "ALTER TABLE USUARIOS ADD ACESSO_ECOMMERCE CHAR(1) DEFAULT 'N'"
+            }
+
+            for campo, query_add in campos.items():
+                query_check = f"""
+                SELECT COUNT(*) FROM RDB$RELATION_FIELDS 
+                WHERE RDB$RELATION_NAME = 'USUARIOS' 
+                AND RDB$FIELD_NAME = '{campo}'
+                """
+                result = execute_query(query_check)
+                if result[0][0] == 0:
+                    self.status_var.set(f"Adicionando campo '{campo}' à tabela de usuários...")
+                    self.root.update_idletasks()
+                    execute_query(query_add)
+                    self.status_var.set(f"Campo '{campo}' adicionado com sucesso.")
+
         except Exception as e:
             messagebox.showerror("Erro", 
-                              f"Falha ao verificar campos da tabela: {str(e)}")
+                              f"Falha ao verificar/adicionar campos da tabela: {str(e)}")
             self.status_var.set(f"Erro: {str(e)}")
     
     def toggle_senha_visibility(self):
@@ -1093,7 +1138,8 @@ class CriarUsuarioApp:
         self.conf_senha_var.set("")
         self.empresa_var.set("")
         self.usuario_master_var.set(False)
-        self.mensalidade_frame.grid_remove()
+        self.acesso_ecommerce_var.set(False)
+        self.toggle_master_fields()
         self.meses_var.set("1")
         self.atualizar_data_expiracao()
         self.usuario_entry.focus_set()
@@ -1108,7 +1154,6 @@ class CriarUsuarioApp:
         conf_senha = self.conf_senha_var.get().strip()
         empresa = self.empresa_var.get().strip()
 
-        # ... (após pegar os dados do formulário)
         acesso_ecommerce_val = 'S' if self.acesso_ecommerce_var.get() else 'N'
         
         # Verificar se é usuário master

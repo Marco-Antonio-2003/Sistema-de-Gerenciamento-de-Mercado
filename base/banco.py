@@ -1,5 +1,6 @@
 # Arquivo: base/banco.py
 # --- IMPORTS PADRÃO E DE OTIMIZAÇÃO ---
+import json
 import os
 import sys
 import fdb
@@ -29,7 +30,30 @@ usuario_logado = {
     "nome": None,
     "empresa": None
 }
-
+def carregar_config(caminho_config='config.json'):
+    """Carrega o arquivo de configuração JSON para o banco."""
+    # DEBUG: Print do caminho base e absoluto do config
+    base_path = get_base_path()
+    abs_config_path = os.path.abspath(caminho_config)
+    print(f"🔍 DEBUG: Caminho base da app: {base_path}")
+    print(f"🔍 DEBUG: Procurando config.json em: {abs_config_path}")
+    print(f"🔍 DEBUG: Arquivo existe? {os.path.exists(abs_config_path)}")
+    
+    try:
+        with open(caminho_config, 'r', encoding='utf-8') as f:
+            config = json.load(f)['database']
+            print(f"✅ Configuração carregada de {caminho_config}: host={config.get('host', 'localhost')}, path={config.get('database_path', 'N/A')}")
+            return config
+    except FileNotFoundError as e:
+        print(f"❌ DEBUG: Arquivo não encontrado: {e}. Usando fallback local.")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"❌ DEBUG: JSON inválido: {e}. Usando fallback local.")
+        return None
+    except Exception as e:
+        print(f"❌ DEBUG: Erro inesperado no config: {e}. Usando fallback local.")
+        return None
+    
 # --- FUNÇÕES DE CAMINHO E CONFIGURAÇÃO ---
 def get_base_path():
     """Retorna o caminho base da aplicação, seja em modo dev ou compilado."""
@@ -40,38 +64,47 @@ def get_base_path():
 def get_db_path():
     """Determina o caminho do banco de dados MBDATA_NOVO.FDB de forma robusta."""
     base_dir = get_base_path()
-    # Caminho principal (estrutura padrão)
     db_path = os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB")
     if os.path.isfile(db_path):
         return db_path
-
-    # Caminho alternativo (caso a estrutura do executável seja diferente)
     alt_db_path = os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB")
     if os.path.isfile(alt_db_path):
         return alt_db_path
-    
-    # Se ainda não encontrou, assume o caminho principal e avisa
     print(f"AVISO: Banco de dados não encontrado. Tentando usar o caminho padrão: {db_path}")
     db_dir = os.path.dirname(db_path)
     if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"Diretório criado: {db_dir}")
-        except Exception as e:
-            print(f"Erro ao criar diretório do banco: {e}")
+        os.makedirs(db_dir, exist_ok=True)
+        print(f"Diretório criado: {db_dir}")
     return db_path
 
-# Configurações do banco (carregadas dinamicamente)
-DB_PATH = get_db_path()
-DB_USER = "SYSDBA"
-DB_PASSWORD = "masterkey"
-DB_HOST = "localhost"
-DB_PORT = 3050
+# Carrega config do JSON (prioriza config; fallback para valores default se arquivo ausente)
+config_db = carregar_config()
+if config_db:
+    DB_HOST = config_db.get('host', 'localhost')
+    DB_PORT = config_db.get('port', 3050)
+    DB_PATH = config_db.get('database_path', None)  # Prioriza config; None temporário se fallback
+    DB_USER = config_db.get('user', 'SYSDBA')
+    DB_PASSWORD = config_db.get('password', 'masterkey')
+    print(f"✅ DEBUG: Usando config remoto: host={DB_HOST}, path={DB_PATH}")
+else:
+    # Fallback hardcode se config falhar
+    DB_PATH = None  # Placeholder; será setado abaixo
+    DB_USER = "SYSDBA"
+    DB_PASSWORD = "masterkey"
+    DB_HOST = "localhost"
+    DB_PORT = 3050
+    print(f"⚠️  DEBUG: Fallback para LOCAL: host={DB_HOST}")
 
-# --- OTIMIZAÇÃO: POOL DE CONEXÕES COM SQLAlchemy (O CORAÇÃO DA MELHORIA) ---
+# Agora setamos DB_PATH final (usa get_db_path() só se necessário, após vars prontas)
+if DB_PATH is None:
+    DB_PATH = get_db_path()  # Chama local só se config não deu path
+print(f"Config final do banco: host={DB_HOST}, port={DB_PORT}, path={DB_PATH}")
+
+# --- OTIMIZAÇÃO: POOL DE CONEXÕES COM SQLAlchemy ---
 engine = None
 DATABASE_URL = None
 try:
+    # Monta URL com valores do config
     DATABASE_URL = f"firebird+fdb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_PATH}?charset=UTF8"
     engine = create_engine(
         DATABASE_URL,
@@ -81,10 +114,10 @@ try:
         pool_recycle=3600,
         echo=False
     )
-    with engine.connect() as conn: # Testa a conexão inicial
+    with engine.connect() as conn:  # Testa a conexão inicial
         print("✅ Pool de conexões com o banco de dados inicializado com sucesso.")
 except Exception as e:
-    print(f"❌ ERRO CRÍTICO: Não foi possível criar o pool de conexões. {e}")
+    print(f"❌ ERRO CRÍTICO: Não foi possível criar o pool de conexões. Verifique config.json e rede. {e}")
     engine = None
 
 # --- UTILITÁRIOS: GARANTIR EXISTÊNCIA DA TABELA CAIXA ---
@@ -155,33 +188,42 @@ def _ensure_caixa_table():
         print(f"❌ Erro crítico ao conectar ao banco para garantir a tabela CAIXA: {e}")
 
 # --- OTIMIZAÇÃO: NOVA FUNÇÃO execute_query (ACEITA MAPPINGS E SEQUÊNCIAS) ---
-def execute_query(query: str, params=None, commit=True):
+def execute_query(query: str, params=None, commit=True, verificar_sync=True):
     """
-    Executa uma query no banco de dados usando o pool de conexões.
-    Params pode ser:
-      - um dict com parâmetros nomeados (':nome' no SQL)
-      - uma tupla/lista de parâmetros posicionais
-      - None
-    Retorna lista de rows (list of sqlalchemy Row) ou [].
+    Executa uma query no banco de dados com suporte a sincronização
     """
-    if not engine:
-        raise ConnectionError("A conexão com o banco de dados não foi estabelecida.")
-
-    with engine.connect() as connection:
-        trans = connection.begin()
-        try:
-            # params pode ser dict ou sequência; text() aceita ambos
-            result_proxy = connection.execute(text(query), params or {})
-            result = result_proxy.fetchall() if result_proxy.returns_rows else []
-            if commit:
-                trans.commit()
-            else:
-                trans.rollback()
-            return result
-        except Exception as e:
-            trans.rollback()
-            print(f"❌ ERRO na execução da query:\nSQL: {query}\nParams: {params}\nErro: {e}")
-            raise
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection(verificar_sync=verificar_sync)  # Usa a nova, com config
+        cursor = conn.cursor()
+        
+        if params:
+            print(f"Executando query com parâmetros: {params}")
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+            
+        # Se for um SELECT, retorna os resultados
+        if query.strip().upper().startswith("SELECT"):
+            results = cursor.fetchall()
+            return results
+        
+        # Se precisar fazer commit
+        if commit:
+            conn.commit()
+            
+        return True
+    except Exception as e:
+        if conn and commit:
+            conn.rollback()
+        print(f"Erro na execução da query: {str(e)}")
+        raise Exception(f"Erro ao executar query: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 # --- HELPERS PRÁTICOS PARA MÓDULO CAIXA ---
 def fetch_caixas(codigo=None, usuario=None, inicio=None, fim=None, limit=1000):
@@ -343,7 +385,7 @@ def limpar_arquivos_conflito():
         print("Verificando arquivos de conflito e temporários...")
         
         # Obter o diretório do banco de dados
-        banco_dir = os.path.dirname(get_db_path())
+        banco_dir = os.path.dirname(get_db_path_safe())
         
         # Padrões de arquivos para remover
         padroes = [
@@ -453,7 +495,7 @@ def controlar_sincronizacao():
         
         # O Syncthing fará a sincronização por conta própria
         # Vamos apenas garantir que o arquivo seja "tocado" para ser detectado
-        caminho_banco = get_db_path()
+        caminho_banco = get_db_path_safe()
         os.utime(caminho_banco, None)
         
         # Atualizar timestamp da última sincronização
@@ -483,7 +525,7 @@ def sincronizar_ao_encerrar():
     if verificar_conectividade() and not banco_em_uso():
         print("Sincronizando banco antes de encerrar...")
         # O Syncthing detectará as alterações e sincronizará
-        caminho_banco = get_db_path()
+        caminho_banco = get_db_path_safe()
         try:
             # Tocar o arquivo para garantir que o Syncthing o detecte
             os.utime(caminho_banco, None)
@@ -510,7 +552,7 @@ def criar_backup_banco():
     import time
     
     try:
-        origem = get_db_path()  # Banco original
+        origem = get_db_path_safe()  # Banco original
         destino = obter_caminho_banco_backup()  # Arquivo de backup
         
         print(f"Criando backup: {origem} -> {destino}")
@@ -539,7 +581,7 @@ def restaurar_backup():
     
     try:
         origem = obter_caminho_banco_backup()  # Arquivo de backup
-        destino = get_db_path()  # Banco original
+        destino = get_db_path_safe()  # Banco original
         
         # Verificar se o backup existe
         if not os.path.exists(origem):
@@ -591,126 +633,29 @@ def obter_estacao_atual():
     except Exception as e:
         print(f"Erro ao obter nome da estação: {e}")
         return "Estação Desconhecida"
-    
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        # Executando como executable
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        # Executando em desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return base_dir
 
-def get_db_path():
-    """
-    Determina o caminho do banco de dados considerando diferentes ambientes
-    de execução (desenvolvimento ou aplicação compilada)
-    """
-    # Opção 1: Verifica se estamos em uma aplicação compilada (PyInstaller)
-    if getattr(sys, 'frozen', False):
-        # Se estiver executando como um executável compilado
-        base_dir = os.path.dirname(sys.executable)
-        db_paths = [
-            # Caminho relativo ao executável
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho relativo ao executável (pasta pai)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho absoluto fixo (caso seja uma instalação específica)
-            r"C:\MBSistema\base\banco\MBDATA_NOVO.FDB",
-        ]
-    else:
-        # Se estiver executando em modo de desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        db_paths = [
-            # Caminho relativo ao script atual
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho alternativo (um nível acima)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-        ]
-    
-    # Verificar qual caminho existe
-    for path in db_paths:
-        if os.path.isfile(path):
-            print(f"Banco de dados encontrado em: {path}")
-            return path
-    
-    # Se chegou até aqui, não encontrou o arquivo
-    # Vamos retornar o primeiro caminho e deixar o Firebird gerar o erro apropriado
-    print(f"AVISO: Banco de dados não encontrado. Tentando usar: {db_paths[0]}")
-    
-    # Verificar se o diretório existe, se não, tentar criá-lo
-    db_dir = os.path.dirname(db_paths[0])
-    if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"Diretório criado: {db_dir}")
-        except Exception as e:
-            print(f"Erro ao criar diretório: {e}")
-    
-    return db_paths[0]
-
-# Configurações do banco de dados
-DB_PATH = get_db_path()
-DB_USER = "SYSDBA"
-DB_PASSWORD = "masterkey"
-DB_HOST = "localhost"
-DB_PORT = 3050
-
-def get_connection():
-    """
-    Retorna uma conexão com o banco de dados Firebird
-    """
+# Função wrapper pra get_db_path: usa config se disponível (definida APÓS as vars globais)
+def get_db_path_safe():
+    """Versão segura de get_db_path: prioriza config remoto sem checar existência local."""
     try:
-        print(f"Tentando conectar ao banco de dados: {DB_PATH}")
-        conn = fdb.connect(
-            host=DB_HOST,
-            database=DB_PATH,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT,
-            charset='UTF8'  # Garantir codificação correta
-        )
-        return conn
-    except Exception as e:
-        print(f"Erro de conexão: {e}")
-        raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
-
-def execute_query(query, params=None, commit=True, verificar_sync=True):
-    """
-    Executa uma query no banco de dados com suporte a sincronização
-    """
-    conn = None
-    cursor = None
-    try:
-        conn = get_connection(verificar_sync=verificar_sync)
-        cursor = conn.cursor()
+        # Protege contra uso precoce (se vars não definidas ainda)
+        if 'DB_HOST' not in globals() or 'DB_PATH' not in globals():
+            print("⚠️  get_db_path_safe: Vars globais não prontas. Usando get_db_path local.")
+            return get_db_path()
         
-        if params:
-            print(f"Executando query com parâmetros: {params}")
-            cursor.execute(query, params)
+        if globals()['DB_HOST'] != "localhost" and globals()['DB_PATH'] is not None:  # Se config remoto e path válido
+            print(f"✅ Usando path REMOTO do config: {globals()['DB_PATH']}")
+            return globals()['DB_PATH']
         else:
-            cursor.execute(query)
-            
-        # Se for um SELECT, retorna os resultados
-        if query.strip().upper().startswith("SELECT"):
-            results = cursor.fetchall()
-            return results
-        
-        # Se precisar fazer commit
-        if commit:
-            conn.commit()
-            
-        return True
+            print("⚠️  Fallback para get_db_path local (config não remoto ou path inválido).")
+            return get_db_path()
+    except NameError as ne:
+        print(f"⚠️  Erro em get_db_path_safe (NameError): {ne}. Fallback local.")
+        return get_db_path()
     except Exception as e:
-        if conn and commit:
-            conn.rollback()
-        print(f"Erro na execução da query: {str(e)}")
-        raise Exception(f"Erro ao executar query: {str(e)}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+        print(f"❌ Erro em get_db_path_safe: {e}. Fallback local.")
+        return get_db_path()
+
 
 def verificar_conectividade():
     """Verifica se há conexão com a internet"""
@@ -724,7 +669,7 @@ def banco_em_uso():
     """Verifica se o banco de dados está em uso no momento"""
     try:
         # Tenta abrir o arquivo do banco para verificar se está bloqueado
-        caminho_banco = get_db_path()
+        caminho_banco = get_db_path_safe()
         with open(caminho_banco, 'rb') as f:
             # Tenta apenas ler o começo do arquivo para verificar acesso
             f.read(10)
@@ -738,38 +683,40 @@ def banco_em_uso():
 # Modifique a função get_connection para verificar sincronização
 def get_connection(verificar_sync=True):
     """
-    Retorna uma conexão com o banco de dados Firebird
-    E realiza sincronização se necessário
+    Retorna uma conexão com o banco de dados Firebird usando o config (remoto ou local).
     """
     try:
-        # Verificar se há um backup mais recente para restaurar
-        if verificar_sync and verificar_conectividade():
-            restaurar_backup()
+        # Seu código original de backup (usa safe agora)
+        if verificar_sync:
+            if verificar_conectividade():  # Assuma que você mudou chamadas internas pra safe
+                restaurar_backup()
         
-        # Obter caminho do banco atual
-        db_path = get_db_path()
-        print(f"Tentando conectar ao banco de dados: {db_path}")
+        # Usa vars do config
+        db_path = get_db_path_safe()  # Usa safe pra priorizar remoto
+        print(f"🔍 DEBUG: Tentando conectar: host={DB_HOST}:{DB_PORT}/{db_path}")
         
-        # Conectar ao banco
+        # Conecta com fdb
         conn = fdb.connect(
             host=DB_HOST,
+            port=DB_PORT,
             database=db_path,
             user=DB_USER,
             password=DB_PASSWORD,
-            port=DB_PORT,
             charset='UTF8'
         )
         
-        # Após a conexão bem-sucedida, verificar sincronização
+        # Sync em background
         if verificar_sync:
-            # Executar em background para não bloquear
             import threading
-            threading.Thread(target=sincronizar_banco).start()
-            
+            threading.Thread(target=sincronizar_banco, daemon=True).start()
+        
+        print("✅ DEBUG: Conexão ao banco OK!")
         return conn
+        
     except Exception as e:
-        print(f"Erro de conexão: {e}")
+        print(f"❌ DEBUG: Erro de conexão: {e}")
         raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
+
 
 #LOGIN 
 def validar_login(usuario, senha, empresa):
@@ -8634,7 +8581,7 @@ def buscar_historico_pagamentos(codigo):
     from datetime import datetime
     
     # Use get_db_path para obter o caminho correto
-    banco_path = get_db_path()
+    banco_path = get_db_path_safe()
     conn = sqlite3.connect(banco_path)
     cursor = conn.cursor()
     

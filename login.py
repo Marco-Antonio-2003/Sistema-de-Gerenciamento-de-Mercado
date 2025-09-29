@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.4.9"
+Versao = "Versão: v0.1.5.0"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
@@ -109,7 +109,6 @@ del "%~f0"
 
 
 class LoadingWorker(QThread):
-    # ... (código existente sem alterações) ...
     """Thread para executar tarefas de inicialização em background"""
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
@@ -832,33 +831,119 @@ class LoginWindow(QMainWindow):
                 id_funcionario=id_funcionario
             )
             
-            # ### PONTO CHAVE - AQUI É A MÁGICA ###
-            # Conecta o sinal 'logout_signal' da MainWindow ao método 'reabrir_tela_login' desta classe.
+            # CORREÇÃO: Conecta o sinal de logout ao método de reabertura
             self.main_window.logout_signal.connect(self.reabrir_tela_login)
             
+            # CORREÇÃO: Mostra a janela principal primeiro
             self.main_window.show()
+            
+            # CORREÇÃO: Só esconde a janela de login após a principal estar visível
             self.hide()
             
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao abrir janela principal: {str(e)}")
             self.restaurar_botao_login()
+
+    def reabrir_tela_login(self):
+        """Esta função é chamada quando o sinal de logout é emitido pela MainWindow."""
+        print("Sinal de logout recebido. Reabrindo a tela de login.")
+        
+        try:
+            # CORREÇÃO 1: Garante que a main_window seja fechada e limpa
+            if hasattr(self, 'main_window') and self.main_window:
+                try:
+                    # Desconecta o sinal para evitar loops
+                    self.main_window.logout_signal.disconnect(self.reabrir_tela_login)
+                except:
+                    pass  # Ignora se já estava desconectado
+                
+                # Força o fechamento se ainda estiver visível
+                if self.main_window.isVisible():
+                    self.main_window.close()
+                
+                # Limpa a referência
+                self.main_window = None
+            
+            # CORREÇÃO 2: Reseta o estado de login
+            self.login_successful = False
+            
+            # CORREÇÃO 3: Limpa os campos sensíveis
+            self.senha_input.clear()
+            
+            # CORREÇÃO 4: Restaura o botão de login
+            self.restaurar_botao_login()
+            
+            # CORREÇÃO 5: Força a janela de login para o primeiro plano
+            self.show()
+            self.raise_()  # Traz para frente
+            self.activateWindow()  # Ativa a janela
+            
+            # CORREÇÃO 6: Foca no campo apropriado
+            if self.usuario_input.text().strip():
+                self.senha_input.setFocus()
+            else:
+                self.usuario_input.setFocus()
+                
+            print("Tela de login reaberta com sucesso.")
+            
+        except Exception as e:
+            print(f"Erro ao reabrir tela de login: {e}")
+            # Em caso de erro, força a reabertura básica
+            self.show()
+            self.raise_()
+            self.activateWindow()
     
     def closeEvent(self, event):
-        """Manipula o evento de fechamento da janela principal"""
+        """Manipula o evento de fechamento da janela de login"""
+        print("Fechando janela de login...")
+        
         try:
-            # Limpar arquivos de conflito antes de fechar
-            from base.banco import limpar_arquivos_conflito
-            limpar_arquivos_conflito()
+            # CORREÇÃO: Fecha a janela principal se ainda estiver aberta
+            if hasattr(self, 'main_window') and self.main_window:
+                try:
+                    print("Fechando main_window associada...")
+                    # Desconecta sinais para evitar loops
+                    try:
+                        self.main_window.logout_signal.disconnect()
+                    except:
+                        pass
+                    
+                    # Fecha a janela principal
+                    if self.main_window.isVisible():
+                        self.main_window.close()
+                    
+                    # Limpa a referência
+                    self.main_window = None
+                    print("Main_window fechada com sucesso")
+                    
+                except Exception as e:
+                    print(f"Erro ao fechar main_window: {e}")
+            
+            # Limpar arquivos de conflito
+            try:
+                from base.banco import limpar_arquivos_conflito
+                limpar_arquivos_conflito()
+                print("Arquivos de conflito limpos")
+            except Exception as e:
+                print(f"Erro ao limpar arquivos de conflito: {e}")
             
             # Fechar Syncthing apenas se o login não foi bem-sucedido
+            # ou se a aplicação está sendo totalmente fechada
             if not hasattr(self, 'login_successful') or not self.login_successful:
-                from base.banco import fechar_syncthing
-                fechar_syncthing()
+                try:
+                    from base.banco import fechar_syncthing
+                    fechar_syncthing()
+                    print("Syncthing fechado")
+                except Exception as e:
+                    print(f"Erro ao fechar Syncthing: {e}")
+            
+            print("Limpeza do closeEvent da LoginWindow concluída")
+            
         except Exception as e:
-            print(f"Erro ao encerrar: {e}")
+            print(f"Erro geral no closeEvent da LoginWindow: {e}")
         
-        # Propagar o evento para fechar normalmente
-        super().closeEvent(event)
+        # Aceita o evento para permitir o fechamento
+        event.accept()
 
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
@@ -892,22 +977,7 @@ class LoginWindow(QMainWindow):
         """)
         msg_box.exec_()
 
-    def reabrir_tela_login(self):
-        """Esta função é chamada quando o sinal de logout é emitido pela MainWindow."""
-        print("Sinal de logout recebido. Reabrindo a tela de login.")
-        
-        # Limpa o campo de senha para o próximo login
-        self.senha_input.clear()
-        
-        # ### A CORREÇÃO ESTÁ AQUI ###
-        # Chama a função que já existe para restaurar o botão.
-        self.restaurar_botao_login()
-        
-        # Mostra esta janela (a de login) novamente
-        self.show()
-        
-        # Opcional, mas boa prática: limpa a referência à janela principal para liberar memória
-        self.main_window = None
+
 
 def resource_path(relative_path):
     # ... (código existente sem alterações) ...
@@ -927,23 +997,23 @@ def main():
     startup_splash.show()
     startup_splash.start_loading()
     
+    # CORREÇÃO: Declarar login_window fora da função para manter referência
     login_window = None
     
     def proximo_passo():
         nonlocal login_window
         startup_splash.close()
         
-        # ### MUDANÇA: Fluxo de atualização simplificado ###
-
-        # 1. Verifica silenciosamente se há uma atualização e, se houver, a aplica.
-        # A função já pergunta ao usuário se encontrar algo.
+        # Verifica atualização
         atualizacao_iniciada = verificar_e_aplicar_atualizacao()
 
-        # 2. Se a atualização não foi iniciada (seja por não ter, por erro ou por o usuário dizer "não"),
-        # abre a tela de login normalmente.
+        # Se não iniciou atualização, abre a tela de login
         if not atualizacao_iniciada:
             login_window = LoginWindow()
             login_window.show()
+            
+            # CORREÇÃO: Armazena a referência no app para evitar garbage collection
+            app.login_window = login_window
     
     startup_splash.worker.finished.connect(proximo_passo)
     

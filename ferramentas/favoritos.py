@@ -2,40 +2,62 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QFrame, QGraphicsDropShadowEffect, QScrollArea, 
-    QCheckBox, QListWidget, QPushButton,QMessageBox
+    QCheckBox, QListWidget, QPushButton, QMessageBox
 )
 from PyQt5.QtGui import QFont, QColor, QCursor
 from PyQt5.QtCore import Qt
+
+# --- NOVO: Importar o necessário para acessar o banco de dados ---
+# Certifique-se de que o caminho para 'base' está correto no seu projeto
+try:
+    from base.banco import execute_query
+except ImportError:
+    # Adiciona o diretório pai ao path se o import direto falhar
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from base.banco import execute_query
 
 class SeletorModulosEstilizado(QDialog):
     """
     Uma janela de diálogo com estilo para selecionar módulos favoritos.
     Esta classe agora herda de QDialog para se integrar com a janela principal.
     """
-    def __init__(self, modulos_disponiveis, favoritos_atuais, parent=None):
+    # --- MODIFICADO: Adicionado 'usuario_id' ao construtor ---
+    def __init__(self, modulos_disponiveis, favoritos_atuais, usuario_id, parent=None):
         super().__init__(parent)
         
         # Recebe os módulos e favoritos da tela principal
         self.modulos_disponiveis = sorted(list(modulos_disponiveis))
         self.favoritos_atuais = favoritos_atuais
         
+        # --- NOVO: Armazena o ID do usuário logado ---
+        self.usuario_id = usuario_id
+        # --- NOVO: Define o nome exato do módulo a ser verificado ---
+        self.modulo_ecommerce_nome = "Ver Dashboard do Mercado livre" # <-- ATENÇÃO: Verifique se este nome corresponde exatamente ao da sua lista
+        
+        # --- NOVO: Lista de módulos que exigem permissão especial ---
+        self.modulos_com_restricao = {
+            "Ver Dashboard do Mercado livre": "ACESSO_ECOMMERCE",
+            "Dashboard Mercado Livre": "ACESSO_ECOMMERCE"
+        }
+        
         self.initUI()
         self.setWindowTitle("Gerenciar Módulos Favoritos")
         
         # Preenche a lista da direita com os favoritos que já estavam selecionados
-        self.atualizar_tela_principal()
+        # --- MODIFICADO: Agora filtra módulos sem permissão ---
+        self.atualizar_lista_favoritos()
 
     def initUI(self):
         """
         Inicializa a interface do usuário com o estilo profissional.
         """
         self.setMinimumSize(900, 700)
-        self.setModal(True) # Torna a janela modal, bloqueando a principal
+        self.setModal(True)
         
         self.setStyleSheet("background-color: #0a3b59;")
 
-        central_widget = QWidget(self) # O widget central agora é filho direto do QDialog
-        main_layout = QVBoxLayout(self) # O layout principal é aplicado diretamente ao QDialog
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         
@@ -58,7 +80,6 @@ class SeletorModulosEstilizado(QDialog):
         sections_layout.setSpacing(20)
         sections_layout.setContentsMargins(20, 20, 20, 20)
         
-        # ===== SEÇÃO DE MÓDULOS (Esquerda) =====
         modulos_frame = QFrame()
         modulos_frame.setStyleSheet("background-color: white; border-radius: 5px;")
         modulos_layout = QVBoxLayout(modulos_frame)
@@ -80,11 +101,20 @@ class SeletorModulosEstilizado(QDialog):
             checkbox = QCheckBox(modulo_nome)
             checkbox.setFont(QFont("Arial", 12))
             
-            # Marca o checkbox se ele já for um favorito
-            if modulo_nome in self.favoritos_atuais:
+            # --- NOVO: Verifica se o módulo tem restrição e se o usuário tem permissão ---
+            if modulo_nome in self.modulos_com_restricao:
+                if not self.verificar_permissao_modulo(modulo_nome):
+                    # Se não tem permissão, desabilita o checkbox e muda a cor
+                    checkbox.setEnabled(False)
+                    checkbox.setStyleSheet("color: #888888; font-style: italic;")
+                    checkbox.setText(f"{modulo_nome} (Acesso Bloqueado)")
+            
+            # --- MODIFICADO: Só marca como selecionado se estiver nos favoritos E tiver permissão ---
+            if modulo_nome in self.favoritos_atuais and checkbox.isEnabled():
                 checkbox.setChecked(True)
                 
-            checkbox.stateChanged.connect(self.atualizar_tela_principal)
+            # --- MODIFICADO: Conectado a um novo método ---
+            checkbox.stateChanged.connect(self.on_checkbox_changed)
             scroll_layout.addWidget(checkbox)
             self.checkboxes.append(checkbox)
         
@@ -92,7 +122,6 @@ class SeletorModulosEstilizado(QDialog):
         modulos_layout.addWidget(scroll_area)
         sections_layout.addWidget(modulos_frame, 1)
         
-        # ===== SEÇÃO DA TELA PRINCIPAL (Direita) =====
         principal_frame = QFrame()
         principal_frame.setStyleSheet("background-color: white; border-radius: 5px;")
         principal_layout = QVBoxLayout(principal_frame)
@@ -103,94 +132,175 @@ class SeletorModulosEstilizado(QDialog):
         
         self.lista_tela_principal = QListWidget()
         self.lista_tela_principal.setStyleSheet("background-color: white; border: none; font-size: 12pt;")
-        principal_layout.addWidget(principal_frame, 1)
+        principal_layout.addWidget(self.lista_tela_principal)
+        sections_layout.addWidget(principal_frame, 1)
         
         main_layout.addWidget(content_container)
 
-        # ===== BOTÃO DE CONFIRMAÇÃO =====
         confirm_button = QPushButton("Confirmar")
         confirm_button.setFont(QFont("Arial", 12, QFont.Bold))
         confirm_button.setCursor(QCursor(Qt.PointingHandCursor))
         confirm_button.setStyleSheet("""
-            QPushButton {
-                background-color: #00e676;
-                color: white;
-                border-radius: 5px;
-                padding: 10px;
-                border: none;
-            }
-            QPushButton:hover {
-                background-color: #00c853;
-            }
-            QPushButton:pressed {
-                background-color: #00b248;
-            }
+            QPushButton { background-color: #00e676; color: white; border-radius: 5px; padding: 10px; border: none; }
+            QPushButton:hover { background-color: #00c853; }
+            QPushButton:pressed { background-color: #00b248; }
         """)
         confirm_button.clicked.connect(self.confirmar_selecao)
         main_layout.addWidget(confirm_button)
 
-    def atualizar_tela_principal(self):
+    # --- NOVO: Função para verificar permissão de um módulo específico ---
+    def verificar_permissao_modulo(self, nome_modulo):
         """
-        Atualiza a lista de módulos e impõe um limite de 8 seleções.
+        Verifica se o usuário tem permissão para acessar um módulo específico.
+        """
+        if nome_modulo not in self.modulos_com_restricao:
+            return True  # Se o módulo não tem restrição, permite acesso
+            
+        campo_permissao = self.modulos_com_restricao[nome_modulo]
+        
+        if self.usuario_id is None:
+            return False  # Se não houver ID de usuário, nega por segurança
+
+        try:
+            # 1. Descobrir se o usuário é master ou funcionário
+            query_user_info = f"SELECT USUARIO_MASTER FROM USUARIOS WHERE ID = {self.usuario_id}"
+            result = execute_query(query_user_info)
+            
+            if not result or not result[0]:
+                print(f"Aviso: Usuário com ID {self.usuario_id} não encontrado no banco.")
+                return False
+
+            usuario_master_id = result[0][0]
+            
+            # Se o usuário não tem um mestre (é NULL), ele é o próprio mestre.
+            id_para_verificar = usuario_master_id if usuario_master_id is not None else self.usuario_id
+
+            # 2. Verificar a permissão específica do usuário mestre
+            query_permissao = f"SELECT {campo_permissao} FROM USUARIOS WHERE ID = {id_para_verificar}"
+            permissao_result = execute_query(query_permissao)
+
+            if permissao_result and permissao_result[0] and permissao_result[0][0] == 'S':
+                return True  # Acesso permitido
+            else:
+                return False  # Acesso negado
+
+        except Exception as e:
+            print(f"Erro ao verificar permissão para módulo {nome_modulo}: {e}")
+            return False  # Em caso de erro, nega o acesso por segurança
+
+    # --- MODIFICADO: Método para gerenciar as mudanças nos checkboxes ---
+    def on_checkbox_changed(self, state):
+        """
+        Chamado sempre que um checkbox muda de estado.
+        Verifica permissões e limites antes de atualizar a lista.
+        """
+        sender = self.sender()
+        if not sender:
+            return
+
+        # Verifica se o usuário está TENTANDO ADICIONAR (marcando a caixa)
+        if state == Qt.Checked:
+            # Obtém o nome do módulo (remove o sufixo " (Acesso Bloqueado)" se existir)
+            nome_modulo = sender.text().replace(" (Acesso Bloqueado)", "")
+            
+            # Verifica se é um módulo com restrição
+            if nome_modulo in self.modulos_com_restricao:
+                # Se for, verifica a permissão
+                if not self.verificar_permissao_modulo(nome_modulo):
+                    # Bloqueia sinais para evitar loop
+                    sender.blockSignals(True)
+                    # Desmarca a caixa
+                    sender.setChecked(False)
+                    # Reativa sinais
+                    sender.blockSignals(False)
+                    # Mostra a mensagem de bloqueio
+                    QMessageBox.warning(self, "Acesso Bloqueado", 
+                                        f"Seu usuário não tem permissão para acessar o módulo: {nome_modulo}.\n\n"
+                                        "Entre em contato com o administrador da sua empresa para liberar o acesso.")
+                    return  # Para a execução aqui
+
+        # Se passou na verificação (ou não era um módulo restrito), atualiza a lista
+        self.atualizar_lista_favoritos()
+
+    def atualizar_lista_favoritos(self):
+        """
+        Atualiza a lista de módulos selecionados, filtra módulos sem permissão
+        e impõe um limite de 6 seleções.
         """
         modulos_selecionados = []
         for checkbox in self.checkboxes:
-            if checkbox.isChecked():
-                modulos_selecionados.append(checkbox.text())
+            if checkbox.isChecked() and checkbox.isEnabled():
+                # Remove o sufixo " (Acesso Bloqueado)" se existir
+                nome_modulo = checkbox.text().replace(" (Acesso Bloqueado)", "")
+                modulos_selecionados.append(nome_modulo)
 
-        # --- NOVO: Lógica para limitar a seleção ---
+        # Lógica para limitar a seleção a 6 módulos
         if len(modulos_selecionados) > 6:
-            # Pega o checkbox que acabou de ser marcado
             sender = self.sender()
             if sender:
-                # Bloqueia os sinais para evitar um loop infinito
                 sender.blockSignals(True)
-                # Desmarca o checkbox que excedeu o limite
-                sender.setChecked(False)
-                # Libera os sinais novamente
+                sender.setChecked(False)  # Desmarca o que excedeu
                 sender.blockSignals(False)
             
-            # Mostra um aviso para o usuário
             QMessageBox.warning(self, "Limite Atingido", "Você pode selecionar no máximo 6 módulos favoritos.")
-            
-            # Remove o item excedente da lista
-            modulos_selecionados.pop()
+            modulos_selecionados.pop()  # Remove o item excedente da lista lógica
 
-        # Atualiza a lista da direita
+        # Atualiza a lista da direita (visual)
         self.lista_tela_principal.clear()
         self.lista_tela_principal.addItems(sorted(modulos_selecionados))
 
     def confirmar_selecao(self):
-        """
-        Ação executada quando o botão Confirmar é clicado.
-        Fecha a janela com o status 'Accepted'.
-        """
         self.accept()
 
     def get_selecao_final(self):
         """
-        Retorna a lista final de módulos selecionados.
-        Este método será chamado pela janela principal após o fechamento.
+        Retorna apenas módulos que o usuário tem permissão para acessar.
         """
         modulos_selecionados = []
         for i in range(self.lista_tela_principal.count()):
-            modulos_selecionados.append(self.lista_tela_principal.item(i).text())
+            nome_modulo = self.lista_tela_principal.item(i).text()
+            # Dupla verificação: só adiciona se tiver permissão
+            if nome_modulo not in self.modulos_com_restricao or self.verificar_permissao_modulo(nome_modulo):
+                modulos_selecionados.append(nome_modulo)
         return modulos_selecionados
 
+    # --- NOVO: Método para filtrar favoritos existentes ---
+    def filtrar_favoritos_com_permissao(self, favoritos_lista):
+        """
+        Filtra uma lista de favoritos, removendo aqueles para os quais
+        o usuário não tem permissão.
+        """
+        favoritos_permitidos = []
+        for modulo in favoritos_lista:
+            if modulo not in self.modulos_com_restricao or self.verificar_permissao_modulo(modulo):
+                favoritos_permitidos.append(modulo)
+            else:
+                print(f"Módulo '{modulo}' removido dos favoritos: sem permissão de acesso.")
+        return favoritos_permitidos
+
+
 if __name__ == '__main__':
-    # Código de exemplo para testar a janela de forma independente
     app = QApplication(sys.argv)
     
     # Simula os dados que viriam da tela principal
     modulos_teste = [
         "Cadastro de Clientes", "Produtos", "Pedido de vendas", 
-        "Controle de caixa (PDV)", "Consulta CNPJ", "Fornecedores"
+        "Controle de caixa (PDV)", "Consulta CNPJ", "Fornecedores",
+        "Ver Dashboard do Mercado livre"  # Módulo que será bloqueado se não tiver permissão
     ]
-    favoritos_teste = ["Produtos", "Cadastro de Clientes"]
+    favoritos_teste = ["Produtos", "Cadastro de Clientes", "Ver Dashboard do Mercado livre"]
     
-    janela = SeletorModulosEstilizado(modulos_disponiveis=modulos_teste, favoritos_atuais=favoritos_teste)
+    # --- NOVO: Simula o ID do usuário logado ---
+    # Altere este valor para testar diferentes cenários.
+    # Use um ID de usuário que você saiba que TEM ou NÃO TEM a permissão 'S' no seu banco.
+    id_usuario_logado_para_teste = 1  # Substitua pelo ID de um usuário real do seu banco para testar
     
-    # Em um teste, podemos verificar o resultado
+    janela = SeletorModulosEstilizado(
+        modulos_disponiveis=modulos_teste, 
+        favoritos_atuais=favoritos_teste,
+        usuario_id=id_usuario_logado_para_teste  # Passando o ID
+    )
+    
     resultado = janela.exec_()
     if resultado == QDialog.Accepted:
         print("Seleção confirmada!")

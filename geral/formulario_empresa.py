@@ -1,4 +1,3 @@
-#formulario_empresa.py
 import sys
 # Importação condicional do requests
 try:
@@ -92,6 +91,7 @@ class FormularioEmpresa(QWidget):
         combo_style = """
             QComboBox {
                 background-color: white;
+                color: black;
                 border: 1px solid #cccccc;
                 padding: 6px;
                 font-size: 13px;
@@ -109,9 +109,10 @@ class FormularioEmpresa(QWidget):
             }
             QComboBox QAbstractItemView {
                 background-color: white;
+                color: black;
                 border: 1px solid #cccccc;
                 selection-background-color: #1a5f96;
-                selection-color: white;
+                selection-color: black;
             }
         """
         
