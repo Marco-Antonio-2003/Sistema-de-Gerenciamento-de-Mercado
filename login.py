@@ -13,14 +13,13 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.0"
+Versao = "Versão: v0.1.5.1"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização, avisando o usuário sobre um
-    possível erro inofensivo no final do processo.
+    Verifica e aplica uma atualização, com atraso estendido no .bat para evitar erros de DLL.
     """
     try:
         app_dir = os.path.dirname(sys.executable)
@@ -44,9 +43,7 @@ def verificar_e_aplicar_atualizacao():
         if confirm_reply == QMessageBox.No:
             return False
 
-
-        # --- A MUDANÇA ESTÁ AQUI ---
-        # Mostramos nosso aviso ANTES de criar e executar o script de atualização.
+        # Diálogo de aviso (mantenha como fallback; remova após testes se o erro de DLL não ocorrer mais)
         aviso_box = QMessageBox()
         aviso_box.setIcon(QMessageBox.Information)
         aviso_box.setWindowTitle("Aviso Importante")
@@ -60,28 +57,33 @@ def verificar_e_aplicar_atualizacao():
         aviso_box.exec_()
    
         # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
+        # CORREÇÃO: Uso de nome fixo para manter APENAS 1 backup (sobrescrevendo o anterior)
         try:
             backup_dir = os.path.join(app_dir, 'backup')
             os.makedirs(backup_dir, exist_ok=True)
 
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            backup_filename = f'MBSistema_{timestamp}.exe'
+            backup_filename = 'MBSistema_backup.exe'  # Nome fixo, sem timestamp
             backup_path = os.path.join(backup_dir, backup_filename)
+
+            # CORREÇÃO: Remove o backup existente, se houver, para sobrescrita
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+                print('Backup anterior removido para sobrescrita.')
 
             shutil.copy2(current_exe, backup_path)
             print(f'Backup do executável salvo em: {backup_path}')
         except Exception as backup_err:
             print(f'Falha ao criar backup do executável: {backup_err}')
 
-        # O resto do código continua como antes
+        # Script .bat com atraso estendido (10 segundos) para limpeza do diretório temporário
         updater_script_path = os.path.join(app_dir, 'updater.bat')
         current_exe_filename = os.path.basename(current_exe)
         new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
 
         script_content = f"""
 @echo off
-echo Aguardando o sistema fechar...
-timeout /t 2 /nobreak > NUL
+echo Aguardando o sistema fechar e limpar recursos...
+ping -n 11 localhost > NUL  :: Atraso de aproximadamente 10 segundos para evitar erro de DLL
 
 ren "{current_exe_filename}" "{current_exe_filename}.old"
 move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
@@ -97,7 +99,7 @@ del "%~f0"
         with open(updater_script_path, 'w') as f:
             f.write(script_content)
         
-        # Inicia o .bat e sai abruptamente
+        # Chamada original: Mantém shell=True e CREATE_NO_WINDOW para lançamento autônomo
         subprocess.Popen(f'"{updater_script_path}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
         os._exit(0)
 
@@ -146,8 +148,8 @@ class LoadingWorker(QThread):
             time.sleep(0.5) # Meio segundo para o usuário ver a última mensagem
             self.progress.emit(100)
 
-            # Emite o sinal de que tudo terminou com sucesso
-            self.finished.emi
+            # CORREÇÃO: Linha incompleta corrigida
+            self.finished.emit()
 
         except Exception as e:
             print(f"Erro durante a inicialização: {e}")
@@ -181,7 +183,6 @@ class LoadingWorker(QThread):
         self.finished.emit()
 
 class SplashScreen(QWidget):
-    # ... (código existente sem alterações) ...
     """Tela de carregamento customizada"""
     def __init__(self, task_type="startup"):
         super().__init__()
@@ -315,7 +316,6 @@ class SplashScreen(QWidget):
         QTimer.singleShot(500, self.close)  # Pequena pausa antes de fechar
 
 class LoginWindow(QMainWindow):
-    # ... (código existente com pequenas modificações para chamar o syncthing antes) ...
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MB Sistema - Login")
@@ -339,7 +339,6 @@ class LoginWindow(QMainWindow):
         # Carregar o usuário e empresa salvos, se existirem
         self.carregar_dados_salvos()
     
-    # ... (RESTANTE DA CLASSE LoginWindow SEM ALTERAÇÕES) ...
     def verificar_e_iniciar_syncthing(self):
         """Verifica e tenta iniciar o Syncthing, com tentativas periódicas"""
         try:
@@ -980,7 +979,6 @@ class LoginWindow(QMainWindow):
 
 
 def resource_path(relative_path):
-    # ... (código existente sem alterações) ...
     """Obtém o caminho absoluto para o recurso"""
     try:
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))

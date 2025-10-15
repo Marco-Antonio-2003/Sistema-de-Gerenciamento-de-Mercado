@@ -417,11 +417,16 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
     def get_favorites_file(self):
-        """Retorna o caminho completo do arquivo de favoritos."""
-        # Garante que o arquivo de configuração fique na mesma pasta do script principal
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        """Retorna o caminho gravável do arquivo de favoritos (ao lado do EXE em modo frozen)."""
+        if getattr(sys, 'frozen', False):
+            # Em EXE: diretório ao lado do executável (gravável)
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            # Em dev: diretório do script
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        
         config_dir = os.path.join(base_dir, "config")
-        os.makedirs(config_dir, exist_ok=True) # Cria a pasta 'config' se não existir
+        os.makedirs(config_dir, exist_ok=True)  # Cria a pasta 'config' se não existir
         return os.path.join(config_dir, "favorites.json")
     
     def create_favorite_button(self, action_name):
@@ -505,15 +510,31 @@ class MainWindow(QMainWindow):
 
 
     def load_favorites(self):
-        """Carrega a lista de favoritos do arquivo JSON, filtrando por permissões."""
-        favorites_file = self.get_favorites_file()
-        if not os.path.exists(favorites_file):
-            return []  # Retorna lista vazia se o arquivo não existe
+        """Carrega a lista de favoritos do arquivo JSON gravável, copiando do bundado se necessário."""
+        writable_path = self.get_favorites_file()
+        bundled_path = self.resource_path("config/favorites.json")
+        
+        # Se o arquivo gravável não existe, tenta copiar do bundado
+        if not os.path.exists(writable_path):
+            if os.path.exists(bundled_path):
+                try:
+                    import shutil
+                    shutil.copy2(bundled_path, writable_path)
+                    print(f"Arquivo favorites.json copiado do bundado para: {writable_path}")
+                except Exception as e:
+                    print(f"Erro ao copiar favorites.json: {e}")
+            else:
+                # Arquivo não existe nem no bundado: cria vazio
+                self.save_favorites()  # Salva lista vazia para inicializar
+        
+        if not os.path.exists(writable_path):
+            return []  # Fallback: lista vazia
+        
         try:
-            with open(favorites_file, 'r', encoding='utf-8') as f:
+            with open(writable_path, 'r', encoding='utf-8') as f:
                 favoritos_salvos = json.load(f)
             
-            # --- NOVO: Filtra os favoritos baseado nas permissões do usuário ---
+            # Filtra os favoritos baseado nas permissões do usuário
             return self.filtrar_favoritos_com_permissao(favoritos_salvos)
         except (json.JSONDecodeError, Exception) as e:
             print(f"Erro ao carregar favoritos: {e}")
@@ -1062,6 +1083,7 @@ class MainWindow(QMainWindow):
         btn_financeiro = MenuButton("FINANCEIRO")
         btn_relatorios = MenuButton("RELATÓRIOS")
         btn_ferramentas = MenuButton("FERRAMENTAS")
+        #btn_fiscal = MenuButton("Fiscal")
         self.btn_mercado_livre = MenuButton("MERCADO LIVRE")
        
         self.add_menu_actions_with_permission(btn_geral, ["Cadastro de empresa", "Cadastro de Clientes", "Cadastro Funcionários", "Consulta CNPJ"], self)
@@ -1071,6 +1093,7 @@ class MainWindow(QMainWindow):
         self.add_menu_actions_with_permission(btn_financeiro, ["Recebimento de clientes", "Gerar lançamento Financeiro", "Controle de caixa (PDV)", "Conta corrente", "Classes financeiras"], self)
         self.add_menu_actions_with_permission(btn_relatorios, ["Relatório de Vendas de Produtos"], self)
         self.add_menu_actions_with_permission(btn_ferramentas, ["Configuração de estação", "Configuração do Sistema", "Adicionar Favoritos"], self)
+        #self.add_menu_actions_with_permission(btn_fiscal, ["Manutenção de Nota Fiscal"], self)
         self.add_menu_actions_with_permission(self.btn_mercado_livre, ["Ver Dashboard do Mercado livre"], self)
        
         for btn in (btn_geral, btn_produtos, btn_compras, btn_vendas, btn_financeiro, btn_relatorios, btn_ferramentas, self.btn_mercado_livre):
@@ -1271,6 +1294,7 @@ class MainWindow(QMainWindow):
             "Configuração de estação": os.path.join("ferramentas", "configuracao_impressora.py"),
             "Configuração do Sistema": os.path.join("ferramentas", "configuracao_sistema.py"),
             "Adicionar Favoritos": os.path.join("ferramentas", "favoritos.py"),
+            "Manutenção de Nota Fiscal": os.path.join("Fiscal", "nota_fiscal_main.py"),
             "Ver Dashboard do Mercado livre": os.path.join("mercado_livre", "main_final.py"),
             "PDV - Ponto de Venda": os.path.join("PDV", "PDV_principal.py")
         }
@@ -1284,9 +1308,19 @@ class MainWindow(QMainWindow):
             "Controle de caixa (PDV)": "ControleCaixaWindow", "Conta corrente": "ContaCorrenteWindow",
             "Classes financeiras": "ClassesFinanceirasWindow", "Fiscal NF-e, SAT, NFC-e": "RelatorioFiscalWindow",
             "Relatório de Vendas de Produtos": "RelatorioVendasWindow", "Configuração de estação": "ConfiguracaoImpressoraWindow",
-            "Configuração do Sistema": "ConfiguracaoSistemaWindow","Adicionar Favoritos": "SeletorModulosEstilizado", "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
+            "Configuração do Sistema": "ConfiguracaoSistemaWindow","Adicionar Favoritos": "SeletorModulosEstilizado","Manutenção de Nota Fiscal": "NotaFiscalMainWindow", "Ver Dashboard do Mercado livre": "MercadoLivreWindow",
             "PDV - Ponto de Venda": "PDVWindow"
         }
+
+    def resource_path(self, relative_path):
+        """Obtém caminho absoluto para recurso bundado, compatível com PyInstaller."""
+        try:
+            # Em modo frozen (EXE), usa o diretório temporário extraído
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+
     def aplicar_estilo_aviso(self, widget):
         """Aplica o estilo de fundo branco e botões azuis a um QMessageBox ou QInputDialog."""
         style = """

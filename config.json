@@ -1,6 +1,6 @@
 {
     "database": {
-      "host": "192.168.1.100",          
+      "host": "DESKTOP-DEU373U",          
       "port": 3050,                     
       "database_path": "C:\\Sistema-teste\\base\\banco\\MBDATA_NOVO.FDB",  
       "user": "SYSDBA",                 

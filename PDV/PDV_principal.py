@@ -3272,6 +3272,43 @@ class PDVWindow(QMainWindow):
         self.combo_pagamento.addItem("90 - Sem pagamento")
         self.combo_pagamento.addItem("99 - Outros")
         
+        self.combo_pagamento.setStyleSheet("""
+            QComboBox {
+                color: #000000;  /* Texto preto quando não selecionado */
+                background-color: #FFFFFF;  /* Fundo branco */
+                padding: 5px;
+                border: 1px solid #CCCCCC;
+                border-radius: 3px;
+            }
+            QComboBox:focus {
+                border: 1px solid #2196F3;
+            }
+            QComboBox QAbstractItemView {
+                color: #000000;  /* Texto preto na lista dropdown */
+                background-color: #FFFFFF;  /* Fundo branco na lista dropdown */
+                selection-background-color: #2196F3;  /* Cor de fundo quando selecionado */
+                selection-color: #FFFFFF;  /* Texto branco quando selecionado */
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 15px;
+                border-left-width: 1px;
+                border-left-color: #CCCCCC;
+                border-left-style: solid;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #666666;
+                width: 0px;
+                height: 0px;
+            }
+        """)
+        
         self.combo_pagamento.setCurrentIndex(0)
         self.combo_pagamento.currentIndexChanged.connect(self.atualizar_layout_pagamento)
         

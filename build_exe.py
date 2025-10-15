@@ -1,4 +1,4 @@
-# build_exe.py - VERSÃO FINAL E CORRETA - MODO --onefile COM BANCO EXTERNO E CONFIG.INI
+# build_exe.py - VERSÃO ATUALIZADA - MODO --onefile COM BANCO EXTERNO, CONFIG.INI E FAVORITES.JSON
 
 import os
 import shutil
@@ -49,11 +49,17 @@ def main():
             pyinstaller_params.extend(["--add-data", f"{pasta}{os.pathsep}{pasta}"])
             print(f"- {pasta}")
 
-    # Adicionar arquivos avulsos DENTRO do .exe, incluindo config.json (se existir para dev)
+    # Adicionar arquivos avulsos DENTRO do .exe, incluindo config.json (se existir para dev) e favorites.json
     arquivos_de_dados_internos = ["syncthing.exe", "assistente_historico.json"]
     if os.path.exists("config.json"):  # Só adiciona se existir (para testes dev)
         arquivos_de_dados_internos.append("config.json")
         print("- config.json (para fallback dev)")
+    
+    # Adição do novo arquivo favorites.json
+    caminho_favorites = "config/favorites.json"
+    if os.path.exists(caminho_favorites):
+        arquivos_de_dados_internos.append(caminho_favorites)
+        print("- config/favorites.json (novo arquivo de favoritos)")
 
     # Remova "base/config.ini" se não usar mais; ou mude para "base/config.json" se quiser lá
     for arquivo in arquivos_de_dados_internos:

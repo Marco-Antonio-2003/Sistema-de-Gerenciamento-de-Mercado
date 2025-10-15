@@ -65,19 +65,17 @@ class CNPJConsultaThread(QThread):
                             'cep': dados.get('cep', '').replace('.', ''),
                             'numero': dados.get('numero', ''),
                             'complemento': dados.get('complemento', ''),
-                            'inscricao_estadual': '',  # Pode não estar disponível
+                            'inscricao_estadual': '',
                             'cnae': dados.get('atividade_principal', [{}])[0].get('code', '') if dados.get('atividade_principal') else '',
-                            'cnea_sec': ''  # Pode não estar disponível
+                            'cnea_sec': ''
                         }
                         
                         self.consulta_concluida.emit(resultado)
                         return
                 
                 except (requests.RequestException, json.JSONDecodeError) as e:
-                    # Continua para próxima API se uma falhar
                     continue
             
-            # Se todas as APIs falharem
             self.erro_consulta.emit("Não foi possível consultar o CNPJ. Verifique o número ou sua conexão.")
         
         except Exception as e:
@@ -94,8 +92,8 @@ class ConsultaCNPJForm(QWidget):
     def initUI(self):
         # Layout principal com margens reduzidas
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 10, 20, 10)  # Reduzido o espaço vertical
-        main_layout.setSpacing(5)  # Espaçamento reduzido entre elementos
+        main_layout.setContentsMargins(20, 10, 20, 10)
+        main_layout.setSpacing(5)
         
         # Botão de voltar e título em linha horizontal
         header_layout = QHBoxLayout()
@@ -108,8 +106,8 @@ class ConsultaCNPJForm(QWidget):
                 background-color: #005079;
                 color: white;
                 border: none;
-                padding: 5px 8px;  /* Padding reduzido */
-                font-size: 13px;   /* Fonte reduzida */
+                padding: 5px 8px;
+                font-size: 13px;
                 font-weight: bold;
                 border-radius: 4px;
             }
@@ -117,13 +115,12 @@ class ConsultaCNPJForm(QWidget):
                 background-color: #003d5c;
             }
         """)
-        # Conectar o botão voltar ao método voltar
         self.btn_voltar.clicked.connect(self.voltar)
         
         # Título
         titulo = QLabel("Consulta CNPJ")
-        titulo.setFont(QFont("Arial", 14, QFont.Bold))  # Fonte reduzida
-        titulo.setStyleSheet("color: white; margin-bottom: 5px;")  # Margem reduzida
+        titulo.setFont(QFont("Arial", 14, QFont.Bold))
+        titulo.setStyleSheet("color: white; margin-bottom: 5px;")
         titulo.setAlignment(Qt.AlignCenter)
         
         header_layout.addWidget(self.btn_voltar)
@@ -131,25 +128,25 @@ class ConsultaCNPJForm(QWidget):
         
         main_layout.addLayout(header_layout)
         
-        # Estilo para os labels - tamanho da fonte reduzido
+        # Estilo para os labels
         label_style = "QLabel { color: white; font-size: 12px; font-weight: bold; }"
         
-        # Estilo para os inputs - menor altura
+        # Estilo para os inputs
         input_style = """
             QLineEdit {
                 background-color: white;
                 border: 1px solid #cccccc;
-                padding: 3px;  /* Padding reduzido */
-                font-size: 12px;  /* Fonte reduzida */
-                min-height: 18px;  /* Altura mínima reduzida */
-                max-height: 24px;  /* Altura máxima reduzida */
+                padding: 3px;
+                font-size: 12px;
+                min-height: 18px;
+                max-height: 24px;
                 border-radius: 3px;
             }
         """
         
         # Campo CNPJ
         cnpj_layout = QHBoxLayout()
-        cnpj_layout.setSpacing(5)  # Espaçamento reduzido
+        cnpj_layout.setSpacing(5)
         
         self.cnpj_label = QLabel("Digite o CNPJ:")
         self.cnpj_label.setStyleSheet(label_style)
@@ -158,7 +155,7 @@ class ConsultaCNPJForm(QWidget):
         self.cnpj_input.setPlaceholderText("00.000.000/0001-00")
         self.cnpj_input.textChanged.connect(self.formatar_cnpj)
         
-        # Botão Consultar com tamanho reduzido
+        # Botão Consultar
         self.btn_consultar = QPushButton("Consultar")
         self.btn_consultar.setStyleSheet("""
             QPushButton {
@@ -166,10 +163,10 @@ class ConsultaCNPJForm(QWidget):
                 color: black;
                 border: none;
                 font-weight: bold;
-                padding: 4px 12px;  /* Padding reduzido */
-                font-size: 12px;  /* Fonte reduzida */
+                padding: 4px 12px;
+                font-size: 12px;
                 border-radius: 3px;
-                min-width: 100px;  /* Largura mínima reduzida */
+                min-width: 100px;
             }
             QPushButton:hover {
                 background-color: #00e088;
@@ -213,8 +210,8 @@ class ConsultaCNPJForm(QWidget):
         form_esquerda = QFormLayout()
         form_esquerda.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form_esquerda.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        form_esquerda.setVerticalSpacing(3)  # Espaçamento vertical reduzido
-        form_esquerda.setHorizontalSpacing(5)  # Espaçamento horizontal reduzido
+        form_esquerda.setVerticalSpacing(3)
+        form_esquerda.setHorizontalSpacing(5)
         
         for label_text, attr_name in campos_esquerda:
             label = QLabel(label_text)
@@ -229,8 +226,8 @@ class ConsultaCNPJForm(QWidget):
         form_direita = QFormLayout()
         form_direita.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form_direita.setFormAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        form_direita.setVerticalSpacing(3)  # Espaçamento vertical reduzido
-        form_direita.setHorizontalSpacing(5)  # Espaçamento horizontal reduzido
+        form_direita.setVerticalSpacing(3)
+        form_direita.setHorizontalSpacing(5)
         
         for label_text, attr_name in campos_direita:
             label = QLabel(label_text)
@@ -246,15 +243,15 @@ class ConsultaCNPJForm(QWidget):
         
         main_layout.addLayout(duas_colunas_layout)
         
-        # Botão "Incluir" com tamanho reduzido
-        self.btn_incluir = QPushButton("Incluir como um novo Cliente")
-        self.btn_incluir.setStyleSheet("""
+        # Botões "Incluir como Cliente" e "Incluir como Fornecedor"
+        self.btn_incluir_cliente = QPushButton("Incluir como um novo Cliente")
+        self.btn_incluir_cliente.setStyleSheet("""
             QPushButton {
                 background-color: #01fd9a;
                 color: black;
                 border: none;
-                padding: 4px 12px;  /* Padding reduzido */
-                font-size: 12px;  /* Fonte reduzida */
+                padding: 4px 12px;
+                font-size: 12px;
                 font-weight: bold;
                 border-radius: 3px;
             }
@@ -262,34 +259,33 @@ class ConsultaCNPJForm(QWidget):
                 background-color: #00e088;
             }
         """)
-        self.btn_incluir.clicked.connect(self.incluir_registro)
+        self.btn_incluir_cliente.clicked.connect(self.incluir_como_cliente)
         
-        # Grupo de opções de inclusão com layout compacto
+        self.btn_incluir_fornecedor = QPushButton("Incluir como um novo Fornecedor")
+        self.btn_incluir_fornecedor.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d7;
+                color: white;
+                border: none;
+                padding: 4px 12px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #005fa3;
+            }
+        """)
+        self.btn_incluir_fornecedor.clicked.connect(self.incluir_como_fornecedor)
+        
+        # Layout horizontal para os botões
         opcoes_inclusion_btns = QHBoxLayout()
         opcoes_inclusion_btns.setAlignment(Qt.AlignCenter)
-        opcoes_inclusion_btns.addWidget(self.btn_incluir)
+        opcoes_inclusion_btns.setSpacing(10)
+        opcoes_inclusion_btns.addWidget(self.btn_incluir_cliente)
+        opcoes_inclusion_btns.addWidget(self.btn_incluir_fornecedor)
         
         main_layout.addLayout(opcoes_inclusion_btns)
-        
-        # Grupo de botões de rádio em layout horizontal com espaçamento reduzido
-        radio_layout = QHBoxLayout()
-        radio_layout.setSpacing(10)  # Espaçamento reduzido
-        radio_layout.setAlignment(Qt.AlignCenter)
-        
-        self.btn_group = QButtonGroup()
-        
-        # self.radio_cliente = QRadioButton("Incluir como Cliente")
-        # self.radio_cliente.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
-        # self.radio_fornecedor = QRadioButton("Como Fornecedor")
-        # self.radio_fornecedor.setStyleSheet("color: white; font-size: 12px;")  # Fonte reduzida
-        
-        # self.btn_group.addButton(self.radio_cliente)
-        # self.btn_group.addButton(self.radio_fornecedor)
-        
-        # radio_layout.addWidget(self.radio_cliente)
-        # radio_layout.addWidget(self.radio_fornecedor)
-        
-        # main_layout.addLayout(radio_layout)
         
         # Definir estilo do widget principal
         self.setStyleSheet("background-color: #043b57;")
@@ -298,7 +294,6 @@ class ConsultaCNPJForm(QWidget):
         if not REQUESTS_AVAILABLE:
             QMessageBox.warning(self, "Atenção", 
                 "O módulo 'requests' não está disponível. A consulta de CNPJ não será possível.")
-            # Desabilitar botão de consulta
             self.btn_consultar.setEnabled(False)
             self.btn_consultar.setStyleSheet("""
                 QPushButton {
@@ -322,14 +317,11 @@ class ConsultaCNPJForm(QWidget):
 
     def formatar_cnpj(self, texto):
         """Formata o CNPJ durante a digitação"""
-        # Remover caracteres não numéricos
         texto_limpo = ''.join(filter(str.isdigit, texto))
         
-        # Limitar a 14 dígitos
         if len(texto_limpo) > 14:
             texto_limpo = texto_limpo[:14]
         
-        # Formatar CNPJ: 00.000.000/0001-00
         if len(texto_limpo) <= 2:
             texto_formatado = texto_limpo
         elif len(texto_limpo) <= 5:
@@ -341,13 +333,10 @@ class ConsultaCNPJForm(QWidget):
         else:
             texto_formatado = f"{texto_limpo[:2]}.{texto_limpo[2:5]}.{texto_limpo[5:8]}/{texto_limpo[8:12]}-{texto_limpo[12:]}"
         
-        # Verifica se o texto realmente mudou para evitar loops
         if texto_formatado != texto:
-            # Bloqueia sinais para evitar recursão
             self.cnpj_input.blockSignals(True)
             self.cnpj_input.setText(texto_formatado)
             
-            # Posicionamento direto do cursor para CNPJ baseado no número de dígitos
             if len(texto_limpo) <= 2:
                 nova_pos = len(texto_limpo)
             elif len(texto_limpo) <= 5:
@@ -359,22 +348,18 @@ class ConsultaCNPJForm(QWidget):
             else:
                 nova_pos = len(texto_limpo) + 4
             
-            # Define a nova posição do cursor
             self.cnpj_input.setCursorPosition(nova_pos)
             self.cnpj_input.blockSignals(False)
     
     def consultar_cnpj(self):
         """Consulta os dados do CNPJ"""
-        # Verificar se o módulo requests está disponível
         if not REQUESTS_AVAILABLE:
             QMessageBox.warning(self, "Funcionalidade indisponível", 
                                "A consulta de CNPJ requer o módulo 'requests' que não está disponível.")
             return
             
-        # Remover caracteres não numéricos
         cnpj = ''.join(filter(str.isdigit, self.cnpj_input.text()))
         
-        # Validar CNPJ
         if len(cnpj) != 14:
             msg = QMessageBox(self)
             msg.setWindowTitle("CNPJ Inválido")
@@ -383,7 +368,6 @@ class ConsultaCNPJForm(QWidget):
             msg.exec_()
             return
         
-        # Validar formato do CNPJ
         if not self.validar_cnpj(cnpj):
             msg = QMessageBox(self)
             msg.setWindowTitle("CNPJ Inválido")
@@ -392,11 +376,9 @@ class ConsultaCNPJForm(QWidget):
             msg.exec_()
             return
         
-        # Desabilitar botão durante consulta
         self.btn_consultar.setEnabled(False)
         self.btn_consultar.setText("Consultando...")
         
-        # Limpar campos anteriores
         campos = [
             'nome_input', 'tipo_empresa_input', 'fantasia_input', 'abertura_input', 
             'numero_input', 'complemento_input', 'bairro_input', 'cidade_input', 
@@ -407,7 +389,6 @@ class ConsultaCNPJForm(QWidget):
         for campo in campos:
             getattr(self, campo).clear()
         
-        # Iniciar thread de consulta
         self.thread_consulta = CNPJConsultaThread(cnpj)
         self.thread_consulta.consulta_concluida.connect(self.processar_resultado_consulta)
         self.thread_consulta.erro_consulta.connect(self.processar_erro_consulta)
@@ -415,11 +396,9 @@ class ConsultaCNPJForm(QWidget):
     
     def processar_resultado_consulta(self, dados):
         """Processa o resultado da consulta de CNPJ"""
-        # Reabilitar botão
         self.btn_consultar.setEnabled(True)
         self.btn_consultar.setText("Consultar")
         
-        # Preencher os campos
         self.nome_input.setText(dados.get('nome', ''))
         self.tipo_empresa_input.setText(dados.get('tipo_empresa', ''))
         self.fantasia_input.setText(dados.get('fantasia', ''))
@@ -445,7 +424,6 @@ class ConsultaCNPJForm(QWidget):
     
     def processar_erro_consulta(self, mensagem):
         """Processa erros na consulta de CNPJ"""
-        # Reabilitar botão
         self.btn_consultar.setEnabled(True)
         self.btn_consultar.setText("Consultar")
         
@@ -453,77 +431,52 @@ class ConsultaCNPJForm(QWidget):
     
     def validar_cnpj(self, cnpj):
         """Valida o formato do CNPJ"""
-        # Verifica se o CNPJ tem 14 dígitos e não são todos iguais
         if len(set(cnpj)) == 1:
             return False
         
-        # Calcula os dígitos verificadores
         def calcular_digito(cnpj, peso):
             soma = sum(int(d) * p for d, p in zip(cnpj, peso))
             resto = soma % 11
             return 0 if resto < 2 else 11 - resto
         
-        # Pesos para o primeiro dígito verificador
         peso1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-        # Pesos para o segundo dígito verificador
         peso2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         
-        # Extrai os dígitos para verificação
         digitos = list(map(int, cnpj))
         
-        # Calcula o primeiro dígito verificador
         dv1 = calcular_digito(cnpj[:12], peso1)
         
-        # Verifica o primeiro dígito verificador
         if dv1 != digitos[12]:
             return False
         
-        # Calcula o segundo dígito verificador
         dv2 = calcular_digito(cnpj[:13], peso2)
         
-        # Verifica o segundo dígito verificador
         return dv2 == digitos[13]
     
-    def incluir_registro(self):
+    def incluir_como_cliente(self):
         """
         Inclui os dados consultados do CNPJ como uma nova pessoa no banco de dados
         """
-        # Verificar se os dados foram consultados
         if not self.nome_input.text():
             QMessageBox.warning(self, "Dados incompletos", 
                             "Por favor, consulte um CNPJ antes de incluir os dados.")
             return
         
         try:
-            # Importando a função criar_pessoa do banco
             import sys
             import os
             sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             from base.banco import criar_pessoa
             
-            # Obter os dados dos campos
             nome = self.nome_input.text()
-            
-            # Determinar o tipo de pessoa (sempre será Jurídica para CNPJ)
             tipo_pessoa = "Jurídica"
-            
-            # Obter o CNPJ formatado
             documento = self.cnpj_input.text()
-            
-            # Obter telefone
             telefone = self.telefone_input.text()
-            
-            # Obter dados de endereço - verificando campos vazios e adicionando informações
             cep = self.cep_input.text() or ""
-            
-            # Para rua, podemos buscar alguma informação relevante ou deixar em branco
-            # Temos que ter cuidado para não confundir o usuário misturando os campos
             complemento = self.complemento_input.text() or ""
             numero = self.numero_input.text() or ""
             
-            # Tentamos formar um endereço completo baseado no que temos disponível
             rua = ""
-            # Verificamos se existe alguma informação de número ou complemento
             if complemento or numero:
                 if complemento and numero:
                     rua = f"{complemento}, {numero}"
@@ -536,14 +489,11 @@ class ConsultaCNPJForm(QWidget):
             cidade = self.cidade_input.text() or ""
             estado = self.uf_input.text() or ""
             
-            # Data cadastro (atual)
             from datetime import datetime
             data_cadastro = datetime.now().strftime("%d/%m/%Y")
             
-            # Criar observação com informações adicionais do CNPJ
             observacao = f"CNPJ consultado automaticamente. "
             
-            # Adicionar informações relevantes à observação
             info_add = []
             if self.situacao_input.text():
                 info_add.append(f"Situação: {self.situacao_input.text()}")
@@ -560,7 +510,6 @@ class ConsultaCNPJForm(QWidget):
             
             observacao += ". ".join(info_add)
             
-            # Inserir a pessoa no banco de dados
             novo_id = criar_pessoa(
                 nome, 
                 tipo_pessoa, 
@@ -575,40 +524,120 @@ class ConsultaCNPJForm(QWidget):
                 observacao
             )
             
-            # Exibir mensagem de sucesso
             msg = QMessageBox(self)
             msg.setWindowTitle("Inclusão")
-            msg.setText(f"Empresa cadastrada com sucesso como uma nova pessoa!\n\nCódigo: {novo_id}\nNome: {nome}")
+            msg.setText(f"Empresa cadastrada com sucesso como Cliente!\n\nCódigo: {novo_id}\nNome: {nome}")
             msg.setStyleSheet("background-color: white;")
             msg.exec_()
             
-            # Notificar tela de cadastro para atualizar a lista (se existir)
             if self.cadastro_tela and hasattr(self.cadastro_tela, 'carregar_pessoas'):
                 self.cadastro_tela.carregar_pessoas()
             
-            # Fechar a janela após inclusão bem-sucedida
             if self.janela_parent:
                 self.janela_parent.close()
                 
         except Exception as e:
-            # Exibir mensagem de erro
             QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao incluir os dados: {str(e)}")
             import traceback
-            traceback.print_exc()  # Imprime o stack trace completo para depuração
+            traceback.print_exc()
+
+    def incluir_como_fornecedor(self):
+        """
+        Inclui os dados consultados do CNPJ como um novo fornecedor no banco de dados
+        """
+        if not self.nome_input.text():
+            QMessageBox.warning(self, "Dados incompletos", 
+                            "Por favor, consulte um CNPJ antes de incluir os dados.")
+            return
+        
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from base.banco import criar_fornecedor
+            
+            nome = self.nome_input.text()
+            fantasia = self.fantasia_input.text() or ""
+            cnpj = self.cnpj_input.text()
+            
+            # Determinar tipo de fornecedor baseado no tipo de empresa
+            tipo_empresa = self.tipo_empresa_input.text()
+            if "Fabricante" in tipo_empresa or "Indústria" in tipo_empresa:
+                tipo = "Fabricante"
+            elif "Distribuidor" in tipo_empresa:
+                tipo = "Distribuidor"
+            elif "Atacado" in tipo_empresa or "Atacadista" in tipo_empresa:
+                tipo = "Atacadista"
+            else:
+                tipo = "Distribuidor"  # Padrão
+            
+            cep = self.cep_input.text() or ""
+            complemento = self.complemento_input.text() or ""
+            numero = self.numero_input.text() or ""
+            
+            # Usar RUA em vez de ENDERECO (conforme a tabela)
+            rua = ""
+            if complemento or numero:
+                if complemento and numero:
+                    rua = f"{complemento}, {numero}"
+                elif complemento:
+                    rua = complemento
+                else:
+                    rua = f"Número: {numero}"
+            
+            bairro = self.bairro_input.text() or ""
+            cidade = self.cidade_input.text() or ""
+            estado = self.uf_input.text() or ""  # Usar ESTADO em vez de UF
+            
+            from datetime import datetime
+            data_cadastro = datetime.now().strftime("%d/%m/%Y")
+            
+            # CORREÇÃO: Chamar criar_fornecedor com a assinatura correta
+            # A função espera: (codigo, nome, fantasia, tipo, cnpj, data_cadastro, cep, rua, bairro, cidade, estado)
+            # O código será gerado automaticamente pela função, então passamos string vazia
+            novo_id = criar_fornecedor(
+                "",  # codigo (será gerado automaticamente)
+                nome,
+                fantasia,
+                tipo,
+                cnpj,
+                data_cadastro,
+                cep,
+                rua,
+                bairro,
+                cidade,
+                estado
+            )
+            
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Inclusão")
+            msg.setText(f"Empresa cadastrada com sucesso como Fornecedor!\n\nCódigo: {novo_id}\nNome: {nome}")
+            msg.setStyleSheet("background-color: white;")
+            msg.exec_()
+            
+            if self.cadastro_tela and hasattr(self.cadastro_tela, 'carregar_fornecedores'):
+                self.cadastro_tela.carregar_fornecedores()
+            
+            if self.janela_parent:
+                self.janela_parent.close()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao incluir o fornecedor: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 
 class ConsultaCNPJWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Consulta CNPJ")
-        self.setGeometry(100, 100, 800, 480)  # Altura reduzida de 600 para 480
+        self.setGeometry(100, 100, 800, 480)
         self.setStyleSheet("background-color: #043b57;")
         
         form_widget = ConsultaCNPJForm(janela_parent=self)
         self.setCentralWidget(form_widget)
 
 
-# Para testar a tela individualmente
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ConsultaCNPJWindow()

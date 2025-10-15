@@ -1365,7 +1365,7 @@ class FormularioPessoa(QWidget):
         
         # Criar uma nova janela para o formulário
         self.form_window = QMainWindow()
-        self.form_window.setWindowTitle("Formulário de Cadastro de Pessoa")
+        self.form_window.setWindowTitle("Formulário de Cadastro de Clientes")
         self.form_window.setGeometry(100, 100, 800, 600)
         self.form_window.setStyleSheet("background-color: #043b57;")
         
