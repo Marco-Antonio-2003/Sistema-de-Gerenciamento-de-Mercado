@@ -55,7 +55,8 @@ def verificar_nova_versao():
         nova_versao = data["tag_name"]
         print(f"Versão mais recente no GitHub: {nova_versao}")
         
-        # CORREÇÃO: Chamada correta da função comparar_versoes
+        # CORREÇÃO PRINCIPAL: Invertida a comparação
+        # Se nova_versao <= VERSAO_ATUAL, não há atualização
         if comparar_versoes(nova_versao, VERSAO_ATUAL) <= 0:
             print("Sistema já está na versão mais recente.")
             return None, None
