@@ -4,85 +4,132 @@ import time
 import shutil  # Para operações de arquivo (backup)
 import subprocess  # Para executar o script de atualização
 import filecmp  # Para comparar arquivos
+import requests  # Para realizar requisições HTTP
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                           QHBoxLayout, QPushButton, QLabel, QLineEdit, QDialog,
-                          QMessageBox, QFrame, QProgressBar, QSplashScreen, QProgressDialog)
+                          QMessageBox, QFrame, QProgressBar, QSplashScreen)
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush, QLinearGradient, QMovie
 from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.3.3"
+Versao = "Versão: v0.1.5.3.4"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
+
+def verificar_atualizacao_simples(self):
+    try:
+        response = requests.get("https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt", timeout=5)
+        nova_versao = response.text.strip()
+        
+        # Extrai número da versão atual
+        versao_atual = Versao.split(": ")[1].strip()
+        
+        if nova_versao > versao_atual:
+            reply = QMessageBox.question(
+                None, 
+                'Atualização Disponível',
+                f"Nova versão {nova_versao} disponível!\n\nDeseja abrir a página de download?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                import webbrowser
+                webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+        else:
+            QMessageBox.information(None, "Atualização", "Seu sistema está atualizado!")
+    except Exception as e:
+        QMessageBox.warning(None, "Erro", f"Não foi possível verificar atualizações: {str(e)}")
+
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização de forma mais robusta.
+    Verifica e aplica uma atualização, com atraso estendido no .bat para evitar erros de DLL.
     """
     try:
         app_dir = os.path.dirname(sys.executable)
         current_exe = sys.executable
         new_exe_path = os.path.join(app_dir, 'atualizacao', 'mbsistema.exe')
 
-        # Verificar se existe atualização pendente
         if not os.path.exists(new_exe_path):
             return False
 
-        # Verificar se o arquivo é diferente
-        try:
-            if os.path.getsize(current_exe) == os.path.getsize(new_exe_path):
-                # Tamanho igual, verificar conteúdo
-                import hashlib
-                def file_hash(filepath):
-                    hash_md5 = hashlib.md5()
-                    with open(filepath, "rb") as f:
-                        for chunk in iter(lambda: f.read(4096), b""):
-                            hash_md5.update(chunk)
-                    return hash_md5.hexdigest()
-                
-                if file_hash(current_exe) == file_hash(new_exe_path):
-                    # Arquivos idênticos, limpar atualização
-                    try:
-                        os.remove(new_exe_path)
-                        # Limpar pasta se estiver vazia
-                        update_dir = os.path.dirname(new_exe_path)
-                        if not os.listdir(update_dir):
-                            os.rmdir(update_dir)
-                    except:
-                        pass
-                    return False
-        except Exception as e:
-            print(f"Erro ao comparar arquivos: {e}")
+        if filecmp.cmp(current_exe, new_exe_path, shallow=False):
+            try:
+                os.remove(new_exe_path)
+            except Exception as e:
+                print(f"Não foi possível remover o arquivo de atualização antigo: {e}")
+            return False
 
-        # Perguntar ao usuário
-        confirm_reply = QMessageBox.question(
-            None, 
-            'Atualização Disponível',
-            "Uma nova versão do sistema está pronta para ser instalada.\n\nDeseja instalar agora? O sistema será reiniciado.",
-            QMessageBox.Yes | QMessageBox.No, 
-            QMessageBox.Yes
-        )
+        confirm_reply = QMessageBox.question(None, 'Atualização Disponível',
+                                             "Uma nova versão do sistema está pronta para ser instalada.\n\nDeseja instalar agora? O sistema será reiniciado.",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
 
         if confirm_reply == QMessageBox.No:
             return False
 
-        # Criar script de atualização
-        from atualizador import criar_script_atualizacao
-        script_path = criar_script_atualizacao(current_exe, new_exe_path)
+        # Diálogo de aviso (mantenha como fallback; remova após testes se o erro de DLL não ocorrer mais)
+        aviso_box = QMessageBox()
+        aviso_box.setIcon(QMessageBox.Information)
+        aviso_box.setWindowTitle("Aviso Importante")
+        aviso_box.setText("A atualização será iniciada agora. O sistema será fechado e reiniciado.")
+        aviso_box.setInformativeText(
+            "Durante o processo, uma mensagem de erro do sistema ('Failed to load DLL') pode aparecer. "
+            "Isto é normal e esperado. Por favor, apenas clique em 'OK' nela para continuar.\n\n"
+            "Clique em 'OK' para iniciar a atualização."
+        )
+        aviso_box.setStandardButtons(QMessageBox.Ok)
+        aviso_box.exec_()
+   
+        # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
+        # CORREÇÃO: Uso de nome fixo para manter APENAS 1 backup (sobrescrevendo o anterior)
+        try:
+            backup_dir = os.path.join(app_dir, 'backup')
+            os.makedirs(backup_dir, exist_ok=True)
+
+            backup_filename = 'MBSistema_backup.exe'  # Nome fixo, sem timestamp
+            backup_path = os.path.join(backup_dir, backup_filename)
+
+            # CORREÇÃO: Remove o backup existente, se houver, para sobrescrita
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+                print('Backup anterior removido para sobrescrita.')
+
+            shutil.copy2(current_exe, backup_path)
+            print(f'Backup do executável salvo em: {backup_path}')
+        except Exception as backup_err:
+            print(f'Falha ao criar backup do executável: {backup_err}')
+
+        # Script .bat com atraso estendido (10 segundos) para limpeza do diretório temporário
+        updater_script_path = os.path.join(app_dir, 'updater.bat')
+        current_exe_filename = os.path.basename(current_exe)
+        new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
+
+        script_content = f"""
+@echo off
+echo Aguardando o sistema fechar e limpar recursos...
+ping -n 11 localhost > NUL  :: Atraso de aproximadamente 10 segundos para evitar erro de DLL
+
+ren "{current_exe_filename}" "{current_exe_filename}.old"
+move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
+
+echo Atualizacao concluida. Reiniciando o sistema...
+start "" "{current_exe_filename}"
+
+timeout /t 5 /nobreak > NUL
+del "{current_exe_filename}.old" > NUL 2> NUL
+
+del "%~f0"
+"""
+        with open(updater_script_path, 'w') as f:
+            f.write(script_content)
         
-        if script_path:
-            # Executar script
-            subprocess.Popen(f'"{script_path}"', shell=True, 
-                           stdout=subprocess.DEVNULL, 
-                           stderr=subprocess.DEVNULL)
-            return True
-        else:
-            QMessageBox.critical(None, "Erro", "Falha ao criar script de atualização.")
-            return False
+        # Chamada original: Mantém shell=True e CREATE_NO_WINDOW para lançamento autônomo
+        subprocess.Popen(f'"{updater_script_path}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        os._exit(0)
 
     except Exception as e:
-        print(f"Erro na verificação de atualização: {e}")
+        QMessageBox.critical(None, "Erro na Atualização", f"Ocorreu um erro ANTES de iniciar o processo de atualização:\n{e}")
         return False
     
 # --- FIM DA SEÇÃO DE ATUALIZAÇÃO ---
@@ -159,32 +206,6 @@ class LoadingWorker(QThread):
         
         self.progress.emit(100)
         self.finished.emit()
-
-class AtualizacaoWorker(QThread):
-    """Thread para executar atualização em background"""
-    progress = pyqtSignal(int)
-    status = pyqtSignal(str)
-    finished = pyqtSignal(str)  # Mensagem de resultado
-    
-    def __init__(self):
-        super().__init__()
-    
-    def run(self):
-        try:
-            # Importar aqui para evitar dependência circular
-            from atualizador import executar_atualizacao
-            
-            def progress_callback(progresso):
-                self.progress.emit(progresso)
-                
-            def status_callback(status):
-                self.status.emit(status)
-            
-            resultado = executar_atualizacao(progress_callback, status_callback)
-            self.finished.emit(resultado)
-            
-        except Exception as e:
-            self.finished.emit(f"Erro na atualização: {str(e)}")
 
 class SplashScreen(QWidget):
     """Tela de carregamento customizada"""
@@ -472,6 +493,11 @@ class LoginWindow(QMainWindow):
         
         form_layout.addSpacing(10)
         
+        # verificar atualização
+        self.verificar_atualizacao_btn = QPushButton("VERIFICAR ATUALIZAÇÃO")
+        self.verificar_atualizacao_btn.clicked.connect(self.verificar_atualizacao_simples)
+        form_layout.addWidget(self.verificar_atualizacao_btn)
+
         # Estilo para os rótulos
         label_style = "color: white; font-size: 14px; font-weight: bold;"
         
@@ -556,33 +582,6 @@ class LoginWindow(QMainWindow):
         self.login_button.setCursor(Qt.PointingHandCursor)
         self.login_button.clicked.connect(self.login)
         form_layout.addWidget(self.login_button)
-
-        # Botão Verificar Atualização
-        self.atualizar_button = QPushButton("VERIFICAR ATUALIZAÇÃO")
-        self.atualizar_button.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 8px;
-                font-size: 12px;
-                font-weight: bold;
-                margin-top: 5px;
-            }
-            QPushButton:hover {
-                background-color: #218838;
-            }
-            QPushButton:pressed {
-                background-color: #1e7e34;
-            }
-            QPushButton:disabled {
-                background-color: #6c757d;
-            }
-        """)
-        self.atualizar_button.setCursor(Qt.PointingHandCursor)
-        self.atualizar_button.clicked.connect(self.verificar_atualizacao)
-        form_layout.addWidget(self.atualizar_button)
         
         # Centralizar o formulário na janela
         container_layout = QHBoxLayout()
@@ -608,81 +607,6 @@ class LoginWindow(QMainWindow):
         self.senha_input.returnPressed.connect(self.avancar_para_empresa)
         self.empresa_input.returnPressed.connect(self.login)
     
-    def verificar_atualizacao(self):
-        """Inicia o processo de verificação de atualização"""
-        try:
-            # Criar e configurar worker
-            self.atualizacao_worker = AtualizacaoWorker()
-            self.atualizacao_worker.progress.connect(self.atualizacao_progresso)
-            self.atualizacao_worker.status.connect(self.atualizacao_status)
-            self.atualizacao_worker.finished.connect(self.atualizacao_concluida)
-            
-            # Desabilitar botão durante atualização
-            self.atualizar_button.setEnabled(False)
-            self.atualizar_button.setText("VERIFICANDO...")
-            
-            # Diálogo de progresso
-            self.progress_dialog = QProgressDialog("Verificando atualizações...", "Cancelar", 0, 100, self)
-            self.progress_dialog.setWindowTitle("Atualização do Sistema")
-            self.progress_dialog.setWindowModality(Qt.WindowModal)
-            self.progress_dialog.canceled.connect(self.cancelar_atualizacao)
-            self.progress_dialog.show()
-            
-            # Iniciar worker
-            self.atualizacao_worker.start()
-            
-        except Exception as e:
-            self.mostrar_mensagem("Erro", f"Falha ao iniciar verificação de atualização: {str(e)}")
-            self.restaurar_botao_atualizacao()
-
-    def atualizacao_progresso(self, valor):
-        """Atualiza a barra de progresso"""
-        if hasattr(self, 'progress_dialog'):
-            self.progress_dialog.setValue(valor)
-
-    def atualizacao_status(self, status):
-        """Atualiza o status da atualização"""
-        if hasattr(self, 'progress_dialog'):
-            self.progress_dialog.setLabelText(status)
-
-    def atualizacao_concluida(self, mensagem):
-        """Chamado quando a atualização é concluída"""
-        try:
-            if hasattr(self, 'progress_dialog'):
-                self.progress_dialog.close()
-                
-            self.mostrar_mensagem("Atualização", mensagem)
-            
-            # Se a atualização foi bem-sucedida e o sistema será reiniciado
-            if "reiniciado" in mensagem.lower():
-                QTimer.singleShot(1000, self.fechar_para_atualizacao)
-            else:
-                self.restaurar_botao_atualizacao()
-                
-        except Exception as e:
-            print(f"Erro ao concluir atualização: {e}")
-            self.restaurar_botao_atualizacao()
-
-    def cancelar_atualizacao(self):
-        """Cancela o processo de atualização"""
-        try:
-            if hasattr(self, 'atualizacao_worker') and self.atualizacao_worker.isRunning():
-                self.atualizacao_worker.terminate()
-                self.atualizacao_worker.wait(3000)  # Espera até 3 segundos
-        except:
-            pass
-        finally:
-            self.restaurar_botao_atualizacao()
-
-    def restaurar_botao_atualizacao(self):
-        """Restaura o botão de atualização ao estado normal"""
-        self.atualizar_button.setEnabled(True)
-        self.atualizar_button.setText("VERIFICAR ATUALIZAÇÃO")
-
-    def fechar_para_atualizacao(self):
-        """Fecha o sistema para permitir a atualização"""
-        self.close()
-
     def solicitar_codigo_licenca(self, usuario_id):
         """Exibe diálogo solicitando código de licença"""
         dialog = QDialog(self)
