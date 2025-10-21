@@ -5,6 +5,7 @@ import shutil  # Para operações de arquivo (backup)
 import subprocess  # Para executar o script de atualização
 import filecmp  # Para comparar arquivos
 import requests  # Para realizar requisições HTTP
+import webbrowser
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                           QHBoxLayout, QPushButton, QLabel, QLineEdit, QDialog,
@@ -18,29 +19,6 @@ Versao = "Versão: v0.1.5.3.4"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
-def verificar_atualizacao_simples(self):
-    try:
-        response = requests.get("https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt", timeout=5)
-        nova_versao = response.text.strip()
-        
-        # Extrai número da versão atual
-        versao_atual = Versao.split(": ")[1].strip()
-        
-        if nova_versao > versao_atual:
-            reply = QMessageBox.question(
-                None, 
-                'Atualização Disponível',
-                f"Nova versão {nova_versao} disponível!\n\nDeseja abrir a página de download?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            
-            if reply == QMessageBox.Yes:
-                import webbrowser
-                webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
-        else:
-            QMessageBox.information(None, "Atualização", "Seu sistema está atualizado!")
-    except Exception as e:
-        QMessageBox.warning(None, "Erro", f"Não foi possível verificar atualizações: {str(e)}")
 
 def verificar_e_aplicar_atualizacao():
     """
@@ -364,6 +342,68 @@ class LoginWindow(QMainWindow):
         # Carregar o usuário e empresa salvos, se existirem
         self.carregar_dados_salvos()
     
+    def verificar_atualizacao_simples(self):
+        """Verifica atualizações de forma simples e abre o link de download se necessário."""
+        try:
+            # URL do arquivo versao.txt no seu repositório
+            version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
+            
+            response = requests.get(version_url, timeout=5)
+            response.raise_for_status()
+            nova_versao = response.text.strip()
+            
+            # Extrai número da versão atual da variável Versao
+            versao_atual = Versao.split(": ")[1].strip()
+            
+            print(f"Versão atual: {versao_atual}")
+            print(f"Nova versão: {nova_versao}")
+            
+            # Compara versões (simples, funciona para formato vX.Y.Z)
+            if self.comparar_versoes_simples(nova_versao, versao_atual):
+                reply = QMessageBox.question(
+                    self, 
+                    'Atualização Disponível',
+                    f"Nova versão {nova_versao} disponível!\n\nDeseja abrir a página de download?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                
+                if reply == QMessageBox.Yes:
+                    import webbrowser
+                    webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+            else:
+                QMessageBox.information(self, "Atualização", "Seu sistema está atualizado!")
+                
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Erro de Conexão", f"Não foi possível verificar atualizações.\nVerifique sua conexão com a internet.\n\nErro: {str(e)}")
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Não foi possível verificar atualizações: {str(e)}")
+    
+    def comparar_versoes_simples(self, versao1, versao2):
+        """Compara duas versões no formato vX.Y.Z"""
+        try:
+            # Remove o 'v' inicial
+            v1 = versao1.lstrip('v').split('.')
+            v2 = versao2.lstrip('v').split('.')
+            
+            # Converte para inteiros
+            v1 = [int(x) for x in v1]
+            v2 = [int(x) for x in v2]
+            
+            # Compara cada parte
+            for i in range(max(len(v1), len(v2))):
+                val1 = v1[i] if i < len(v1) else 0
+                val2 = v2[i] if i < len(v2) else 0
+                
+                if val1 > val2:
+                    return True
+                elif val1 < val2:
+                    return False
+            
+            return False  # Versões iguais
+        except:
+            return False
+
     def verificar_e_iniciar_syncthing(self):
         """Verifica e tenta iniciar o Syncthing, com tentativas periódicas"""
         try:
