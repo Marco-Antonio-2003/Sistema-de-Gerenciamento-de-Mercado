@@ -5,7 +5,6 @@ import requests
 import subprocess
 import tempfile
 import time
-
 # Obter versão atual do sistema dinamicamente
 try:
     from login import Versao

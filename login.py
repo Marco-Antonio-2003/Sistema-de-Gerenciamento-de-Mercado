@@ -16,7 +16,6 @@ from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, 
 Versao = "Versão: v0.1.5.3.3"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
-
 def verificar_e_aplicar_atualizacao():
     """
     Verifica e aplica uma atualização de forma mais robusta.
