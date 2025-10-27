@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import sys
 import re
+import base64
 from dotenv import load_dotenv  
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
                             QLineEdit, QPushButton, QLabel, QApplication,
@@ -72,11 +73,6 @@ class BancoDadosAssistente:
             
             # Contas correntes
             r'contas?\s*correntes?': self.contar_contas_correntes,
-            
-            # Resumo geral
-            r'resumo\s*geral': self.resumo_geral,
-            r'dashboard': self.resumo_geral,
-            r'visão\s*geral': self.resumo_geral,
         }
     
     def processar_pergunta(self, pergunta):
@@ -371,9 +367,23 @@ class AssistenteAPI(QThread):
     
     def __init__(self):
         super().__init__()
-        self.api_key = os.getenv('API_KEY')
-        if not self.api_key:
-            raise ValueError("❌ API_KEY não encontrada no arquivo .env. Verifique se o arquivo .env está na pasta correta e contém a variável API_KEY.")
+        # --- Alteração Principal: Usar a chave codificada ---
+        try:
+            # Chave que você gerou, embutida diretamente no código
+            chave_codificada = "c2stb3ItdjEtNDU5ZjhkYjhjMTFkMzZmY2ZjOGZkNmNkZDAwZDY4YzcyZjkwNDNkMWQxZDMxNWIxNmNhYmYzZTU2NDg4M2FiNg=="
+            
+            # Decodifica a chave de Base64 para a string original
+            chave_decodificada_bytes = base64.b64decode(chave_codificada)
+            self.api_key = chave_decodificada_bytes.decode('utf-8')
+            
+            if not self.api_key:
+                # Este erro agora é muito menos provável, mas é uma boa prática manter a verificação
+                raise ValueError("❌ Chave de API interna está vazia após a decodificação.")
+                
+        except Exception as e:
+            # Captura qualquer erro durante a decodificação
+            raise ValueError(f"❌ Falha ao processar a chave de API interna: {e}")
+        
         self.mensagem = ""
         self.historico_conversa = []
         self.use_streaming = True  # Ativar streaming
@@ -486,8 +496,8 @@ class AssistenteAPI(QThread):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
+                    'Authorization': f'Bearer {self.api_key}', 
+                    'Content-Type': 'application/json',
                     "HTTP-Referer": "https://mbsistema.com.br",
                     "X-Title": "MB Sistema - Assistente Virtual",
                 },
@@ -1041,6 +1051,9 @@ class ChatWidget(QWidget):
 class ChatbotAssistente(QWidget):
     """Widget principal otimizado"""
     navegar_para = pyqtSignal(str, str)
+    # ### NOVO SINAL ###
+    # Sinal para pedir que o dock seja fechado.
+    fechar_solicitado = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1071,8 +1084,9 @@ class ChatbotAssistente(QWidget):
                 font-weight: bold;
             }
         """)
-        header_layout.addWidget(header, 1)
+        header_layout.addWidget(header, 1) # Adiciona o título
         
+        # Botão Limpar (continua o mesmo)
         btn_limpar = QPushButton("🗑️")
         btn_limpar.setToolTip("Limpar conversa")
         btn_limpar.setFixedSize(30, 30)
@@ -1089,6 +1103,28 @@ class ChatbotAssistente(QWidget):
             }
         """)
         header_layout.addWidget(btn_limpar)
+
+        # ### MUDANÇA 3: Adicionando o botão 'X' de fechar ###
+        btn_fechar = QPushButton("X")
+        btn_fechar.setToolTip("Fechar assistente")
+        btn_fechar.setFixedSize(30, 30)
+        btn_fechar.setStyleSheet("""
+            QPushButton { 
+                background-color: transparent; 
+                color: white; 
+                border: none; 
+                font-size: 14px; 
+                font-weight: bold;
+                border-radius: 15px;
+            }
+            QPushButton:hover { 
+                background-color: #c0392b; /* Vermelho ao passar o mouse */
+            }
+        """)
+        # Conecta o clique do botão ao novo sinal
+        btn_fechar.clicked.connect(self.fechar_solicitado.emit)
+        header_layout.addWidget(btn_fechar)
+        
         layout.addWidget(header_frame)
         
         self.chat_widget = ChatWidget()
@@ -1102,32 +1138,23 @@ class ChatbotDockWidget(QDockWidget):
     navegar_para_main = pyqtSignal(str, str)
     
     def __init__(self, parent=None):
-        super().__init__("Assistente Virtual", parent)
-        self.chatbot_widget_interno = ChatbotAssistente()
-        self.setWidget(self.chatbot_widget_interno)
-        self.chatbot_widget_interno.navegar_para.connect(self.navegar_para_main.emit)
+        super().__init__("", parent) 
         
-        # Configurações otimizadas
-        self.setFeatures(
-            QDockWidget.DockWidgetMovable | 
-            QDockWidget.DockWidgetFloatable | 
-            QDockWidget.DockWidgetClosable
-        )
+        self.chatbot_widget_interno = ChatbotAssistente(self)
+        self.setWidget(self.chatbot_widget_interno)
+        
+        # Conexões dos sinais
+        self.chatbot_widget_interno.navegar_para.connect(self.navegar_para_main.emit)
+        # ### NOVA CONEXÃO ###
+        # Quando o botão 'X' for clicado, ele emite 'fechar_solicitado',
+        # que por sua vez chama o método 'hide()' do próprio dock para se fechar.
+        self.chatbot_widget_interno.fechar_solicitado.connect(self.hide)
+
+        self.setTitleBarWidget(QWidget())
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.setMinimumWidth(350)
         self.setMaximumWidth(500)
-        
-        self.setStyleSheet("""
-            QDockWidget { 
-                border: 1px solid #005079;
-            }
-            QDockWidget::title { 
-                background-color: #005079; 
-                color: white; 
-                padding: 8px; 
-                font-weight: bold;
-            }
-        """)
+        self.setStyleSheet("QDockWidget { border: 1px solid #005079; }")
 
 
 # Função de integração otimizada

@@ -88,6 +88,7 @@ class FormularioPessoa(QWidget):
         combo_style = """
             QComboBox {
                 background-color: white;
+                color: black; /* Texto do combobox fechado */
                 border: 1px solid #cccccc;
                 padding: 6px;
                 font-size: 13px;
@@ -103,11 +104,23 @@ class FormularioPessoa(QWidget):
                 width: 12px;
                 height: 12px;
             }
+            /* Estilo da lista suspensa - corrigido para garantir texto preto */
             QComboBox QAbstractItemView {
-                background-color: white;
+                background-color: white !important;
+                color: black !important; /* Cor do texto forçada para preto */
                 border: 1px solid #cccccc;
-                selection-background-color: #1a5f96;
-                selection-color: white;
+                selection-background-color: #043b57;
+                selection-color: white; /* Cor do texto do item selecionado */
+            }
+            /* Apenas o item sob o mouse fica com texto branco */
+            QComboBox QAbstractItemView::item:selected,
+            QComboBox QAbstractItemView::item:hover {
+                color: white !important;
+                background-color: #043b57;
+            }
+            /* Força TODOS os outros itens a terem texto preto */
+            QComboBox QAbstractItemView::item {
+                color: black !important; /* Cor forçada para preto */
             }
         """
         

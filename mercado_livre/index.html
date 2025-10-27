@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código de Autorização - Seu Sistema</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .code-box {
+            background-color: #e8f0fe;
+            border: 1px solid #d2e3fc;
+            padding: 15px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            color: #3c4043;
+            word-wrap: break-word;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+        .copy-btn {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .copy-btn:hover {
+            background-color: #1558b8;
+        }
+        .error {
+            color: #d93025;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="main-container">
+        <!-- O conteúdo será preenchido pelo JavaScript -->
+    </div>
+
+    <script>
+        window.onload = function() {
+            const container = document.getElementById('main-container');
+            const params = new URLSearchParams(window.location.search);
+            const authCode = params.get('code');
+            const error = params.get('error');
+
+            if (authCode) {
+                // SUCESSO: O código foi recebido
+                container.innerHTML = `
+                    <h1>✅ Autorização Quase Completa!</h1>
+                    <p>Copie o código abaixo e cole no campo solicitado dentro do seu sistema para finalizar a conexão.</p>
+                    <div id="authCode" class="code-box">${authCode}</div>
+                    <button class="copy-btn" onclick="copyCode()">Copiar Código</button>
+                    <p style="font-size: 14px; color: #888; margin-top: 20px;">Após copiar, você já pode fechar esta página.</p>
+                `;
+            } else if (error) {
+                // ERRO: O Mercado Livre retornou um erro
+                const errorDescription = params.get('error_description') || 'Não foi possível autorizar o acesso.';
+                container.innerHTML = `
+                    <h1 class="error">❌ Ocorreu um Erro</h1>
+                    <p>A autenticação com o Mercado Livre falhou.</p>
+                    <p class="error">${errorDescription.replace(/_/g, ' ')}</p>
+                    <p>Por favor, feche esta página e tente conectar novamente a partir do sistema.</p>
+                `;
+            } else {
+                // NENHUM PARÂMETRO: Acesso direto à página
+                 container.innerHTML = `
+                    <h1>Página de Redirecionamento</h1>
+                    <p>Esta página é utilizada apenas durante o processo de autenticação com o Mercado Livre. Por favor, inicie o processo a partir do seu sistema.</p>
+                `;
+            }
+        };
+
+        function copyCode() {
+            const codeElement = document.getElementById('authCode');
+            const button = document.querySelector('.copy-btn');
+            navigator.clipboard.writeText(codeElement.innerText).then(function() {
+                button.innerText = 'Copiado!';
+                setTimeout(() => { button.innerText = 'Copiar Código'; }, 2000);
+            }, function(err) {
+                console.error('Erro ao copiar o código: ', err);
+            });
+        }
+    </script>
+</body>
+</html>

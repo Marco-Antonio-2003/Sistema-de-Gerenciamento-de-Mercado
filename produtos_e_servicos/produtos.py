@@ -1259,7 +1259,7 @@ class Produtos(QWidget):
             # Tente primeiro com importação direta (para ambiente de desenvolvimento)
             try:
                 # Importação direta usando o módulo
-                from geral.formulario_produtos import FormularioProdutos
+                from produtos_e_servicos.formulario_produtos import FormularioProdutos
                 print("Importação direta de FormularioProdutos bem-sucedida")
                 return FormularioProdutos
             except ImportError as e:

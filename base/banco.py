@@ -1,25 +1,302 @@
-"""
-Módulo para gerenciar conexões com o banco de dados Firebird
-"""
-
-#banco.py
-from datetime import date
+# Arquivo: base/banco.py
+# --- IMPORTS PADRÃO E DE OTIMIZAÇÃO ---
+import json
 import os
 import sys
-import fdb  # Módulo para conexão com Firebird
-from PyQt5.QtWidgets import QMessageBox
+import fdb
+import functools
+import threading
+import time
+import atexit
+from datetime import date, datetime, timedelta
+import glob
 import hashlib
 import base64
-import time
 import random
 import string
-import threading
-import atexit
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import QueuePool
+from PyQt5.QtWidgets import QMessageBox
 
-# Variáveis globais para controle de sincronização (adicione junto às outras variáveis globais)
+print("Módulo 'banco.py' sendo carregado...")
+
+# --- CONFIGURAÇÃO INICIAL E VARIÁVEIS GLOBAIS ---
 SINCRONIZACAO_ATIVA = False
 ULTIMA_SINCRONIZACAO = 0
-INTERVALO_MIN_SYNC = 300  # 5 minutos entre sincronizações
+INTERVALO_MIN_SYNC = 300  # 5 minutos
+
+usuario_logado = {
+    "id": None,
+    "nome": None,
+    "empresa": None
+}
+def carregar_config(caminho_config='config.json'):
+    """Carrega o arquivo de configuração JSON para o banco."""
+    # DEBUG: Print do caminho base e absoluto do config
+    base_path = get_base_path()
+    abs_config_path = os.path.abspath(caminho_config)
+    print(f"🔍 DEBUG: Caminho base da app: {base_path}")
+    print(f"🔍 DEBUG: Procurando config.json em: {abs_config_path}")
+    print(f"🔍 DEBUG: Arquivo existe? {os.path.exists(abs_config_path)}")
+    
+    try:
+        with open(caminho_config, 'r', encoding='utf-8') as f:
+            config = json.load(f)['database']
+            print(f"✅ Configuração carregada de {caminho_config}: host={config.get('host', 'localhost')}, path={config.get('database_path', 'N/A')}")
+            return config
+    except FileNotFoundError as e:
+        print(f"❌ DEBUG: Arquivo não encontrado: {e}. Usando fallback local.")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"❌ DEBUG: JSON inválido: {e}. Usando fallback local.")
+        return None
+    except Exception as e:
+        print(f"❌ DEBUG: Erro inesperado no config: {e}. Usando fallback local.")
+        return None
+    
+# --- FUNÇÕES DE CAMINHO E CONFIGURAÇÃO ---
+def get_base_path():
+    """Retorna o caminho base da aplicação, seja em modo dev ou compilado."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def get_db_path():
+    """Determina o caminho do banco de dados MBDATA_NOVO.FDB de forma robusta."""
+    base_dir = get_base_path()
+    db_path = os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB")
+    if os.path.isfile(db_path):
+        return db_path
+    alt_db_path = os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB")
+    if os.path.isfile(alt_db_path):
+        return alt_db_path
+    print(f"AVISO: Banco de dados não encontrado. Tentando usar o caminho padrão: {db_path}")
+    db_dir = os.path.dirname(db_path)
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+        print(f"Diretório criado: {db_dir}")
+    return db_path
+
+# Carrega config do JSON (prioriza config; fallback para valores default se arquivo ausente)
+config_db = carregar_config()
+if config_db:
+    DB_HOST = config_db.get('host', 'localhost')
+    DB_PORT = config_db.get('port', 3050)
+    DB_PATH = config_db.get('database_path', None)  # Prioriza config; None temporário se fallback
+    DB_USER = config_db.get('user', 'SYSDBA')
+    DB_PASSWORD = config_db.get('password', 'masterkey')
+    print(f"✅ DEBUG: Usando config remoto: host={DB_HOST}, path={DB_PATH}")
+else:
+    # Fallback hardcode se config falhar
+    DB_PATH = None  # Placeholder; será setado abaixo
+    DB_USER = "SYSDBA"
+    DB_PASSWORD = "masterkey"
+    DB_HOST = "localhost"
+    DB_PORT = 3050
+    print(f"⚠️  DEBUG: Fallback para LOCAL: host={DB_HOST}")
+
+# Agora setamos DB_PATH final (usa get_db_path() só se necessário, após vars prontas)
+if DB_PATH is None:
+    DB_PATH = get_db_path()  # Chama local só se config não deu path
+print(f"Config final do banco: host={DB_HOST}, port={DB_PORT}, path={DB_PATH}")
+
+# --- OTIMIZAÇÃO: POOL DE CONEXÕES COM SQLAlchemy ---
+engine = None
+DATABASE_URL = None
+try:
+    # Monta URL com valores do config
+    DATABASE_URL = f"firebird+fdb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_PATH}?charset=UTF8"
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=3600,
+        echo=False
+    )
+    with engine.connect() as conn:  # Testa a conexão inicial
+        print("✅ Pool de conexões com o banco de dados inicializado com sucesso.")
+except Exception as e:
+    print(f"❌ ERRO CRÍTICO: Não foi possível criar o pool de conexões. Verifique config.json e rede. {e}")
+    engine = None
+
+# --- UTILITÁRIOS: GARANTIR EXISTÊNCIA DA TABELA CAIXA ---
+# NO ARQUIVO base/banco.py, SUBSTITUA A FUNÇÃO ANTIGA POR ESTA:
+
+def _ensure_caixa_table():
+    """
+    Verifica se a tabela CAIXA existe e a cria usando o método compatível
+    de Generator e Trigger, caso não exista.
+    """
+    if not engine:
+        print("⚠️  Engine não inicializada: não é possível verificar/criar tabela CAIXA.")
+        return
+
+    try:
+        with engine.connect() as conn:
+            # 1. Testa se a tabela CAIXA existe
+            try:
+                conn.execute(text("SELECT 1 FROM CAIXA WHERE 1=0"))
+                print("Tabela CAIXA já existe — OK.")
+                return # Se existe, não faz mais nada
+            except Exception:
+                print("Tabela CAIXA não encontrada — iniciando processo de criação.")
+
+            # 2. Se não existe, cria a tabela, o generator e o trigger
+            trans = conn.begin()
+            try:
+                # MUDANÇA 1: DDL sem a sintaxe 'IDENTITY'
+                ddl_create_table = """
+                CREATE TABLE CAIXA (
+                    CODIGO INTEGER NOT NULL PRIMARY KEY,
+                    ABERTURA TIMESTAMP,
+                    FECHAMENTO TIMESTAMP,
+                    USUARIO VARCHAR(50),
+                    ESTACAO VARCHAR(50),
+                    FUNDO_TROCO DECIMAL(10,2)
+                );
+                """
+                conn.execute(text(ddl_create_table))
+                print("-> Tabela CAIXA criada.")
+
+                # MUDANÇA 2: Cria o GENERATOR (sequência) para o ID
+                ddl_create_generator = "CREATE GENERATOR GEN_CAIXA_ID;"
+                conn.execute(text(ddl_create_generator))
+                print("-> Generator GEN_CAIXA_ID criado.")
+
+                # MUDANÇA 3: Cria o TRIGGER para auto-incrementar o CODIGO
+                ddl_create_trigger = """
+                CREATE TRIGGER CAIXA_BI FOR CAIXA
+                ACTIVE BEFORE INSERT POSITION 0
+                AS
+                BEGIN
+                    IF (NEW.CODIGO IS NULL) THEN
+                        NEW.CODIGO = NEXT VALUE FOR GEN_CAIXA_ID;
+                END
+                """
+                conn.execute(text(ddl_create_trigger))
+                print("-> Trigger CAIXA_BI criado.")
+
+                trans.commit()
+                print("✅ Tabela CAIXA configurada com sucesso.")
+
+            except Exception as e_create:
+                print(f"❌ Erro durante a criação da estrutura da tabela CAIXA: {e_create}")
+                trans.rollback()
+
+    except Exception as e:
+        print(f"❌ Erro crítico ao conectar ao banco para garantir a tabela CAIXA: {e}")
+
+# --- OTIMIZAÇÃO: NOVA FUNÇÃO execute_query (ACEITA MAPPINGS E SEQUÊNCIAS) ---
+def execute_query(query: str, params=None, commit=True, verificar_sync=True):
+    """
+    Executa uma query no banco de dados com suporte a sincronização
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection(verificar_sync=verificar_sync)  # Usa a nova, com config
+        cursor = conn.cursor()
+        
+        if params:
+            print(f"Executando query com parâmetros: {params}")
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+            
+        # Se for um SELECT, retorna os resultados
+        if query.strip().upper().startswith("SELECT"):
+            results = cursor.fetchall()
+            return results
+        
+        # Se precisar fazer commit
+        if commit:
+            conn.commit()
+            
+        return True
+    except Exception as e:
+        if conn and commit:
+            conn.rollback()
+        print(f"Erro na execução da query: {str(e)}")
+        raise Exception(f"Erro ao executar query: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+# --- HELPERS PRÁTICOS PARA MÓDULO CAIXA ---
+def fetch_caixas(codigo=None, usuario=None, inicio=None, fim=None, limit=1000):
+    """
+    Retorna lista de tuplas com (CODIGO, ABERTURA, FECHAMENTO, ESTACAO, USUARIO)
+    Parâmetros:
+      - codigo: inteiro ou string
+      - usuario: string (busca LIKE)
+      - inicio/fim: string 'YYYY-MM-DD' ou datetime
+    """
+    query = "SELECT CODIGO, ABERTURA, FECHAMENTO, ESTACAO, USUARIO FROM CAIXA WHERE 1=1"
+    params = {}
+    if codigo is not None and str(codigo).strip() != "":
+        query += " AND CODIGO = :codigo"
+        params["codigo"] = int(codigo)
+    if usuario:
+        query += " AND USUARIO LIKE :usuario"
+        params["usuario"] = f"%{usuario}%"
+    if inicio:
+        query += " AND ABERTURA >= :inicio"
+        params["inicio"] = inicio if isinstance(inicio, str) else inicio.strftime("%Y-%m-%d")
+    if fim:
+        query += " AND ABERTURA <= :fim"
+        params["fim"] = fim if isinstance(fim, str) else fim.strftime("%Y-%m-%d")
+    query += " ORDER BY ABERTURA DESC"
+    if limit:
+        # Firebird aceita FIRST
+        query = query.replace("SELECT", f"SELECT FIRST {limit}", 1)
+    return execute_query(query, params or {})
+
+def abrir_caixa(usuario, estacao="ESTACAO_PADRAO", fundo_troco=0.0):
+    """
+    Insere um novo caixa e retorna o CODIGO (se possível).
+    """
+    # Firebird: usamos CURRENT_TIMESTAMP para ABERTURA
+    query = """
+    INSERT INTO CAIXA (ABERTURA, USUARIO, ESTACAO, FUNDO_TROCO)
+    VALUES (CURRENT_TIMESTAMP, :usuario, :estacao, :fundo)
+    """
+    execute_query(query, {"usuario": usuario, "estacao": estacao, "fundo": float(fundo_troco)}, commit=True)
+    # Tentamos retornar o último CODIGO inserido: em Firebird moderno poderia usar RETURNING,
+    # mas para compatibilidade, fazemos um SELECT do último registro por ABERTURA.
+    rows = execute_query("SELECT CODIGO FROM CAIXA ORDER BY ABERTURA DESC ROWS 1", {}, commit=False)
+    return rows[0][0] if rows else None
+
+def fechar_caixa(codigo):
+    """
+    Atualiza FECHAMENTO = CURRENT_TIMESTAMP para o CODIGO informado.
+    Retorna True se atualizou algo.
+    """
+    query = "UPDATE CAIXA SET FECHAMENTO = CURRENT_TIMESTAMP WHERE CODIGO = :codigo"
+    res = execute_query(query, {"codigo": int(codigo)}, commit=True)
+    # execute_query retorna [] para não-SELECT; perguntamos quantas linhas afetadas:
+    # Infelizmente fetchall não retorna affected_rows com text(). Então, para confirmar,
+    # executamos um SELECT simples para verificar se FECHAMENTO foi preenchido.
+    check = execute_query("SELECT FECHAMENTO FROM CAIXA WHERE CODIGO = :codigo", {"codigo": int(codigo)}, commit=False)
+    return bool(check and check[0][0] is not None)
+
+# --- FUNÇÃO DE DESLIGAMENTO ---
+def desligar_banco():
+    """Fecha o pool de conexões de forma segura."""
+    global engine
+    if engine:
+        engine.dispose()
+        print("🔌 Pool de conexões do banco de dados foi encerrado.")
+
+# Garante que o pool seja fechado quando o programa terminar
+atexit.register(desligar_banco)
+
+
+# ==============================================================================
+#  A PARTIR DAQUI VAMOS COLAR AS SUAS FUNÇÕES ANTIGAS, UMA POR UMA
+# ==============================================================================
 
 def iniciar_syncthing_se_necessario():
     """Inicia o Syncthing se ele não estiver em execução, usando o gerenciador singleton"""
@@ -108,7 +385,7 @@ def limpar_arquivos_conflito():
         print("Verificando arquivos de conflito e temporários...")
         
         # Obter o diretório do banco de dados
-        banco_dir = os.path.dirname(get_db_path())
+        banco_dir = os.path.dirname(get_db_path_safe())
         
         # Padrões de arquivos para remover
         padroes = [
@@ -173,152 +450,7 @@ def arquivo_esta_em_uso(caminho_arquivo):
     except Exception:
         # Para qualquer outro erro, assumir que está em uso por segurança
         return True
-
-# Função para encontrar o caminho do banco de dados
-# Função adicionada para resolver problemas de caminho no executável
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        # Executando como executable
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        # Executando em desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return base_dir
-
-def get_db_path():
-    """
-    Determina o caminho do banco de dados considerando diferentes ambientes
-    de execução (desenvolvimento ou aplicação compilada)
-    """
-    # Opção 1: Verifica se estamos em uma aplicação compilada (PyInstaller)
-    if getattr(sys, 'frozen', False):
-        # Se estiver executando como um executável compilado
-        base_dir = os.path.dirname(sys.executable)
-        db_paths = [
-            # Caminho relativo ao executável
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho relativo ao executável (pasta pai)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho absoluto fixo (caso seja uma instalação específica)
-            r"C:\MBSistema\base\banco\MBDATA_NOVO.FDB",
-        ]
-    else:
-        # Se estiver executando em modo de desenvolvimento
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        db_paths = [
-            # Caminho relativo ao script atual
-            os.path.join(base_dir, "base", "banco", "MBDATA_NOVO.FDB"),
-            # Caminho alternativo (um nível acima)
-            os.path.join(os.path.dirname(base_dir), "base", "banco", "MBDATA_NOVO.FDB"),
-        ]
     
-    # Verificar qual caminho existe
-    for path in db_paths:
-        if os.path.isfile(path):
-            print(f"Banco de dados encontrado em: {path}")
-            return path
-    
-    # Se chegou até aqui, não encontrou o arquivo
-    # Vamos retornar o primeiro caminho e deixar o Firebird gerar o erro apropriado
-    print(f"AVISO: Banco de dados não encontrado. Tentando usar: {db_paths[0]}")
-    
-    # Verificar se o diretório existe, se não, tentar criá-lo
-    db_dir = os.path.dirname(db_paths[0])
-    if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"Diretório criado: {db_dir}")
-        except Exception as e:
-            print(f"Erro ao criar diretório: {e}")
-    
-    return db_paths[0]
-
-# Configurações do banco de dados
-DB_PATH = get_db_path()
-DB_USER = "SYSDBA"
-DB_PASSWORD = "masterkey"
-DB_HOST = "localhost"
-DB_PORT = 3050
-
-def get_connection():
-    """
-    Retorna uma conexão com o banco de dados Firebird
-    """
-    try:
-        print(f"Tentando conectar ao banco de dados: {DB_PATH}")
-        conn = fdb.connect(
-            host=DB_HOST,
-            database=DB_PATH,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT,
-            charset='UTF8'  # Garantir codificação correta
-        )
-        return conn
-    except Exception as e:
-        print(f"Erro de conexão: {e}")
-        raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
-
-def execute_query(query, params=None, commit=True, verificar_sync=True):
-    """
-    Executa uma query no banco de dados com suporte a sincronização
-    """
-    conn = None
-    cursor = None
-    try:
-        conn = get_connection(verificar_sync=verificar_sync)
-        cursor = conn.cursor()
-        
-        if params:
-            print(f"Executando query com parâmetros: {params}")
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-            
-        # Se for um SELECT, retorna os resultados
-        if query.strip().upper().startswith("SELECT"):
-            results = cursor.fetchall()
-            return results
-        
-        # Se precisar fazer commit
-        if commit:
-            conn.commit()
-            
-        return True
-    except Exception as e:
-        if conn and commit:
-            conn.rollback()
-        print(f"Erro na execução da query: {str(e)}")
-        raise Exception(f"Erro ao executar query: {str(e)}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-def verificar_conectividade():
-    """Verifica se há conexão com a internet"""
-    try:
-        import socket
-        socket.create_connection(("www.google.com", 80), timeout=3)
-        return True
-    except OSError:
-        return False
-def banco_em_uso():
-    """Verifica se o banco de dados está em uso no momento"""
-    try:
-        # Tenta abrir o arquivo do banco para verificar se está bloqueado
-        caminho_banco = get_db_path()
-        with open(caminho_banco, 'rb') as f:
-            # Tenta apenas ler o começo do arquivo para verificar acesso
-            f.read(10)
-            return False  # Se conseguir abrir, o banco não está em uso exclusivo
-    except (IOError, PermissionError):
-        return True  # Erro ao abrir, indica que o banco está em uso
-    except Exception as e:
-        print(f"Erro ao verificar uso do banco: {e}")
-        return True  # Em caso de dúvida, considerar como em uso
-
 def controlar_sincronizacao():
     """Controla o processo de sincronização do banco principal"""
     global SINCRONIZACAO_ATIVA, ULTIMA_SINCRONIZACAO
@@ -363,7 +495,7 @@ def controlar_sincronizacao():
         
         # O Syncthing fará a sincronização por conta própria
         # Vamos apenas garantir que o arquivo seja "tocado" para ser detectado
-        caminho_banco = get_db_path()
+        caminho_banco = get_db_path_safe()
         os.utime(caminho_banco, None)
         
         # Atualizar timestamp da última sincronização
@@ -393,7 +525,7 @@ def sincronizar_ao_encerrar():
     if verificar_conectividade() and not banco_em_uso():
         print("Sincronizando banco antes de encerrar...")
         # O Syncthing detectará as alterações e sincronizará
-        caminho_banco = get_db_path()
+        caminho_banco = get_db_path_safe()
         try:
             # Tocar o arquivo para garantir que o Syncthing o detecte
             os.utime(caminho_banco, None)
@@ -420,7 +552,7 @@ def criar_backup_banco():
     import time
     
     try:
-        origem = get_db_path()  # Banco original
+        origem = get_db_path_safe()  # Banco original
         destino = obter_caminho_banco_backup()  # Arquivo de backup
         
         print(f"Criando backup: {origem} -> {destino}")
@@ -449,7 +581,7 @@ def restaurar_backup():
     
     try:
         origem = obter_caminho_banco_backup()  # Arquivo de backup
-        destino = get_db_path()  # Banco original
+        destino = get_db_path_safe()  # Banco original
         
         # Verificar se o backup existe
         if not os.path.exists(origem):
@@ -488,41 +620,103 @@ def sincronizar_banco(force=False):
     
     return False
 
+def obter_estacao_atual():
+    """
+    Obtém o nome da estação atual (computador)
+    
+    Returns:
+        str: Nome da estação
+    """
+    try:
+        import socket   
+        return socket.gethostname()
+    except Exception as e:
+        print(f"Erro ao obter nome da estação: {e}")
+        return "Estação Desconhecida"
+
+# Função wrapper pra get_db_path: usa config se disponível (definida APÓS as vars globais)
+def get_db_path_safe():
+    """Versão segura de get_db_path: prioriza config remoto sem checar existência local."""
+    try:
+        # Protege contra uso precoce (se vars não definidas ainda)
+        if 'DB_HOST' not in globals() or 'DB_PATH' not in globals():
+            print("⚠️  get_db_path_safe: Vars globais não prontas. Usando get_db_path local.")
+            return get_db_path()
+        
+        if globals()['DB_HOST'] != "localhost" and globals()['DB_PATH'] is not None:  # Se config remoto e path válido
+            print(f"✅ Usando path REMOTO do config: {globals()['DB_PATH']}")
+            return globals()['DB_PATH']
+        else:
+            print("⚠️  Fallback para get_db_path local (config não remoto ou path inválido).")
+            return get_db_path()
+    except NameError as ne:
+        print(f"⚠️  Erro em get_db_path_safe (NameError): {ne}. Fallback local.")
+        return get_db_path()
+    except Exception as e:
+        print(f"❌ Erro em get_db_path_safe: {e}. Fallback local.")
+        return get_db_path()
+
+
+def verificar_conectividade():
+    """Verifica se há conexão com a internet"""
+    try:
+        import socket
+        socket.create_connection(("www.google.com", 80), timeout=3)
+        return True
+    except OSError:
+        return False
+def banco_em_uso():
+    """Verifica se o banco de dados está em uso no momento"""
+    try:
+        # Tenta abrir o arquivo do banco para verificar se está bloqueado
+        caminho_banco = get_db_path_safe()
+        with open(caminho_banco, 'rb') as f:
+            # Tenta apenas ler o começo do arquivo para verificar acesso
+            f.read(10)
+            return False  # Se conseguir abrir, o banco não está em uso exclusivo
+    except (IOError, PermissionError):
+        return True  # Erro ao abrir, indica que o banco está em uso
+    except Exception as e:
+        print(f"Erro ao verificar uso do banco: {e}")
+        return True  # Em caso de dúvida, considerar como em uso
+
 # Modifique a função get_connection para verificar sincronização
 def get_connection(verificar_sync=True):
     """
-    Retorna uma conexão com o banco de dados Firebird
-    E realiza sincronização se necessário
+    Retorna uma conexão com o banco de dados Firebird usando o config (remoto ou local).
     """
     try:
-        # Verificar se há um backup mais recente para restaurar
-        if verificar_sync and verificar_conectividade():
-            restaurar_backup()
+        # Seu código original de backup (usa safe agora)
+        if verificar_sync:
+            if verificar_conectividade():  # Assuma que você mudou chamadas internas pra safe
+                restaurar_backup()
         
-        # Obter caminho do banco atual
-        db_path = get_db_path()
-        print(f"Tentando conectar ao banco de dados: {db_path}")
+        # Usa vars do config
+        db_path = get_db_path_safe()  # Usa safe pra priorizar remoto
+        print(f"🔍 DEBUG: Tentando conectar: host={DB_HOST}:{DB_PORT}/{db_path}")
         
-        # Conectar ao banco
+        # Conecta com fdb
         conn = fdb.connect(
             host=DB_HOST,
+            port=DB_PORT,
             database=db_path,
             user=DB_USER,
             password=DB_PASSWORD,
-            port=DB_PORT,
             charset='UTF8'
         )
         
-        # Após a conexão bem-sucedida, verificar sincronização
+        # Sync em background
         if verificar_sync:
-            # Executar em background para não bloquear
             import threading
-            threading.Thread(target=sincronizar_banco).start()
-            
+            threading.Thread(target=sincronizar_banco, daemon=True).start()
+        
+        print("✅ DEBUG: Conexão ao banco OK!")
         return conn
+        
     except Exception as e:
-        print(f"Erro de conexão: {e}")
+        print(f"❌ DEBUG: Erro de conexão: {e}")
         raise Exception(f"Erro ao conectar ao banco de dados: {str(e)}")
+
 
 #LOGIN 
 def validar_login(usuario, senha, empresa):
@@ -1193,7 +1387,8 @@ def listar_empresas():
     except Exception as e:
         print(f"Erro ao listar empresas: {e}")
         raise Exception(f"Erro ao listar empresas: {str(e)}")
-
+    
+@functools.lru_cache(maxsize=512)
 def buscar_empresa_por_id(id_empresa):
     """
     Busca uma empresa pelo ID
@@ -1459,6 +1654,35 @@ def atualizar_empresa(id_empresa, nome_empresa, nome_pessoa, documento, tipo_doc
         print(f"Erro ao atualizar empresa: {e}")
         raise Exception(f"Erro ao atualizar empresa: {str(e)}")
 
+def buscar_empresas_por_filtro(codigo: str, nome: str, documento: str):
+    """
+    Busca empresas no banco de dados com base em filtros dinâmicos.
+    
+    Returns:
+        list: Lista de tuplas com (ID, NOME_EMPRESA, DOCUMENTO)
+    """
+    try:
+        query = "SELECT ID, NOME_EMPRESA, DOCUMENTO FROM EMPRESAS WHERE 1=1"
+        params = []
+        
+        if codigo:
+            query += " AND ID = ?"
+            params.append(int(codigo))
+        if nome:
+            query += " AND UPPER(NOME_EMPRESA) LIKE UPPER(?)"
+            params.append(f"%{nome}%")
+        if documento:
+            doc_limpo = ''.join(filter(str.isdigit, documento))
+            if doc_limpo:
+                query += " AND DOCUMENTO LIKE ?"
+                params.append(f"%{doc_limpo}%")
+        
+        query += " ORDER BY ID"
+        return execute_query(query, tuple(params))
+    except Exception as e:
+        print(f"Erro ao buscar empresas por filtro: {e}")
+        return []
+
 def excluir_empresa(id_empresa):
     """
     Exclui uma empresa do banco de dados
@@ -1606,7 +1830,7 @@ def listar_pessoas():
     except Exception as e:
         print(f"Erro ao listar pessoas: {e}")
         raise Exception(f"Erro ao listar pessoas: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_pessoa_por_id(id_pessoa):
     """
     Busca uma pessoa pelo ID
@@ -1993,7 +2217,7 @@ def listar_funcionarios():
     except Exception as e:
         print(f"Erro ao listar funcionários: {e}")
         raise Exception(f"Erro ao listar funcionários: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_funcionario_por_id(id_funcionario):
     """
     Busca um funcionário pelo ID
@@ -2395,7 +2619,7 @@ def listar_produtos():
     except Exception as e:
         print(f"Erro ao listar produtos: {e}")
         raise Exception(f"Erro ao listar produtos: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_produto_por_id(id_produto):
     """
     Busca um produto pelo ID
@@ -3278,28 +3502,17 @@ def listar_fornecedores():
         print(f"Erro ao listar fornecedores: {e}")
         raise Exception(f"Erro ao listar fornecedores: {str(e)}")
 
+@functools.lru_cache(maxsize=128)
 def buscar_fornecedor_por_id(id_fornecedor):
-    """
-    Busca um fornecedor pelo ID
-    
-    Args:
-        id_fornecedor (int): ID do fornecedor
-        
-    Returns:
-        tuple: Dados do fornecedor ou None se não encontrado
-    """
+    """Busca um fornecedor pelo seu ID (PK)."""
+    # A sua lógica de busca continua a mesma aqui dentro
     try:
-        query = """
-        SELECT * FROM FORNECEDORES
-        WHERE ID = ?
-        """
-        result = execute_query(query, (id_fornecedor,))
-        if result and len(result) > 0:
-            return result[0]
-        return None
+        query = "SELECT * FROM FORNECEDORES WHERE ID = ?"
+        resultado = execute_query(query, (id_fornecedor,))
+        return resultado[0] if resultado else None
     except Exception as e:
-        print(f"Erro ao buscar fornecedor: {e}")
-        raise Exception(f"Erro ao buscar fornecedor: {str(e)}")
+        print(f"Erro ao buscar fornecedor por ID {id_fornecedor}: {e}")
+        return None
 
 def buscar_fornecedor_por_codigo(codigo):
     """
@@ -4074,7 +4287,7 @@ def listar_pedidos_venda():
     except Exception as e:
         print(f"Erro ao listar pedidos de venda: {e}")
         raise Exception(f"Erro ao listar pedidos de venda: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_pedido_por_id(id_pedido):
     """
     Busca um pedido pelo ID
@@ -4637,7 +4850,7 @@ def listar_recebimentos_pendentes():
         print(f"Erro ao listar recebimentos pendentes: {e}")
         raise Exception(f"Erro ao listar recebimentos pendentes: {str(e)}")
     
-
+@functools.lru_cache(maxsize=512)
 def buscar_recebimento_por_id(id_recebimento):
     """
     Busca um recebimento pelo ID
@@ -4914,7 +5127,7 @@ def listar_recebimentos_concluidos():
     except Exception as e:
         print(f"Erro ao listar recebimentos concluídos: {e}")
         raise Exception(f"Erro ao listar recebimentos concluídos: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_recebimento_por_id(id_recebimento):
     """
     Busca um recebimento pelo ID
@@ -5987,305 +6200,416 @@ def get_usuario_logado():
 
 # Funções para o sistema de caixa
 
-def verificar_tabelas_caixa():
-    """
-    Verifica se as tabelas do sistema de caixa existem e as cria se não existirem
+# def verificar_tabelas_caixa():
+#     """
+#     Verifica se as tabelas do sistema de caixa existem e as cria se não existirem
     
-    Returns:
-        bool: True se as tabelas existem ou foram criadas com sucesso
-    """
-    try:
-        # Verificar se a tabela CAIXA_CONTROLE existe
-        query_check = """
-        SELECT COUNT(*) FROM RDB$RELATIONS 
-        WHERE RDB$RELATION_NAME = 'CAIXA_CONTROLE'
-        """
-        result = execute_query(query_check)
+#     Returns:
+#         bool: True se as tabelas existem ou foram criadas com sucesso
+#     """
+#     try:
+#         # Verificar se a tabela CAIXA_CONTROLE existe
+#         query_check = """
+#         SELECT COUNT(*) FROM RDB$RELATIONS 
+#         WHERE RDB$RELATION_NAME = 'CAIXA_CONTROLE'
+#         """
+#         result = execute_query(query_check)
         
-        # Se a tabela não existe, criar as tabelas
-        if result[0][0] == 0:
-            print("Tabelas do sistema de caixa não encontradas. Criando...")
+#         # Se a tabela não existe, criar as tabelas
+#         if result[0][0] == 0:
+#             print("Tabelas do sistema de caixa não encontradas. Criando...")
             
-            # Criar tabela CAIXA_CONTROLE
-            query_create_controle = """
-            CREATE TABLE CAIXA_CONTROLE (
-                ID INTEGER NOT NULL PRIMARY KEY,
-                CODIGO VARCHAR(10) NOT NULL,
-                DATA_ABERTURA DATE NOT NULL,
-                HORA_ABERTURA TIME NOT NULL,
-                DATA_FECHAMENTO DATE,
-                HORA_FECHAMENTO TIME,
-                VALOR_ABERTURA DECIMAL(15,2) DEFAULT 0 NOT NULL,
-                VALOR_FECHAMENTO DECIMAL(15,2),
-                ESTACAO VARCHAR(20) NOT NULL,
-                ID_USUARIO INTEGER NOT NULL,
-                USUARIO VARCHAR(50) NOT NULL,
-                STATUS CHAR(1) DEFAULT 'A' NOT NULL,
-                OBSERVACAO_ABERTURA VARCHAR(200),
-                OBSERVACAO_FECHAMENTO VARCHAR(200)
-            )
-            """
-            execute_query(query_create_controle)
-            print("Tabela CAIXA_CONTROLE criada com sucesso.")
+#             # Criar tabela CAIXA_CONTROLE
+#             query_create_controle = """
+#             CREATE TABLE CAIXA_CONTROLE (
+#                 ID INTEGER NOT NULL PRIMARY KEY,
+#                 CODIGO VARCHAR(10) NOT NULL,
+#                 DATA_ABERTURA DATE NOT NULL,
+#                 HORA_ABERTURA TIME NOT NULL,
+#                 DATA_FECHAMENTO DATE,
+#                 HORA_FECHAMENTO TIME,
+#                 VALOR_ABERTURA DECIMAL(15,2) DEFAULT 0 NOT NULL,
+#                 VALOR_FECHAMENTO DECIMAL(15,2),
+#                 ESTACAO VARCHAR(20) NOT NULL,
+#                 ID_USUARIO INTEGER NOT NULL,
+#                 USUARIO VARCHAR(50) NOT NULL,
+#                 STATUS CHAR(1) DEFAULT 'A' NOT NULL,
+#                 OBSERVACAO_ABERTURA VARCHAR(200),
+#                 OBSERVACAO_FECHAMENTO VARCHAR(200)
+#             )
+#             """
+#             execute_query(query_create_controle)
+#             print("Tabela CAIXA_CONTROLE criada com sucesso.")
             
-            # Criar gerador de IDs para CAIXA_CONTROLE
-            try:
-                query_generator = """
-                CREATE GENERATOR GEN_CAIXA_CONTROLE_ID
-                """
-                execute_query(query_generator)
-                print("Gerador de IDs para CAIXA_CONTROLE criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Gerador pode já existir: {e}")
-                pass
+#             # Criar gerador de IDs para CAIXA_CONTROLE
+#             try:
+#                 query_generator = """
+#                 CREATE GENERATOR GEN_CAIXA_CONTROLE_ID
+#                 """
+#                 execute_query(query_generator)
+#                 print("Gerador de IDs para CAIXA_CONTROLE criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Gerador pode já existir: {e}")
+#                 pass
             
-            # Criar trigger para CAIXA_CONTROLE
-            try:
-                query_trigger = """
-                CREATE TRIGGER CAIXA_CONTROLE_BI FOR CAIXA_CONTROLE
-                ACTIVE BEFORE INSERT POSITION 0
-                AS
-                BEGIN
-                    IF (NEW.ID IS NULL) THEN
-                        NEW.ID = GEN_ID(GEN_CAIXA_CONTROLE_ID, 1);
-                END
-                """
-                execute_query(query_trigger)
-                print("Trigger para CAIXA_CONTROLE criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Trigger pode já existir: {e}")
-                pass
+#             # Criar trigger para CAIXA_CONTROLE
+#             try:
+#                 query_trigger = """
+#                 CREATE TRIGGER CAIXA_CONTROLE_BI FOR CAIXA_CONTROLE
+#                 ACTIVE BEFORE INSERT POSITION 0
+#                 AS
+#                 BEGIN
+#                     IF (NEW.ID IS NULL) THEN
+#                         NEW.ID = GEN_ID(GEN_CAIXA_CONTROLE_ID, 1);
+#                 END
+#                 """
+#                 execute_query(query_trigger)
+#                 print("Trigger para CAIXA_CONTROLE criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Trigger pode já existir: {e}")
+#                 pass
             
-            # Criar tabela CAIXA_MOVIMENTOS
-            query_create_movimentos = """
-            CREATE TABLE CAIXA_MOVIMENTOS (
-                ID INTEGER NOT NULL PRIMARY KEY,
-                ID_CAIXA INTEGER NOT NULL,
-                TIPO CHAR(1) NOT NULL,
-                DATA DATE NOT NULL,
-                HORA TIME NOT NULL,
-                VALOR DECIMAL(15,2) NOT NULL,
-                MOTIVO VARCHAR(50) NOT NULL,
-                ID_USUARIO INTEGER NOT NULL,
-                USUARIO VARCHAR(50) NOT NULL,
-                OBSERVACAO VARCHAR(200)
-            )
-            """
-            execute_query(query_create_movimentos)
-            print("Tabela CAIXA_MOVIMENTOS criada com sucesso.")
+#             # Criar tabela CAIXA_MOVIMENTOS
+#             query_create_movimentos = """
+#             CREATE TABLE CAIXA_MOVIMENTOS (
+#                 ID INTEGER NOT NULL PRIMARY KEY,
+#                 ID_CAIXA INTEGER NOT NULL,
+#                 TIPO CHAR(1) NOT NULL,
+#                 DATA DATE NOT NULL,
+#                 HORA TIME NOT NULL,
+#                 VALOR DECIMAL(15,2) NOT NULL,
+#                 MOTIVO VARCHAR(50) NOT NULL,
+#                 ID_USUARIO INTEGER NOT NULL,
+#                 USUARIO VARCHAR(50) NOT NULL,
+#                 OBSERVACAO VARCHAR(200)
+#             )
+#             """
+#             execute_query(query_create_movimentos)
+#             print("Tabela CAIXA_MOVIMENTOS criada com sucesso.")
             
-            # Criar gerador de IDs para CAIXA_MOVIMENTOS
-            try:
-                query_generator = """
-                CREATE GENERATOR GEN_CAIXA_MOVIMENTOS_ID
-                """
-                execute_query(query_generator)
-                print("Gerador de IDs para CAIXA_MOVIMENTOS criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Gerador pode já existir: {e}")
-                pass
+#             # Criar gerador de IDs para CAIXA_MOVIMENTOS
+#             try:
+#                 query_generator = """
+#                 CREATE GENERATOR GEN_CAIXA_MOVIMENTOS_ID
+#                 """
+#                 execute_query(query_generator)
+#                 print("Gerador de IDs para CAIXA_MOVIMENTOS criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Gerador pode já existir: {e}")
+#                 pass
             
-            # Criar trigger para CAIXA_MOVIMENTOS
-            try:
-                query_trigger = """
-                CREATE TRIGGER CAIXA_MOVIMENTOS_BI FOR CAIXA_MOVIMENTOS
-                ACTIVE BEFORE INSERT POSITION 0
-                AS
-                BEGIN
-                    IF (NEW.ID IS NULL) THEN
-                        NEW.ID = GEN_ID(GEN_CAIXA_MOVIMENTOS_ID, 1);
-                END
-                """
-                execute_query(query_trigger)
-                print("Trigger para CAIXA_MOVIMENTOS criado com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Trigger pode já existir: {e}")
-                pass
+#             # Criar trigger para CAIXA_MOVIMENTOS
+#             try:
+#                 query_trigger = """
+#                 CREATE TRIGGER CAIXA_MOVIMENTOS_BI FOR CAIXA_MOVIMENTOS
+#                 ACTIVE BEFORE INSERT POSITION 0
+#                 AS
+#                 BEGIN
+#                     IF (NEW.ID IS NULL) THEN
+#                         NEW.ID = GEN_ID(GEN_CAIXA_MOVIMENTOS_ID, 1);
+#                 END
+#                 """
+#                 execute_query(query_trigger)
+#                 print("Trigger para CAIXA_MOVIMENTOS criado com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Trigger pode já existir: {e}")
+#                 pass
             
-            # Criar chave estrangeira para relacionar CAIXA_MOVIMENTOS com CAIXA_CONTROLE
-            try:
-                query_fk = """
-                ALTER TABLE CAIXA_MOVIMENTOS
-                ADD CONSTRAINT FK_CAIXA_MOVIMENTOS_CAIXA_CONTROLE
-                FOREIGN KEY (ID_CAIXA) REFERENCES CAIXA_CONTROLE(ID)
-                ON DELETE CASCADE
-                """
-                execute_query(query_fk)
-                print("Chave estrangeira para CAIXA_MOVIMENTOS criada com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Chave estrangeira pode já existir: {e}")
-                pass
+#             # Criar chave estrangeira para relacionar CAIXA_MOVIMENTOS com CAIXA_CONTROLE
+#             try:
+#                 query_fk = """
+#                 ALTER TABLE CAIXA_MOVIMENTOS
+#                 ADD CONSTRAINT FK_CAIXA_MOVIMENTOS_CAIXA_CONTROLE
+#                 FOREIGN KEY (ID_CAIXA) REFERENCES CAIXA_CONTROLE(ID)
+#                 ON DELETE CASCADE
+#                 """
+#                 execute_query(query_fk)
+#                 print("Chave estrangeira para CAIXA_MOVIMENTOS criada com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Chave estrangeira pode já existir: {e}")
+#                 pass
             
-            # Criar índices para melhorar a performance
-            try:
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_CODIGO ON CAIXA_CONTROLE (CODIGO)")
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_DATA_ABERTURA ON CAIXA_CONTROLE (DATA_ABERTURA)")
-                execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_STATUS ON CAIXA_CONTROLE (STATUS)")
-                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_ID_CAIXA ON CAIXA_MOVIMENTOS (ID_CAIXA)")
-                execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_DATA ON CAIXA_MOVIMENTOS (DATA)")
-                print("Índices criados com sucesso.")
-            except Exception as e:
-                print(f"Aviso: Alguns índices podem já existir: {e}")
-                pass
+#             # Criar índices para melhorar a performance
+#             try:
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_CODIGO ON CAIXA_CONTROLE (CODIGO)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_DATA_ABERTURA ON CAIXA_CONTROLE (DATA_ABERTURA)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_CONTROLE_STATUS ON CAIXA_CONTROLE (STATUS)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_ID_CAIXA ON CAIXA_MOVIMENTOS (ID_CAIXA)")
+#                 execute_query("CREATE INDEX IDX_CAIXA_MOVIMENTOS_DATA ON CAIXA_MOVIMENTOS (DATA)")
+#                 print("Índices criados com sucesso.")
+#             except Exception as e:
+#                 print(f"Aviso: Alguns índices podem já existir: {e}")
+#                 pass
             
-            return True
-        else:
-            print("Tabelas do sistema de caixa já existem.")
+#             return True
+#         else:
+#             print("Tabelas do sistema de caixa já existem.")
         
-        return True
-    except Exception as e:
-        print(f"Erro ao verificar/criar tabelas de caixa: {e}")
-        raise Exception(f"Erro ao verificar/criar tabelas de caixa: {str(e)}")
+#         return True
+#     except Exception as e:
+#         print(f"Erro ao verificar/criar tabelas de caixa: {e}")
+#         raise Exception(f"Erro ao verificar/criar tabelas de caixa: {str(e)}")
 
-def abrir_caixa(codigo, data_abertura, hora_abertura, valor_abertura, estacao, observacao=None):
-    """
-    Registra a abertura de um caixa
+# def abrir_caixa(codigo, data_abertura, hora_abertura, valor_abertura, estacao, observacao=None):
+#     """
+#     Registra a abertura de um caixa
     
-    Args:
-        codigo (str): Código do caixa
-        data_abertura (str): Data de abertura no formato DD/MM/YYYY
-        hora_abertura (str): Hora de abertura no formato HH:MM
-        valor_abertura (float): Valor inicial do caixa
-        estacao (str): Nome da estação/terminal
-        observacao (str, optional): Observação opcional
+#     Args:
+#         codigo (str): Código do caixa
+#         data_abertura (str): Data de abertura no formato DD/MM/YYYY
+#         hora_abertura (str): Hora de abertura no formato HH:MM
+#         valor_abertura (float): Valor inicial do caixa
+#         estacao (str): Nome da estação/terminal
+#         observacao (str, optional): Observação opcional
         
-    Returns:
-        int: ID do caixa aberto
-    """
-    try:
-        # Verificar se o usuário está logado
-        if not usuario_logado["id"]:
-            raise Exception("Nenhum usuário logado. Faça login antes de abrir o caixa.")
+#     Returns:
+#         int: ID do caixa aberto
+#     """
+#     try:
+#         # Verificar se o usuário está logado
+#         if not usuario_logado["id"]:
+#             raise Exception("Nenhum usuário logado. Faça login antes de abrir o caixa.")
         
-        # Verificar se já existe um caixa aberto com o mesmo código
-        query_check = """
-        SELECT ID FROM CAIXA_CONTROLE 
-        WHERE CODIGO = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_check, (codigo,))
+#         # Verificar se já existe um caixa aberto com o mesmo código
+#         query_check = """
+#         SELECT ID FROM CAIXA_CONTROLE 
+#         WHERE CODIGO = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_check, (codigo,))
         
-        if result and len(result) > 0:
-            raise Exception(f"Já existe um caixa aberto com o código {codigo}.")
+#         if result and len(result) > 0:
+#             raise Exception(f"Já existe um caixa aberto com o código {codigo}.")
         
-        # Converter data para o formato do banco (YYYY-MM-DD)
-        data_parts = data_abertura.split('/')
-        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+#         # Converter data para o formato do banco (YYYY-MM-DD)
+#         data_parts = data_abertura.split('/')
+#         data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
         
-        # Inserir registro de abertura de caixa
-        query_insert = """
-        INSERT INTO CAIXA_CONTROLE (
-            CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
-            ESTACAO, ID_USUARIO, USUARIO, STATUS, OBSERVACAO_ABERTURA
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A', ?)
-        """
-        execute_query(query_insert, (
-            codigo, data_iso, hora_abertura, valor_abertura,
-            estacao, usuario_logado["id"], usuario_logado["nome"], observacao
-        ))
+#         # Inserir registro de abertura de caixa
+#         query_insert = """
+#         INSERT INTO CAIXA_CONTROLE (
+#             CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+#             ESTACAO, ID_USUARIO, USUARIO, STATUS, OBSERVACAO_ABERTURA
+#         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A', ?)
+#         """
+#         execute_query(query_insert, (
+#             codigo, data_iso, hora_abertura, valor_abertura,
+#             estacao, usuario_logado["id"], usuario_logado["nome"], observacao
+#         ))
         
-        # Obter o ID do caixa recém-aberto
-        query_id = """
-        SELECT MAX(ID) FROM CAIXA_CONTROLE 
-        WHERE CODIGO = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_id, (codigo,))
+#         # Obter o ID do caixa recém-aberto
+#         query_id = """
+#         SELECT MAX(ID) FROM CAIXA_CONTROLE 
+#         WHERE CODIGO = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_id, (codigo,))
         
-        if result and len(result) > 0 and result[0][0]:
-            caixa_id = result[0][0]
+#         if result and len(result) > 0 and result[0][0]:
+#             caixa_id = result[0][0]
             
-            # Registrar a entrada inicial como movimento
-            if valor_abertura > 0:
-                registrar_movimento(
-                    id_caixa=caixa_id,
-                    tipo='E',  # Entrada
-                    data=data_abertura,
-                    hora=hora_abertura,
-                    valor=valor_abertura,
-                    motivo="Abertura de Caixa",
-                    observacao=observacao
-                )
+#             # Registrar a entrada inicial como movimento
+#             if valor_abertura > 0:
+#                 registrar_movimento(
+#                     id_caixa=caixa_id,
+#                     tipo='E',  # Entrada
+#                     data=data_abertura,
+#                     hora=hora_abertura,
+#                     valor=valor_abertura,
+#                     motivo="Abertura de Caixa",
+#                     observacao=observacao
+#                 )
             
-            return caixa_id
-        else:
-            raise Exception("Erro ao obter o ID do caixa aberto.")
-    except Exception as e:
-        print(f"Erro ao abrir caixa: {e}")
-        raise Exception(f"Erro ao abrir caixa: {str(e)}")
+#             return caixa_id
+#         else:
+#             raise Exception("Erro ao obter o ID do caixa aberto.")
+#     except Exception as e:
+#         print(f"Erro ao abrir caixa: {e}")
+#         raise Exception(f"Erro ao abrir caixa: {str(e)}")
 
-def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, observacao=None):
-    """
-    Registra o fechamento de um caixa
+# def fechar_caixa(id_caixa, data_fechamento, hora_fechamento, valor_fechamento, observacao=None):
+#     """
+#     Registra o fechamento de um caixa
     
-    Args:
-        id_caixa (int): ID do caixa a ser fechado
-        data_fechamento (str): Data de fechamento no formato DD/MM/YYYY
-        hora_fechamento (str): Hora de fechamento no formato HH:MM
-        valor_fechamento (float): Valor final do caixa
-        observacao (str, optional): Observação opcional
+#     Args:
+#         id_caixa (int): ID do caixa a ser fechado
+#         data_fechamento (str): Data de fechamento no formato DD/MM/YYYY
+#         hora_fechamento (str): Hora de fechamento no formato HH:MM
+#         valor_fechamento (float): Valor final do caixa
+#         observacao (str, optional): Observação opcional
         
-    Returns:
-        bool: True se o caixa foi fechado com sucesso
-    """
-    try:
-        # Verificar se o usuário está logado
-        if not usuario_logado["id"]:
-            raise Exception("Nenhum usuário logado. Faça login antes de fechar o caixa.")
+#     Returns:
+#         bool: True se o caixa foi fechado com sucesso
+#     """
+#     try:
+#         # Verificar se o usuário está logado
+#         if not usuario_logado["id"]:
+#             raise Exception("Nenhum usuário logado. Faça login antes de fechar o caixa.")
         
-        # Verificar se o caixa existe e está aberto
-        query_check = """
-        SELECT ID, CODIGO, VALOR_ABERTURA FROM CAIXA_CONTROLE 
-        WHERE ID = ? AND STATUS = 'A'
-        """
-        result = execute_query(query_check, (id_caixa,))
+#         # Verificar se o caixa existe e está aberto
+#         query_check = """
+#         SELECT ID, CODIGO, VALOR_ABERTURA FROM CAIXA_CONTROLE 
+#         WHERE ID = ? AND STATUS = 'A'
+#         """
+#         result = execute_query(query_check, (id_caixa,))
         
-        if not result or len(result) == 0:
-            raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
+#         if not result or len(result) == 0:
+#             raise Exception(f"Caixa com ID {id_caixa} não encontrado ou já está fechado.")
         
-        codigo_caixa = result[0][1]
-        valor_abertura = float(result[0][2])  # Convertendo para float
+#         codigo_caixa = result[0][1]
+#         valor_abertura = float(result[0][2])  # Convertendo para float
         
-        # Converter data para o formato do banco (YYYY-MM-DD)
-        data_parts = data_fechamento.split('/')
-        data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
+#         # Converter data para o formato do banco (YYYY-MM-DD)
+#         data_parts = data_fechamento.split('/')
+#         data_iso = f"{data_parts[2]}-{data_parts[1]}-{data_parts[0]}"
         
-        # Atualizar registro para fechar o caixa
-        query_update = """
-        UPDATE CAIXA_CONTROLE SET
-            DATA_FECHAMENTO = ?,
-            HORA_FECHAMENTO = ?,
-            VALOR_FECHAMENTO = ?,
-            STATUS = 'F',
-            OBSERVACAO_FECHAMENTO = ?
-        WHERE ID = ?
-        """
-        execute_query(query_update, (
-            data_iso, hora_fechamento, valor_fechamento,
-            observacao, id_caixa
-        ))
+#         # Atualizar registro para fechar o caixa
+#         query_update = """
+#         UPDATE CAIXA_CONTROLE SET
+#             DATA_FECHAMENTO = ?,
+#             HORA_FECHAMENTO = ?,
+#             VALOR_FECHAMENTO = ?,
+#             STATUS = 'F',
+#             OBSERVACAO_FECHAMENTO = ?
+#         WHERE ID = ?
+#         """
+#         execute_query(query_update, (
+#             data_iso, hora_fechamento, valor_fechamento,
+#             observacao, id_caixa
+#         ))
         
-        # Registrar o fechamento como movimento (se houver diferença)
-        diferenca = valor_fechamento - valor_abertura
+#         # Registrar o fechamento como movimento (se houver diferença)
+#         diferenca = valor_fechamento - valor_abertura
         
-        if diferenca != 0:
-            tipo = 'E' if diferenca > 0 else 'S'  # Entrada ou Saída
-            valor_movimento = abs(diferenca)
-            motivo = "Fechamento de Caixa"
+#         if diferenca != 0:
+#             tipo = 'E' if diferenca > 0 else 'S'  # Entrada ou Saída
+#             valor_movimento = abs(diferenca)
+#             motivo = "Fechamento de Caixa"
             
-            registrar_movimento(
-                id_caixa=id_caixa,
-                tipo=tipo,
-                data=data_fechamento,
-                hora=hora_fechamento,
-                valor=valor_movimento,
-                motivo=motivo,
-                observacao=observacao
-            )
+#             registrar_movimento(
+#                 id_caixa=id_caixa,
+#                 tipo=tipo,
+#                 data=data_fechamento,
+#                 hora=hora_fechamento,
+#                 valor=valor_movimento,
+#                 motivo=motivo,
+#                 observacao=observacao
+#             )
         
-        return True
-    except Exception as e:
-        print(f"Erro ao fechar caixa: {e}")
-        raise Exception(f"Erro ao fechar caixa: {str(e)}")
+#         return True
+#     except Exception as e:
+#         print(f"Erro ao fechar caixa: {e}")
+#         raise Exception(f"Erro ao fechar caixa: {str(e)}")
 
+# def obter_turno_ativo():
+#     """Retorna o turno ativo (sem data de fechamento)"""
+#     try:
+#         query = """
+#         SELECT ID, CODIGO, DATA_ABERTURA, HORA_ABERTURA, VALOR_ABERTURA, 
+#                ESTACAO, USUARIO, ID_USUARIO
+#         FROM CAIXA_CONTROLE 
+#         WHERE DATA_FECHAMENTO IS NULL 
+#         ORDER BY ID DESC 
+#         LIMIT 1
+#         """
+        
+#         result = execute_query(query)
+        
+#         if result and len(result) > 0:
+#             turno = result[0]
+#             return {
+#                 'id': turno[0],
+#                 'codigo': turno[1],
+#                 'data_abertura': turno[2],
+#                 'hora_abertura': turno[3],
+#                 'valor_abertura': float(turno[4]) if turno[4] else 0.0,
+#                 'estacao': turno[5],
+#                 'usuario': turno[6],
+#                 'usuario_id': turno[7]
+#             }
+        
+#         return None
+        
+#     except Exception as e:
+#         print(f"Erro ao obter turno ativo: {e}")
+#         return None
+
+# def registrar_venda_caixa(turno_id, numero_venda, valor_total, forma_pagamento, operador_id=None):
+#     """Registra uma venda no controle de caixa"""
+#     try:
+#         if not operador_id:
+#             usuario = get_usuario_logado()
+#             operador_id = usuario.get("id") if usuario else None
+            
+#         if not operador_id:
+#             operador_id = 1  # ID padrão se não conseguir obter
+        
+#         # Data e hora atuais
+#         from datetime import datetime
+#         agora = datetime.now()
+#         data_venda = agora.strftime("%d/%m/%Y")
+#         hora_venda = agora.strftime("%H:%M")
+        
+#         # Registrar venda na tabela CAIXA_VENDAS (se existir)
+#         try:
+#             query_venda = """
+#             INSERT INTO CAIXA_VENDAS 
+#             (TURNO_ID, NUMERO_VENDA, VALOR_TOTAL, FORMA_PAGAMENTO, 
+#              DATA_VENDA, HORA_VENDA, OPERADOR_ID)
+#             VALUES (?, ?, ?, ?, ?, ?, ?)
+#             """
+            
+#             params_venda = (
+#                 turno_id, numero_venda, valor_total, forma_pagamento,
+#                 data_venda, hora_venda, operador_id
+#             )
+            
+#             execute_query(query_venda, params_venda)
+#             print(f"✅ Venda registrada na tabela CAIXA_VENDAS")
+            
+#         except Exception as e:
+#             print(f"⚠️ Tabela CAIXA_VENDAS não existe ou erro: {e}")
+        
+#         # Registrar como movimentação na tabela CAIXA_MOVIMENTACOES (se existir)
+#         try:
+#             query_mov = """
+#             INSERT INTO CAIXA_MOVIMENTACOES 
+#             (TURNO_ID, TIPO, FORMA_PAGAMENTO, VALOR, MOTIVO, OBSERVACAO, 
+#              DATA_MOVIMENTO, HORA_MOVIMENTO, USUARIO_ID)
+#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+#             """
+            
+#             params_mov = (
+#                 turno_id, "venda", forma_pagamento, valor_total,
+#                 f"Venda Nº {numero_venda}", None,
+#                 data_venda, hora_venda, operador_id
+#             )
+            
+#             execute_query(query_mov, params_mov)
+#             print(f"✅ Movimentação registrada na tabela CAIXA_MOVIMENTACOES")
+            
+#         except Exception as e:
+#             print(f"⚠️ Tabela CAIXA_MOVIMENTACOES não existe ou erro: {e}")
+        
+#         print(f"✅ Venda {numero_venda} registrada no controle de caixa - Turno {turno_id}")
+#         return True
+        
+#     except Exception as e:
+#         print(f"❌ Erro ao registrar venda no caixa: {e}")
+#         # NÃO propagar o erro - não quebrar a venda
+#         return False
+
+# Função auxiliar se não existir
+def get_usuario_logado():
+    """Retorna o usuário logado ou dados padrão"""
+    try:
+        # Se você tem uma variável global para usuário logado
+        if hasattr(get_usuario_logado, 'usuario_atual'):
+            return get_usuario_logado.usuario_atual
+        
+        # Retornar dados padrão
+        return {"id": 1, "nome": "Operador PDV"}
+        
+    except:
+        return {"id": 1, "nome": "Operador PDV"}
 
 def registrar_movimento(id_caixa, tipo, data, hora, valor, motivo, observacao=None):
     """
@@ -6445,7 +6769,7 @@ def listar_caixas(data_inicial=None, data_final=None, status=None, codigo=None, 
     except Exception as e:
         print(f"Erro ao listar caixas: {e}")
         raise Exception(f"Erro ao listar caixas: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def obter_caixa_por_id(id_caixa):
     """
     Obtém os dados de um caixa específico pelo ID
@@ -7121,7 +7445,7 @@ def listar_contas_correntes():
     except Exception as e:
         print(f"Erro ao listar contas correntes: {e}")
         raise Exception(f"Erro ao listar contas correntes: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_conta_corrente_por_id(id_conta):
     """
     Busca uma conta corrente pelo ID
@@ -7518,7 +7842,7 @@ def criar_classe_financeira(codigo, descricao):
     except Exception as e:
         print(f"Erro ao criar classe financeira: {e}")
         raise Exception(f"Erro ao criar classe financeira: {str(e)}")
-
+@functools.lru_cache(maxsize=512)
 def buscar_classe_financeira_por_id(id_classe):
     """
     Busca uma classe financeira pelo ID
@@ -7807,21 +8131,6 @@ def excluir_configuracao_impressora(id_config):
         print(f"Erro ao excluir configuração de impressora: {e}")
         raise Exception(f"Erro ao excluir configuração de impressora: {str(e)}")
 
-def obter_estacao_atual():
-    """
-    Obtém o nome da estação atual (computador)
-    
-    Returns:
-        str: Nome da estação
-    """
-    try:
-        import socket
-        return socket.gethostname()
-    except Exception as e:
-        print(f"Erro ao obter nome da estação: {e}")
-        return "Estação Desconhecida"
-
-
 # cadastrar funcionario para login
 def verificar_usuario_existente(nome_usuario):
     """
@@ -7970,16 +8279,19 @@ def autenticar_por_funcionario(nome_usuario, senha):
         print(f"Erro na autenticação por funcionário: {e}")
         return None
 
-def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=None):
+
+def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=None, acesso_ecommerce='N'):
     """
-    Cria um novo usuário no banco de dados
+    Cria um novo usuário no banco de dados, incluindo a permissão de e-commerce.
     
     Args:
         usuario (str): Nome de usuário
-        senha (str): Senha do usuário
+        senha (str): Senha do usuário (IMPORTANTE: o código original não fazia hash,
+                     isso deve ser considerado por segurança)
         empresa (str): Nome da empresa
         usuario_master (int, optional): ID do usuário master/principal
         data_expiracao (date, optional): Data de expiração do acesso
+        acesso_ecommerce (str, optional): 'S' para sim, 'N' para não.
     
     Returns:
         int: ID do usuário criado ou None em caso de erro
@@ -8001,19 +8313,78 @@ def criar_usuario(usuario, senha, empresa, usuario_master=None, data_expiracao=N
         """
         next_id = execute_query(query_nextid)[0][0]
         
-        # Inserir novo usuário com ID explícito
+        # --- ALTERAÇÃO PRINCIPAL AQUI ---
+        # Adicionamos a coluna ACESSO_ECOMMERCE na query de inserção
         query_insert = """
         INSERT INTO USUARIOS (
-            ID, USUARIO, SENHA, EMPRESA, BLOQUEADO, USUARIO_MASTER, DATA_EXPIRACAO
-        ) VALUES (?, ?, ?, ?, 'N', ?, ?)
+            ID, USUARIO, SENHA, EMPRESA, BLOQUEADO, USUARIO_MASTER, DATA_EXPIRACAO, ACESSO_ECOMMERCE
+        ) VALUES (?, ?, ?, ?, 'N', ?, ?, ?)
         """
-        execute_query(query_insert, (next_id, usuario, senha, empresa, usuario_master, data_expiracao))
+        # Adicionamos o parâmetro 'acesso_ecommerce' no final da tupla
+        execute_query(query_insert, (next_id, usuario, senha, empresa, usuario_master, data_expiracao, acesso_ecommerce))
         
         return next_id
     except Exception as e:
         print(f"Erro ao criar usuário: {e}")
         raise Exception(f"Erro ao criar usuário: {str(e)}")
 
+
+
+def modificar_acesso_ecommerce(usuario_master_id, novo_status):
+    """
+    Modifica o status de acesso ao e-commerce para um usuário master e todos os seus funcionários.
+    Args:
+        usuario_master_id: ID do usuário master.
+        novo_status: 'S' para liberar, 'N' para bloquear.
+    """
+    if novo_status not in ['S', 'N']:
+        raise ValueError("Status inválido. Use 'S' ou 'N'.")
+
+    # Atualiza tanto o usuário master quanto todos os funcionários vinculados a ele
+    query = "UPDATE USUARIOS SET ACESSO_ECOMMERCE = ? WHERE ID = ? OR USUARIO_MASTER = ?"
+    params = (novo_status, usuario_master_id, usuario_master_id)
+    
+    execute_query(query, params, commit=True)
+    print(f"Acesso e-commerce para o usuário master {usuario_master_id} e seus funcionários foi definido como '{novo_status}'.")
+
+
+def verificar_acesso_ecommerce(usuario_id):
+    """
+    Verifica se a conta do usuário (ou de seu master) tem acesso ao e-commerce.
+    Retorna True se tiver acesso, False caso contrário.
+    """
+    if not usuario_id:
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Primeiro, verifica o próprio usuário
+    cur.execute("SELECT ACESSO_ECOMMERCE, USUARIO_MASTER FROM USUARIOS WHERE ID = ?", (usuario_id,))
+    resultado = cur.fetchone()
+
+    if not resultado:
+        conn.close()
+        return False
+
+    acesso, master_id = resultado
+    
+    # Se o próprio usuário tem a flag 'S', ele tem acesso (caso do master)
+    if acesso and acesso.strip() == 'S':
+        conn.close()
+        return True
+    
+    # Se ele é um funcionário (tem um master_id), verifica o acesso do master
+    if master_id is not None:
+        cur.execute("SELECT ACESSO_ECOMMERCE FROM USUARIOS WHERE ID = ?", (master_id,))
+        resultado_master = cur.fetchone()
+        conn.close()
+        if resultado_master and resultado_master[0] and resultado_master[0].strip() == 'S':
+            return True
+
+    conn.close()
+    return False
+    
 def buscar_funcionario_por_usuario(nome_usuario):
     """
     Busca um funcionário pelo nome de usuário
@@ -8210,7 +8581,7 @@ def buscar_historico_pagamentos(codigo):
     from datetime import datetime
     
     # Use get_db_path para obter o caminho correto
-    banco_path = get_db_path()
+    banco_path = get_db_path_safe()
     conn = sqlite3.connect(banco_path)
     cursor = conn.cursor()
     

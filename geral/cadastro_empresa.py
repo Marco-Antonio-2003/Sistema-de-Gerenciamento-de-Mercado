@@ -334,8 +334,12 @@ class CadastroEmpresa(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.table.itemClicked.connect(self.selecionar_empresa)
+
+        self.table.itemDoubleClicked.connect(self.abrir_alteracao_por_duplo_clique) # Conecta o duplo clique
         
         main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
@@ -345,6 +349,21 @@ class CadastroEmpresa(QWidget):
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
 
+    def abrir_alteracao_por_duplo_clique(self, item):
+        """
+        Abre o formulário de alteração ao dar um duplo clique em uma linha.
+        """
+        # Obter a linha do item que foi duplamente clicado
+        row = item.row()
+        
+        # Obter o código da empresa da primeira coluna (coluna 0) da linha selecionada
+        codigo_da_empresa = self.table.item(row, 0).text()
+        
+        # Preenche o campo de código (self.codigo_input) que a função alterar_empresa usa
+        self.codigo_input.setText(codigo_da_empresa)
+        
+        # Agora, simplesmente chame a sua função de alterar existente
+        self.alterar_empresa()
 
     # Adicionar novos métodos para pesquisa
     def pesquisar(self):

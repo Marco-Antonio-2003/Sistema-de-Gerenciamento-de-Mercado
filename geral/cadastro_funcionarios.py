@@ -367,6 +367,8 @@ class CadastroFuncionario(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         self.table.itemClicked.connect(self.selecionar_funcionario)
+
+        self.table.itemDoubleClicked.connect(self.abrir_alteracao_por_duplo_clique)
         
         main_layout.addWidget(self.table, 1)  # Dar maior prioridade de espaço para a tabela
         
@@ -377,6 +379,22 @@ class CadastroFuncionario(QWidget):
         # Aplicar estilo ao fundo
         self.setStyleSheet("QWidget { background-color: #043b57; }")
     
+    def abrir_alteracao_por_duplo_clique(self, item):
+        """
+        Abre o formulário de alteração ao dar um duplo clique em uma linha da tabela.
+        """
+        # Pega a linha do item que recebeu o duplo clique
+        row = item.row()
+        
+        # Pega o código do funcionário da primeira coluna (índice 0)
+        codigo_do_funcionario = self.table.item(row, 0).text()
+        
+        # Preenche o campo de texto 'codigo_input', que a sua função 'alterar_funcionario' já utiliza
+        self.codigo_input.setText(codigo_do_funcionario)
+        
+        # Simplesmente chama a função de alterar que já existe
+        self.alterar_funcionario()
+
     def formatar_telefone(self, texto):
         """Formata o telefone para (XX) XXXXX-XXXX"""
         # Remover caracteres não numéricos

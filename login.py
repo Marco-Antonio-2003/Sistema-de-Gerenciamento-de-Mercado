@@ -1,6 +1,12 @@
 import sys
 import os
 import time
+import shutil  # Para operações de arquivo (backup)
+import subprocess  # Para executar o script de atualização
+import filecmp  # Para comparar arquivos
+import requests  # Para realizar requisições HTTP
+import webbrowser
+
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                           QHBoxLayout, QPushButton, QLabel, QLineEdit, QDialog,
                           QMessageBox, QFrame, QProgressBar, QSplashScreen)
@@ -9,7 +15,103 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.3"
+Versao = "Versão: v0.1.5.3.4"
+
+# --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
+
+
+def verificar_e_aplicar_atualizacao():
+    """
+    Verifica e aplica uma atualização, com atraso estendido no .bat para evitar erros de DLL.
+    """
+    try:
+        app_dir = os.path.dirname(sys.executable)
+        current_exe = sys.executable
+        new_exe_path = os.path.join(app_dir, 'atualizacao', 'mbsistema.exe')
+
+        if not os.path.exists(new_exe_path):
+            return False
+
+        if filecmp.cmp(current_exe, new_exe_path, shallow=False):
+            try:
+                os.remove(new_exe_path)
+            except Exception as e:
+                print(f"Não foi possível remover o arquivo de atualização antigo: {e}")
+            return False
+
+        confirm_reply = QMessageBox.question(None, 'Atualização Disponível',
+                                             "Uma nova versão do sistema está pronta para ser instalada.\n\nDeseja instalar agora? O sistema será reiniciado.",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+
+        if confirm_reply == QMessageBox.No:
+            return False
+
+        # Diálogo de aviso (mantenha como fallback; remova após testes se o erro de DLL não ocorrer mais)
+        aviso_box = QMessageBox()
+        aviso_box.setIcon(QMessageBox.Information)
+        aviso_box.setWindowTitle("Aviso Importante")
+        aviso_box.setText("A atualização será iniciada agora. O sistema será fechado e reiniciado.")
+        aviso_box.setInformativeText(
+            "Durante o processo, uma mensagem de erro do sistema ('Failed to load DLL') pode aparecer. "
+            "Isto é normal e esperado. Por favor, apenas clique em 'OK' nela para continuar.\n\n"
+            "Clique em 'OK' para iniciar a atualização."
+        )
+        aviso_box.setStandardButtons(QMessageBox.Ok)
+        aviso_box.exec_()
+   
+        # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
+        # CORREÇÃO: Uso de nome fixo para manter APENAS 1 backup (sobrescrevendo o anterior)
+        try:
+            backup_dir = os.path.join(app_dir, 'backup')
+            os.makedirs(backup_dir, exist_ok=True)
+
+            backup_filename = 'MBSistema_backup.exe'  # Nome fixo, sem timestamp
+            backup_path = os.path.join(backup_dir, backup_filename)
+
+            # CORREÇÃO: Remove o backup existente, se houver, para sobrescrita
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+                print('Backup anterior removido para sobrescrita.')
+
+            shutil.copy2(current_exe, backup_path)
+            print(f'Backup do executável salvo em: {backup_path}')
+        except Exception as backup_err:
+            print(f'Falha ao criar backup do executável: {backup_err}')
+
+        # Script .bat com atraso estendido (10 segundos) para limpeza do diretório temporário
+        updater_script_path = os.path.join(app_dir, 'updater.bat')
+        current_exe_filename = os.path.basename(current_exe)
+        new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
+
+        script_content = f"""
+@echo off
+echo Aguardando o sistema fechar e limpar recursos...
+ping -n 11 localhost > NUL  :: Atraso de aproximadamente 10 segundos para evitar erro de DLL
+
+ren "{current_exe_filename}" "{current_exe_filename}.old"
+move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
+
+echo Atualizacao concluida. Reiniciando o sistema...
+start "" "{current_exe_filename}"
+
+timeout /t 5 /nobreak > NUL
+del "{current_exe_filename}.old" > NUL 2> NUL
+
+del "%~f0"
+"""
+        with open(updater_script_path, 'w') as f:
+            f.write(script_content)
+        
+        # Chamada original: Mantém shell=True e CREATE_NO_WINDOW para lançamento autônomo
+        subprocess.Popen(f'"{updater_script_path}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        os._exit(0)
+
+    except Exception as e:
+        QMessageBox.critical(None, "Erro na Atualização", f"Ocorreu um erro ANTES de iniciar o processo de atualização:\n{e}")
+        return False
+    
+# --- FIM DA SEÇÃO DE ATUALIZAÇÃO ---
+
 
 class LoadingWorker(QThread):
     """Thread para executar tarefas de inicialização em background"""
@@ -22,17 +124,53 @@ class LoadingWorker(QThread):
         self.task_type = task_type
     
     def run(self):
-        if self.task_type == "startup":
-            self.startup_tasks()
+        """Executa as tarefas de inicialização reais em segundo plano."""
+        try:
+            # Tarefa 1: Iniciar o Syncthing
+            self.status.emit("Iniciando serviços de sincronização...")
+            # Importamos aqui dentro para manter a thread isolada
+            from base.banco import iniciar_syncthing_se_necessario
+            iniciar_syncthing_se_necessario()
+            time.sleep(1) # Uma pequena pausa para garantir que o serviço subiu
+            self.progress.emit(25)
+
+            # Tarefa 2: Verificar o banco de dados
+            self.status.emit("Verificando estrutura do banco de dados...")
+            from base.banco import verificar_tabela_usuarios
+            verificar_tabela_usuarios()
+            self.progress.emit(50)
+
+            # Tarefa 3: Limpar arquivos temporários/conflito
+            self.status.emit("Realizando manutenção de arquivos...")
+            from base.banco import limpar_arquivos_conflito
+            limpar_arquivos_conflito()
+            self.progress.emit(75)
+            
+            # Tarefa 4: Preparando para finalizar
+            self.status.emit("Finalizando...")
+            time.sleep(0.5) # Meio segundo para o usuário ver a última mensagem
+            self.progress.emit(100)
+
+            # CORREÇÃO: Linha incompleta corrigida
+            self.finished.emit()
+
+        except Exception as e:
+            print(f"Erro durante a inicialização: {e}")
+            # Se o erro foi apenas um aviso, pode emitir um status mais amigável:
+            self.status.emit("Inicialização concluída com avisos.")
+            self.progress.emit(100)
+            time.sleep(2)
+            self.finished.emit()
     
     def startup_tasks(self):
         """Tarefas de inicialização do programa"""
+        # ### MUDANÇA: Reduzimos os tempos de espera (msleep) drasticamente ###
         tasks = [
-            ("Carregando módulos...", 1000),
-            ("Verificando banco de dados...", 1500),
-            ("Iniciando serviços...", 2000),
-            ("Preparando interface...", 1000),
-            ("Finalizando...", 500)
+            ("Carregando módulos...", 150),  # Era 1000
+            ("Verificando banco de dados...", 200), # Era 1500
+            ("Iniciando serviços...", 250), # Era 2000
+            ("Preparando interface...", 150), # Era 1000
+            ("Finalizando...", 50)     # Era 500
         ]
         
         progress_step = 100 // len(tasks)
@@ -40,13 +178,12 @@ class LoadingWorker(QThread):
         
         for task_name, delay_ms in tasks:
             self.status.emit(task_name)
-            self.msleep(delay_ms)  # Simula tempo de processamento
+            self.msleep(delay_ms)  # Agora a simulação é muito mais rápida
             current_progress += progress_step
             self.progress.emit(min(current_progress, 100))
         
         self.progress.emit(100)
         self.finished.emit()
-
 
 class SplashScreen(QWidget):
     """Tela de carregamento customizada"""
@@ -181,7 +318,6 @@ class SplashScreen(QWidget):
         """Chamado quando o carregamento termina"""
         QTimer.singleShot(500, self.close)  # Pequena pausa antes de fechar
 
-
 class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -193,33 +329,81 @@ class LoginWindow(QMainWindow):
         
         # Centralizar a janela na tela
         self.center_on_screen()
-
-        # Iniciar Syncthing com verificação periódica
-        self.syncthing_iniciado = False
-        self.tentativas_syncthing = 0
-        self.max_tentativas = 5
         
         # Configurações para salvar dados de usuário
         self.settings = QSettings("MBSistema", "Login")
 
-        # Iniciar Syncthing
-        try:
-            iniciar_syncthing_se_necessario()
-        except Exception as e:
-            print(f"Aviso: Não foi possível iniciar o Syncthing: {e}")
-        
         # Configurar a interface
         self.initUI()
         
-        # Inicializar banco de dados
-        self.inicializar_bd()
-        
-        # Verificar e iniciar Syncthing
-        self.verificar_e_iniciar_syncthing()
+        # Verificar e iniciar Syncthing (já foi chamado antes da janela de login na função main)
+        # self.verificar_e_iniciar_syncthing()
 
         # Carregar o usuário e empresa salvos, se existirem
         self.carregar_dados_salvos()
     
+    def verificar_atualizacao_simples(self):
+        """Verifica atualizações de forma simples e abre o link de download se necessário."""
+        try:
+            # URL do arquivo versao.txt no seu repositório
+            version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
+            
+            response = requests.get(version_url, timeout=5)
+            response.raise_for_status()
+            nova_versao = response.text.strip()
+            
+            # Extrai número da versão atual da variável Versao
+            versao_atual = Versao.split(": ")[1].strip()
+            
+            print(f"Versão atual: {versao_atual}")
+            print(f"Nova versão: {nova_versao}")
+            
+            # Compara versões (simples, funciona para formato vX.Y.Z)
+            if self.comparar_versoes_simples(nova_versao, versao_atual):
+                reply = QMessageBox.question(
+                    self, 
+                    'Atualização Disponível',
+                    f"Nova versão {nova_versao} disponível!\n\nDeseja abrir a página de download?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                
+                if reply == QMessageBox.Yes:
+                    import webbrowser
+                    webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+            else:
+                QMessageBox.information(self, "Atualização", "Seu sistema está atualizado!")
+                
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Erro de Conexão", f"Não foi possível verificar atualizações.\nVerifique sua conexão com a internet.\n\nErro: {str(e)}")
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Não foi possível verificar atualizações: {str(e)}")
+    
+    def comparar_versoes_simples(self, versao1, versao2):
+        """Compara duas versões no formato vX.Y.Z"""
+        try:
+            # Remove o 'v' inicial
+            v1 = versao1.lstrip('v').split('.')
+            v2 = versao2.lstrip('v').split('.')
+            
+            # Converte para inteiros
+            v1 = [int(x) for x in v1]
+            v2 = [int(x) for x in v2]
+            
+            # Compara cada parte
+            for i in range(max(len(v1), len(v2))):
+                val1 = v1[i] if i < len(v1) else 0
+                val2 = v2[i] if i < len(v2) else 0
+                
+                if val1 > val2:
+                    return True
+                elif val1 < val2:
+                    return False
+            
+            return False  # Versões iguais
+        except:
+            return False
+
     def verificar_e_iniciar_syncthing(self):
         """Verifica e tenta iniciar o Syncthing, com tentativas periódicas"""
         try:
@@ -349,6 +533,11 @@ class LoginWindow(QMainWindow):
         
         form_layout.addSpacing(10)
         
+        # verificar atualização
+        self.verificar_atualizacao_btn = QPushButton("VERIFICAR ATUALIZAÇÃO")
+        self.verificar_atualizacao_btn.clicked.connect(self.verificar_atualizacao_simples)
+        form_layout.addWidget(self.verificar_atualizacao_btn)
+
         # Estilo para os rótulos
         label_style = "color: white; font-size: 14px; font-weight: bold;"
         
@@ -670,9 +859,18 @@ class LoginWindow(QMainWindow):
                                                 "Mensalidade da conta principal vencida. Entre em contato com o suporte.")
                                 self.restaurar_botao_login()
                                 return
+                
+            # --- LÓGICA PARA OBTER O ID CORRETO ---
+            id_para_passar = None
+            if id_funcionario:
+                # Se logou como funcionário, o id que importa para permissões é o do funcionário
+                id_para_passar = id_funcionario
+            elif usuario_id:
+                # Se logou como master, usamos o id do master
+                id_para_passar = usuario_id
             
             # Login bem-sucedido! Abrir a janela principal diretamente
-            self.open_main_window(usuario, empresa, id_funcionario)
+            self.open_main_window(usuario, empresa, id_para_passar, id_funcionario)
 
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Falha ao acessar o sistema: {str(e)}")
@@ -684,48 +882,137 @@ class LoginWindow(QMainWindow):
         self.login_button.setEnabled(True)
         self.login_button.setText("LOGIN")
     
-    def open_main_window(self, usuario, empresa, id_funcionario):
+    def open_main_window(self, usuario, empresa, id_usuario, id_funcionario):
         """Abre a janela principal diretamente após login bem-sucedido"""
         try:
-            # Marcar que o login foi bem-sucedido
             self.login_successful = True
             
-            # Garantir que o Syncthing esteja rodando
             try:
                 from base.syncthing_manager import syncthing_manager
                 syncthing_manager.iniciar_syncthing()
             except Exception as e:
                 print(f"Aviso: Erro ao verificar Syncthing: {e}")
             
-            # Abrir a janela principal
             self.main_window = MainWindow(
                 usuario=usuario, 
-                empresa=empresa, 
+                empresa=empresa,
+                id_usuario=id_usuario,
                 id_funcionario=id_funcionario
             )
+            
+            # CORREÇÃO: Conecta o sinal de logout ao método de reabertura
+            self.main_window.logout_signal.connect(self.reabrir_tela_login)
+            
+            # CORREÇÃO: Mostra a janela principal primeiro
             self.main_window.show()
-            self.hide()  # Esconder a tela de login
+            
+            # CORREÇÃO: Só esconde a janela de login após a principal estar visível
+            self.hide()
             
         except Exception as e:
             self.mostrar_mensagem("Erro", f"Erro ao abrir janela principal: {str(e)}")
             self.restaurar_botao_login()
+
+    def reabrir_tela_login(self):
+        """Esta função é chamada quando o sinal de logout é emitido pela MainWindow."""
+        print("Sinal de logout recebido. Reabrindo a tela de login.")
+        
+        try:
+            # CORREÇÃO 1: Garante que a main_window seja fechada e limpa
+            if hasattr(self, 'main_window') and self.main_window:
+                try:
+                    # Desconecta o sinal para evitar loops
+                    self.main_window.logout_signal.disconnect(self.reabrir_tela_login)
+                except:
+                    pass  # Ignora se já estava desconectado
+                
+                # Força o fechamento se ainda estiver visível
+                if self.main_window.isVisible():
+                    self.main_window.close()
+                
+                # Limpa a referência
+                self.main_window = None
+            
+            # CORREÇÃO 2: Reseta o estado de login
+            self.login_successful = False
+            
+            # CORREÇÃO 3: Limpa os campos sensíveis
+            self.senha_input.clear()
+            
+            # CORREÇÃO 4: Restaura o botão de login
+            self.restaurar_botao_login()
+            
+            # CORREÇÃO 5: Força a janela de login para o primeiro plano
+            self.show()
+            self.raise_()  # Traz para frente
+            self.activateWindow()  # Ativa a janela
+            
+            # CORREÇÃO 6: Foca no campo apropriado
+            if self.usuario_input.text().strip():
+                self.senha_input.setFocus()
+            else:
+                self.usuario_input.setFocus()
+                
+            print("Tela de login reaberta com sucesso.")
+            
+        except Exception as e:
+            print(f"Erro ao reabrir tela de login: {e}")
+            # Em caso de erro, força a reabertura básica
+            self.show()
+            self.raise_()
+            self.activateWindow()
     
     def closeEvent(self, event):
-        """Manipula o evento de fechamento da janela principal"""
+        """Manipula o evento de fechamento da janela de login"""
+        print("Fechando janela de login...")
+        
         try:
-            # Limpar arquivos de conflito antes de fechar
-            from base.banco import limpar_arquivos_conflito
-            limpar_arquivos_conflito()
+            # CORREÇÃO: Fecha a janela principal se ainda estiver aberta
+            if hasattr(self, 'main_window') and self.main_window:
+                try:
+                    print("Fechando main_window associada...")
+                    # Desconecta sinais para evitar loops
+                    try:
+                        self.main_window.logout_signal.disconnect()
+                    except:
+                        pass
+                    
+                    # Fecha a janela principal
+                    if self.main_window.isVisible():
+                        self.main_window.close()
+                    
+                    # Limpa a referência
+                    self.main_window = None
+                    print("Main_window fechada com sucesso")
+                    
+                except Exception as e:
+                    print(f"Erro ao fechar main_window: {e}")
+            
+            # Limpar arquivos de conflito
+            try:
+                from base.banco import limpar_arquivos_conflito
+                limpar_arquivos_conflito()
+                print("Arquivos de conflito limpos")
+            except Exception as e:
+                print(f"Erro ao limpar arquivos de conflito: {e}")
             
             # Fechar Syncthing apenas se o login não foi bem-sucedido
+            # ou se a aplicação está sendo totalmente fechada
             if not hasattr(self, 'login_successful') or not self.login_successful:
-                from base.banco import fechar_syncthing
-                fechar_syncthing()
+                try:
+                    from base.banco import fechar_syncthing
+                    fechar_syncthing()
+                    print("Syncthing fechado")
+                except Exception as e:
+                    print(f"Erro ao fechar Syncthing: {e}")
+            
+            print("Limpeza do closeEvent da LoginWindow concluída")
+            
         except Exception as e:
-            print(f"Erro ao encerrar: {e}")
+            print(f"Erro geral no closeEvent da LoginWindow: {e}")
         
-        # Propagar o evento para fechar normalmente
-        super().closeEvent(event)
+        # Aceita o evento para permitir o fechamento
+        event.accept()
 
     def mostrar_mensagem(self, titulo, texto):
         """Exibe uma caixa de mensagem"""
@@ -760,6 +1047,7 @@ class LoginWindow(QMainWindow):
         msg_box.exec_()
 
 
+
 def resource_path(relative_path):
     """Obtém o caminho absoluto para o recurso"""
     try:
@@ -769,30 +1057,35 @@ def resource_path(relative_path):
         print(f"Erro ao obter caminho do recurso: {e}")
         return relative_path
 
-
 def main():
-    """Função principal que inicia o aplicativo com splash screen"""
+    """Função principal que inicia o aplicativo com splash screen e verificação de atualização."""
     app = QApplication(sys.argv)
     
-    # Primeiro splash screen - inicialização do programa
     startup_splash = SplashScreen("startup")
     startup_splash.show()
     startup_splash.start_loading()
     
-    # Variável para armazenar a janela de login
+    # CORREÇÃO: Declarar login_window fora da função para manter referência
     login_window = None
     
-    def show_login():
+    def proximo_passo():
         nonlocal login_window
         startup_splash.close()
-        login_window = LoginWindow()
-        login_window.show()
+        
+        # Verifica atualização
+        atualizacao_iniciada = verificar_e_aplicar_atualizacao()
+
+        # Se não iniciou atualização, abre a tela de login
+        if not atualizacao_iniciada:
+            login_window = LoginWindow()
+            login_window.show()
+            
+            # CORREÇÃO: Armazena a referência no app para evitar garbage collection
+            app.login_window = login_window
     
-    # Quando o carregamento inicial terminar, mostrar o login
-    startup_splash.worker.finished.connect(show_login)
+    startup_splash.worker.finished.connect(proximo_passo)
     
     sys.exit(app.exec_())
-
 
 if __name__ == "__main__":
     main()

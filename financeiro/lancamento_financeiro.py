@@ -1,11 +1,10 @@
-#lançamento financeiro
 import sys
 import os
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QPushButton, QLabel, QLineEdit,
                            QTextEdit, QDateEdit, QMessageBox, QSizePolicy,
-                           QComboBox, QCalendarWidget)
+                           QComboBox, QCalendarWidget, QStyle)
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 from PyQt5.QtCore import Qt, QSize, QDate
 
@@ -149,30 +148,45 @@ class LancamentoFinanceiroWindow(QWidget):
         # Estilo para ComboBox
         combobox_style = """
             QComboBox {
-                background-color: #fffff0;
+                background-color: white;
+                color: black; /* Texto do combobox fechado */
                 border: 1px solid #cccccc;
-                padding: 10px;
-                font-size: 14px;
-                min-height: 25px;
+                padding: 6px;
+                font-size: 13px;
+                min-height: 20px;
+                max-height: 30px;
                 border-radius: 4px;
             }
             QComboBox::drop-down {
-                border: none;
-                width: 24px;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: darkgray;
+                border-left-style: solid;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
             }
             QComboBox::down-arrow {
-                image: url(ico-img/down-arrow.png);
-                width: 16px;
-                height: 16px;
+                image: url(:/qt-project.org/styles/commonstyle/images/down-arrow.png);
             }
+            /* Estilo da lista suspensa - corrigido para garantir texto preto */
             QComboBox QAbstractItemView {
-                background-color: white;
-                color: black;
-                selection-background-color: #003b57;
-                selection-color: white;
+                background-color: white !important;
+                color: black !important; /* Cor do texto forçada para preto */
+                border: 1px solid #cccccc;
+                selection-background-color: #043b57;
+                selection-color: white; /* Cor do texto do item selecionado */
             }
-            QComboBox:hover {
-                border: 1px solid #0078d7;
+            /* Apenas o item sob o mouse fica com texto branco */
+            QComboBox QAbstractItemView::item:selected,
+            QComboBox QAbstractItemView::item:hover {
+                color: white !important;
+                background-color: #043b57;
+            }
+            /* Força TODOS os outros itens a terem texto preto */
+            QComboBox QAbstractItemView::item {
+                color: black !important; /* Cor forçada para preto */
             }
         """
         
@@ -307,6 +321,7 @@ class LancamentoFinanceiroWindow(QWidget):
         self.observacoes_input = QTextEdit()
         self.observacoes_input.setStyleSheet(textedit_style)
         self.observacoes_input.setMinimumHeight(150)
+        self.observacoes_input.setReadOnly(True)  # Impede a edição do campo
         main_layout.addWidget(self.observacoes_input)
         
         # Botões na parte inferior

@@ -1,21 +1,13 @@
 {
-  "ultima_atualizacao": "2025-06-09T14:17:02.939146",
+  "ultima_atualizacao": "2025-08-26T12:01:05.197519",
   "conversas": [
     {
       "role": "user",
-      "content": "NCM de notebook"
+      "content": "Resumo geral"
     },
     {
       "role": "assistant",
-      "content": "O NCM (Nomenclatura Comum do Mercosul) para notebooks é:\n\n**8471.30.10** - Máquinas automáticas para processamento de dados, portáteis, de peso não superior a 10 kg, constituídas por, no mínimo, uma unidade central de processamento, um teclado e uma tela.\n\n📦 Para cadastrar ou consultar produtos com esse NCM, acesse: **Menu Produtos e Serviços → Produtos**."
-    },
-    {
-      "role": "user",
-      "content": "Produtos estoque baixo"
-    },
-    {
-      "role": "assistant",
-      "content": "⚠️ **1 produtos** com estoque baixo:\n\n• **Herbissimo** - Estoque: 4\n"
+      "content": "Aqui está um resumo geral do sistema 📊:\n\n**Clientes:**\n- Total de clientes cadastrados: [Número de clientes]\n\n**Produtos:**\n- Total de produtos cadastrados: [Número de produtos]\n- Produtos com estoque baixo: [Número de produtos com estoque baixo]\n\n**Financeiro:**\n- Valor total a receber: R$ [Valor total a receber]\n- Recebimentos pendentes: [Número de recebimentos pendentes]\n\n**Vendas:**\n- Total de pedidos de venda: [Número de pedidos de venda]\n- Valor total em vendas: R$ [Valor total em vendas]\n\n**Caixa:**\n- Situação do caixa: [Status do caixa]\n\nPara mais detalhes, acesse os módulos específicos no menu. 🏢📦💰"
     },
     {
       "role": "user",
@@ -23,7 +15,7 @@
     },
     {
       "role": "assistant",
-      "content": "📊 Você tem **3 clientes** cadastrados no sistema."
+      "content": "📊 Você tem **4 clientes** cadastrados no sistema."
     }
   ]
 }
