@@ -9,13 +9,92 @@ import webbrowser
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                           QHBoxLayout, QPushButton, QLabel, QLineEdit, QDialog,
-                          QMessageBox, QFrame, QProgressBar, QSplashScreen)
+                          QMessageBox, QFrame, QProgressBar, QSplashScreen, QProgressDialog)
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush, QLinearGradient, QMovie
 from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.3.5"
+Versao = "Versão: v0.1.5.4"
+
+# ============================================================================
+# THREAD PARA DOWNLOAD EM SEGUNDO PLANO
+# ============================================================================
+
+class DownloadThread(QThread):
+    """Thread para baixar a atualização sem travar a interface"""
+    progress = pyqtSignal(int)  # Progresso em porcentagem
+    status = pyqtSignal(str)    # Mensagem de status
+    finished = pyqtSignal(bool, str)  # (sucesso, mensagem/caminho)
+    
+    def __init__(self, url, destino):
+        super().__init__()
+        self.url = url
+        self.destino = destino
+        self.cancelado = False
+    
+    def run(self):
+        """Executa o download"""
+        try:
+            self.status.emit("Conectando ao servidor...")
+            
+            # Fazer requisição com stream para download progressivo
+            response = requests.get(self.url, stream=True, timeout=30)
+            response.raise_for_status()
+            
+            # Obter tamanho total do arquivo
+            total_size = int(response.headers.get('content-length', 0))
+            
+            if total_size == 0:
+                self.finished.emit(False, "Não foi possível determinar o tamanho do arquivo")
+                return
+            
+            # Criar diretório se não existir
+            os.makedirs(os.path.dirname(self.destino), exist_ok=True)
+            
+            # Baixar em chunks
+            downloaded_size = 0
+            chunk_size = 8192  # 8KB por chunk
+            
+            self.status.emit(f"Baixando atualização... (0%)")
+            
+            with open(self.destino, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if self.cancelado:
+                        self.finished.emit(False, "Download cancelado pelo usuário")
+                        return
+                    
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+                        
+                        # Calcular progresso
+                        progress_percent = int((downloaded_size / total_size) * 100)
+                        self.progress.emit(progress_percent)
+                        
+                        # Atualizar status com tamanho
+                        mb_downloaded = downloaded_size / (1024 * 1024)
+                        mb_total = total_size / (1024 * 1024)
+                        self.status.emit(
+                            f"Baixando atualização... ({progress_percent}%)\n"
+                            f"{mb_downloaded:.1f} MB de {mb_total:.1f} MB"
+                        )
+            
+            self.status.emit("Download concluído!")
+            self.finished.emit(True, self.destino)
+            
+        except requests.exceptions.Timeout:
+            self.finished.emit(False, "Tempo limite de download excedido")
+        except requests.exceptions.ConnectionError:
+            self.finished.emit(False, "Erro de conexão durante o download")
+        except requests.exceptions.RequestException as e:
+            self.finished.emit(False, f"Erro ao baixar: {str(e)}")
+        except Exception as e:
+            self.finished.emit(False, f"Erro inesperado: {str(e)}")
+    
+    def cancelar(self):
+        """Cancela o download"""
+        self.cancelado = True
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
@@ -342,8 +421,122 @@ class LoginWindow(QMainWindow):
         # Carregar o usuário e empresa salvos, se existirem
         self.carregar_dados_salvos()
     
+    def obter_url_download_release(self, versao):
+        """
+        Obtém a URL de download do executável no GitHub Release
+        
+        Args:
+            versao: String da versão (ex: "v0.1.6")
+        
+        Returns:
+            URL do arquivo ou None se não encontrar
+        """
+        try:
+            # URL da API do GitHub para obter informações do release
+            api_url = f"https://api.github.com/repos/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/tags/{versao}"
+            
+            headers = {
+                'User-Agent': 'MBSistema-UpdateChecker/1.0',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            response = requests.get(api_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            release_data = response.json()
+            
+            # Procurar o arquivo .exe nos assets do release
+            for asset in release_data.get('assets', []):
+                nome_arquivo = asset.get('name', '').lower()
+                
+                # Procurar por mbsistema.exe ou similar
+                if nome_arquivo.endswith('.exe') and 'mbsistema' in nome_arquivo:
+                    return asset.get('browser_download_url')
+            
+            return None
+            
+        except Exception as e:
+            print(f"Erro ao obter URL do release: {e}")
+            return None
+
+
+    def baixar_atualizacao(self, url_download, versao):
+        """
+        Baixa a atualização e mostra progresso
+        
+        Args:
+            url_download: URL do arquivo para download
+            versao: Versão que está sendo baixada
+        
+        Returns:
+            Caminho do arquivo baixado ou None se falhar
+        """
+        try:
+            # Definir destino do download
+            app_dir = os.path.dirname(sys.executable)
+            destino = os.path.join(app_dir, 'atualizacao', 'mbsistema.exe')
+            
+            # Criar diálogo de progresso
+            progress_dialog = QProgressDialog(
+                "Preparando download...",
+                "Cancelar",
+                0, 100,
+                self
+            )
+            progress_dialog.setWindowTitle("Baixando Atualização")
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.setAutoClose(False)
+            progress_dialog.setAutoReset(False)
+            
+            # Criar thread de download
+            self.download_thread = DownloadThread(url_download, destino)
+            
+            # Conectar sinais
+            self.download_thread.progress.connect(progress_dialog.setValue)
+            self.download_thread.status.connect(progress_dialog.setLabelText)
+            
+            # Variável para armazenar resultado
+            resultado = [None, None]  # [sucesso, mensagem/caminho]
+            
+            def on_finished(sucesso, msg):
+                resultado[0] = sucesso
+                resultado[1] = msg
+                progress_dialog.close()
+            
+            self.download_thread.finished.connect(on_finished)
+            
+            # Conectar botão cancelar
+            progress_dialog.canceled.connect(self.download_thread.cancelar)
+            
+            # Iniciar download
+            self.download_thread.start()
+            
+            # Esperar conclusão (o diálogo mantém a UI responsiva)
+            progress_dialog.exec_()
+            
+            # Verificar resultado
+            if resultado[0]:
+                return resultado[1]  # Retorna o caminho do arquivo
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Erro no Download",
+                    f"Não foi possível baixar a atualização:\n\n{resultado[1]}"
+                )
+                return None
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Erro",
+                f"Erro ao preparar download:\n\n{str(e)}"
+            )
+            return None
+
+
     def verificar_atualizacao_simples(self):
-        """Verifica atualizações de forma simples e abre o link de download se necessário."""
+        """Verifica atualizações e oferece download automático"""
         try:
             # Verificar se já foi checado recentemente (últimas 24 horas)
             ultima_verificacao = self.settings.value("ultima_verificacao_atualizacao", None)
@@ -367,71 +560,129 @@ class LoginWindow(QMainWindow):
                 except:
                     pass  # Se houver erro, continua a verificação
             
-            try:
-                # URL do arquivo versao.txt no seu repositório
-                version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
-                
-                # Configurar headers para evitar rate limiting
-                headers = {
-                    'User-Agent': 'MBSistema-UpdateChecker/1.0',
-                    'Accept': 'text/plain',
-                    'Cache-Control': 'no-cache'
-                }
-                
-                # Fazer requisição com timeout e headers
-                response = requests.get(version_url, timeout=10, headers=headers)
-                
-                # Verificar o código de status
-                if response.status_code == 429:
-                    QMessageBox.warning(
-                        self, 
-                        "Limite de Requisições", 
-                        "Muitas verificações de atualização em pouco tempo.\n\n"
-                        "Por favor, aguarde alguns minutos e tente novamente."
-                    )
-                    return
-                
-                # Lançar exceção para outros códigos de erro
-                response.raise_for_status()
-                
-                # Obter e limpar a versão remota
-                nova_versao = response.text.strip()
-                
-                # Extrai número da versão atual da variável Versao
-                # Versao = "Versão: v0.1.5.3.4"
-                versao_atual = Versao.split(": ")[1].strip()
-                
-                print(f"Versão atual: {versao_atual}")
-                print(f"Nova versão disponível: {nova_versao}")
-                
-                # Compara versões
-                if self.comparar_versoes_simples(nova_versao, versao_atual):
-                    reply = QMessageBox.question(
-                        self, 
-                        'Atualização Disponível',
-                        f"Nova versão {nova_versao} disponível!\n"
-                        f"Versão atual: {versao_atual}\n\n"
-                        f"Deseja abrir a página de download?",
-                        QMessageBox.Yes | QMessageBox.No,
-                        QMessageBox.Yes
-                    )
-                    
-                    if reply == QMessageBox.Yes:
-                        webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
-                else:
-                    QMessageBox.information(
-                        self, 
-                        "Sistema Atualizado", 
-                        f"Seu sistema está atualizado!\n\nVersão atual: {versao_atual}"
-                    )
-                    
-            except requests.exceptions.Timeout:
+            # URL do arquivo versao.txt no seu repositório
+            version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
+            
+            # Configurar headers para evitar rate limiting
+            headers = {
+                'User-Agent': 'MBSistema-UpdateChecker/1.0',
+                'Accept': 'text/plain',
+                'Cache-Control': 'no-cache'
+            }
+            
+            # Fazer requisição com timeout e headers
+            response = requests.get(version_url, timeout=10, headers=headers)
+            
+            # Verificar o código de status
+            if response.status_code == 429:
                 QMessageBox.warning(
                     self, 
-                    "Tempo Esgotado", 
-                    "A verificação de atualização demorou muito tempo.\n\n"
-                    "Verifique sua conexão com a internet e tente novamente."
+                    "Limite de Requisições", 
+                    "Muitas verificações de atualização em pouco tempo.\n\n"
+                    "Por favor, aguarde alguns minutos e tente novamente."
                 )
+                return
+            
+            # Lançar exceção para outros códigos de erro
+            response.raise_for_status()
+            
+            # Obter e limpar a versão remota
+            nova_versao = response.text.strip()
+            
+            # Extrai número da versão atual da variável Versao
+            versao_atual = Versao.split(": ")[1].strip()
+            
+            print(f"Versão atual: {versao_atual}")
+            print(f"Nova versão disponível: {nova_versao}")
+            
+            # Compara versões
+            if self.comparar_versoes_simples(nova_versao, versao_atual):
+                # ===== AQUI ESTÁ A MUDANÇA PRINCIPAL =====
+                # Mostrar opções: Download Automático ou Manual
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Question)
+                msg_box.setWindowTitle("Atualização Disponível")
+                msg_box.setText(
+                    f"Nova versão {nova_versao} disponível!\n"
+                    f"Versão atual: {versao_atual}"
+                )
+                msg_box.setInformativeText(
+                    "Como deseja atualizar?\n\n"
+                    "• Download Automático: O sistema baixa e instala automaticamente\n"
+                    "• Download Manual: Abre a página do GitHub para download manual"
+                )
+                
+                btn_automatico = msg_box.addButton("Download Automático", QMessageBox.AcceptRole)
+                btn_manual = msg_box.addButton("Download Manual", QMessageBox.ActionRole)
+                btn_cancelar = msg_box.addButton("Agora Não", QMessageBox.RejectRole)
+                
+                msg_box.setDefaultButton(btn_automatico)
+                msg_box.exec_()
+                
+                clicked_button = msg_box.clickedButton()
+                
+                if clicked_button == btn_automatico:
+                    # ===== FLUXO DE DOWNLOAD AUTOMÁTICO =====
+                    print("Iniciando download automático...")
+                    
+                    # Obter URL do release
+                    url_download = self.obter_url_download_release(nova_versao)
+                    
+                    if not url_download:
+                        reply = QMessageBox.question(
+                            self,
+                            "URL não encontrada",
+                            "Não foi possível encontrar o arquivo de atualização automaticamente.\n\n"
+                            "Deseja abrir a página de releases manualmente?",
+                            QMessageBox.Yes | QMessageBox.No
+                        )
+                        
+                        if reply == QMessageBox.Yes:
+                            import webbrowser
+                            webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+                        return
+                    
+                    # Baixar a atualização
+                    arquivo_baixado = self.baixar_atualizacao(url_download, nova_versao)
+                    
+                    if arquivo_baixado:
+                        # Importar a função que você já tem
+                        from login import verificar_e_aplicar_atualizacao
+                        
+                        QMessageBox.information(
+                            self,
+                            "Download Concluído",
+                            "Atualização baixada com sucesso!\n\n"
+                            "O sistema será reiniciado para aplicar a atualização."
+                        )
+                        
+                        # Aplicar a atualização usando sua função existente
+                        verificar_e_aplicar_atualizacao()
+                    
+                elif clicked_button == btn_manual:
+                    # ===== FLUXO MANUAL (COMO ERA ANTES) =====
+                    import webbrowser
+                    webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+            
+            else:
+                QMessageBox.information(
+                    self, 
+                    "Sistema Atualizado", 
+                    f"Seu sistema está atualizado!\n\nVersão atual: {versao_atual}"
+                )
+            
+            # Salvar timestamp da verificação bem-sucedida
+            from datetime import datetime
+            self.settings.setValue("ultima_verificacao_atualizacao", datetime.now().isoformat())
+            self.settings.sync()
+                
+        except requests.exceptions.Timeout:
+            QMessageBox.warning(
+                self, 
+                "Tempo Esgotado", 
+                "A verificação de atualização demorou muito tempo.\n\n"
+                "Verifique sua conexão com a internet e tente novamente."
+            )
         except requests.exceptions.ConnectionError:
             QMessageBox.warning(
                 self, 
@@ -440,7 +691,6 @@ class LoginWindow(QMainWindow):
                 "Verifique sua conexão com a internet e tente novamente."
             )
         except requests.exceptions.RequestException as e:
-            # Captura outros erros de requisição
             error_msg = str(e)
             if "429" in error_msg:
                 QMessageBox.warning(
@@ -456,16 +706,7 @@ class LoginWindow(QMainWindow):
                     f"Não foi possível verificar atualizações.\n\n"
                     f"Detalhes técnicos:\n{error_msg}"
                 )
-        except ValueError as e:
-            # Erro ao processar a versão
-            QMessageBox.warning(
-                self, 
-                "Erro de Processamento", 
-                f"Não foi possível processar as informações de versão.\n\n"
-                f"Erro: {str(e)}"
-            )
         except Exception as e:
-            # Captura qualquer outro erro inesperado
             QMessageBox.warning(
                 self, 
                 "Erro Inesperado", 
@@ -473,44 +714,36 @@ class LoginWindow(QMainWindow):
                 f"Erro: {str(e)}"
             )
 
+
     def comparar_versoes_simples(self, versao1, versao2):
         """
         Compara duas versões no formato vX.Y.Z.W
         Retorna True se versao1 > versao2, False caso contrário
         """
         try:
-            # Remove o 'v' inicial e quaisquer espaços
             v1_str = versao1.strip().lstrip('vV')
             v2_str = versao2.strip().lstrip('vV')
             
-            # Divide as versões em componentes
             v1_parts = v1_str.split('.')
             v2_parts = v2_str.split('.')
             
-            # Converte para inteiros
             v1 = [int(x) for x in v1_parts]
             v2 = [int(x) for x in v2_parts]
             
-            # Normaliza os tamanhos (adiciona zeros se necessário)
             max_len = max(len(v1), len(v2))
             v1.extend([0] * (max_len - len(v1)))
             v2.extend([0] * (max_len - len(v2)))
             
-            # Compara cada componente
             for i in range(max_len):
                 if v1[i] > v2[i]:
                     return True
                 elif v1[i] < v2[i]:
                     return False
             
-            # Versões são iguais
             return False
             
-        except ValueError as e:
-            print(f"Erro ao converter versão para número: {e}")
-            return False
         except Exception as e:
-            print(f"Erro inesperado ao comparar versões: {e}")
+            print(f"Erro ao comparar versões: {e}")
             return False
 
     def verificar_e_iniciar_syncthing(self):
