@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.3.4"
+Versao = "Versão: v0.1.5.3.5"
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
@@ -345,63 +345,172 @@ class LoginWindow(QMainWindow):
     def verificar_atualizacao_simples(self):
         """Verifica atualizações de forma simples e abre o link de download se necessário."""
         try:
-            # URL do arquivo versao.txt no seu repositório
-            version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
+            # Verificar se já foi checado recentemente (últimas 24 horas)
+            ultima_verificacao = self.settings.value("ultima_verificacao_atualizacao", None)
+            if ultima_verificacao:
+                from datetime import datetime
+                try:
+                    ultima_data = datetime.fromisoformat(ultima_verificacao)
+                    agora = datetime.now()
+                    diferenca = (agora - ultima_data).total_seconds()
+                    
+                    # Se verificou há menos de 24 horas (86400 segundos)
+                    if diferenca < 86400:
+                        horas_restantes = int((86400 - diferenca) / 3600)
+                        QMessageBox.information(
+                            self,
+                            "Verificação Recente",
+                            f"Você já verificou atualizações recentemente.\n\n"
+                            f"Aguarde aproximadamente {horas_restantes}h para verificar novamente."
+                        )
+                        return
+                except:
+                    pass  # Se houver erro, continua a verificação
             
-            response = requests.get(version_url, timeout=5)
-            response.raise_for_status()
-            nova_versao = response.text.strip()
-            
-            # Extrai número da versão atual da variável Versao
-            versao_atual = Versao.split(": ")[1].strip()
-            
-            print(f"Versão atual: {versao_atual}")
-            print(f"Nova versão: {nova_versao}")
-            
-            # Compara versões (simples, funciona para formato vX.Y.Z)
-            if self.comparar_versoes_simples(nova_versao, versao_atual):
-                reply = QMessageBox.question(
+            try:
+                # URL do arquivo versao.txt no seu repositório
+                version_url = "https://raw.githubusercontent.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/main/versao.txt"
+                
+                # Configurar headers para evitar rate limiting
+                headers = {
+                    'User-Agent': 'MBSistema-UpdateChecker/1.0',
+                    'Accept': 'text/plain',
+                    'Cache-Control': 'no-cache'
+                }
+                
+                # Fazer requisição com timeout e headers
+                response = requests.get(version_url, timeout=10, headers=headers)
+                
+                # Verificar o código de status
+                if response.status_code == 429:
+                    QMessageBox.warning(
+                        self, 
+                        "Limite de Requisições", 
+                        "Muitas verificações de atualização em pouco tempo.\n\n"
+                        "Por favor, aguarde alguns minutos e tente novamente."
+                    )
+                    return
+                
+                # Lançar exceção para outros códigos de erro
+                response.raise_for_status()
+                
+                # Obter e limpar a versão remota
+                nova_versao = response.text.strip()
+                
+                # Extrai número da versão atual da variável Versao
+                # Versao = "Versão: v0.1.5.3.4"
+                versao_atual = Versao.split(": ")[1].strip()
+                
+                print(f"Versão atual: {versao_atual}")
+                print(f"Nova versão disponível: {nova_versao}")
+                
+                # Compara versões
+                if self.comparar_versoes_simples(nova_versao, versao_atual):
+                    reply = QMessageBox.question(
+                        self, 
+                        'Atualização Disponível',
+                        f"Nova versão {nova_versao} disponível!\n"
+                        f"Versão atual: {versao_atual}\n\n"
+                        f"Deseja abrir a página de download?",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.Yes
+                    )
+                    
+                    if reply == QMessageBox.Yes:
+                        webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
+                else:
+                    QMessageBox.information(
+                        self, 
+                        "Sistema Atualizado", 
+                        f"Seu sistema está atualizado!\n\nVersão atual: {versao_atual}"
+                    )
+                    
+            except requests.exceptions.Timeout:
+                QMessageBox.warning(
                     self, 
-                    'Atualização Disponível',
-                    f"Nova versão {nova_versao} disponível!\n\nDeseja abrir a página de download?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes
+                    "Tempo Esgotado", 
+                    "A verificação de atualização demorou muito tempo.\n\n"
+                    "Verifique sua conexão com a internet e tente novamente."
                 )
-                
-                if reply == QMessageBox.Yes:
-                    import webbrowser
-                    webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
-            else:
-                QMessageBox.information(self, "Atualização", "Seu sistema está atualizado!")
-                
+        except requests.exceptions.ConnectionError:
+            QMessageBox.warning(
+                self, 
+                "Erro de Conexão", 
+                "Não foi possível conectar ao servidor.\n\n"
+                "Verifique sua conexão com a internet e tente novamente."
+            )
         except requests.exceptions.RequestException as e:
-            QMessageBox.warning(self, "Erro de Conexão", f"Não foi possível verificar atualizações.\nVerifique sua conexão com a internet.\n\nErro: {str(e)}")
+            # Captura outros erros de requisição
+            error_msg = str(e)
+            if "429" in error_msg:
+                QMessageBox.warning(
+                    self, 
+                    "Limite de Requisições", 
+                    "Muitas verificações de atualização em pouco tempo.\n\n"
+                    "Por favor, aguarde alguns minutos e tente novamente."
+                )
+            else:
+                QMessageBox.warning(
+                    self, 
+                    "Erro de Conexão", 
+                    f"Não foi possível verificar atualizações.\n\n"
+                    f"Detalhes técnicos:\n{error_msg}"
+                )
+        except ValueError as e:
+            # Erro ao processar a versão
+            QMessageBox.warning(
+                self, 
+                "Erro de Processamento", 
+                f"Não foi possível processar as informações de versão.\n\n"
+                f"Erro: {str(e)}"
+            )
         except Exception as e:
-            QMessageBox.warning(self, "Erro", f"Não foi possível verificar atualizações: {str(e)}")
-    
+            # Captura qualquer outro erro inesperado
+            QMessageBox.warning(
+                self, 
+                "Erro Inesperado", 
+                f"Ocorreu um erro ao verificar atualizações.\n\n"
+                f"Erro: {str(e)}"
+            )
+
     def comparar_versoes_simples(self, versao1, versao2):
-        """Compara duas versões no formato vX.Y.Z"""
+        """
+        Compara duas versões no formato vX.Y.Z.W
+        Retorna True se versao1 > versao2, False caso contrário
+        """
         try:
-            # Remove o 'v' inicial
-            v1 = versao1.lstrip('v').split('.')
-            v2 = versao2.lstrip('v').split('.')
+            # Remove o 'v' inicial e quaisquer espaços
+            v1_str = versao1.strip().lstrip('vV')
+            v2_str = versao2.strip().lstrip('vV')
+            
+            # Divide as versões em componentes
+            v1_parts = v1_str.split('.')
+            v2_parts = v2_str.split('.')
             
             # Converte para inteiros
-            v1 = [int(x) for x in v1]
-            v2 = [int(x) for x in v2]
+            v1 = [int(x) for x in v1_parts]
+            v2 = [int(x) for x in v2_parts]
             
-            # Compara cada parte
-            for i in range(max(len(v1), len(v2))):
-                val1 = v1[i] if i < len(v1) else 0
-                val2 = v2[i] if i < len(v2) else 0
-                
-                if val1 > val2:
+            # Normaliza os tamanhos (adiciona zeros se necessário)
+            max_len = max(len(v1), len(v2))
+            v1.extend([0] * (max_len - len(v1)))
+            v2.extend([0] * (max_len - len(v2)))
+            
+            # Compara cada componente
+            for i in range(max_len):
+                if v1[i] > v2[i]:
                     return True
-                elif val1 < val2:
+                elif v1[i] < v2[i]:
                     return False
             
-            return False  # Versões iguais
-        except:
+            # Versões são iguais
+            return False
+            
+        except ValueError as e:
+            print(f"Erro ao converter versão para número: {e}")
+            return False
+        except Exception as e:
+            print(f"Erro inesperado ao comparar versões: {e}")
             return False
 
     def verificar_e_iniciar_syncthing(self):
@@ -535,6 +644,25 @@ class LoginWindow(QMainWindow):
         
         # verificar atualização
         self.verificar_atualizacao_btn = QPushButton("VERIFICAR ATUALIZAÇÃO")
+        self.verificar_atualizacao_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px;
+                font-size: 12px;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+            QPushButton:pressed {
+                background-color: #1e7e34;
+            }
+        """)
+        self.verificar_atualizacao_btn.setCursor(Qt.PointingHandCursor)
         self.verificar_atualizacao_btn.clicked.connect(self.verificar_atualizacao_simples)
         form_layout.addWidget(self.verificar_atualizacao_btn)
 
