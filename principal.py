@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMenu, QToolBar, QGraphicsDropShadowEffect, QMessageBox, QDialog,
                              QDockWidget, QInputDialog) # <<< IMPORTADO
 from PyQt5.QtGui import QFont, QCursor, QIcon, QPixmap, QColor
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QSize,QRect, QPropertyAnimation, QEasingCurve, QUrl, QTimer, QRect, pyqtSignal, QTimer
 from PyQt5.QtGui import QDesktopServices
 from base.banco import execute_query
 try:
@@ -265,8 +265,13 @@ class ContatosWhatsAppDialog(QDialog):
         except Exception as e:
             print(f"Erro ao abrir WhatsApp: {e}")
             QMessageBox.warning(self, "Erro", f"Erro ao abrir WhatsApp: {str(e)}")
+            
 class MenuButton(QPushButton):
-    # ... (Seu código da classe MenuButton - sem alterações) ...
+    """Botão de menu que abre automaticamente ao passar o mouse"""
+    
+    # Variável de classe para rastrear qual botão está com menu aberto
+    _current_button = None
+    
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setFixedHeight(50)
@@ -287,7 +292,8 @@ class MenuButton(QPushButton):
                 background-color: #00283d;
             }
         """)
-       
+        
+        # Cria o menu
         self.menu = QMenu(self)
         self.menu.setStyleSheet("""
             QMenu {
@@ -303,7 +309,138 @@ class MenuButton(QPushButton):
                 background-color: #e6e6e6;
             }
         """)
-        self.setMenu(self.menu)
+        
+        # Timer para abrir o menu
+        self.open_timer = QTimer(self)
+        self.open_timer.setSingleShot(True)
+        self.open_timer.timeout.connect(self._open_menu)
+        
+        # Timer para verificar e fechar o menu
+        self.check_timer = QTimer(self)
+        self.check_timer.setInterval(100)  # Verifica a cada 100ms
+        self.check_timer.timeout.connect(self._check_should_close)
+        
+        # Remove o comportamento padrão de clique
+        self.setMenu(None)
+        
+        # Habilita rastreamento de mouse
+        self.setMouseTracking(True)
+        
+        # Conecta o sinal de quando o menu é fechado
+        self.menu.aboutToHide.connect(self._on_menu_hide)
+    
+    def enterEvent(self, event):
+        """Quando o mouse entra no botão"""
+        super().enterEvent(event)
+        
+        # Se outro botão tem menu aberto, abre este imediatamente
+        if MenuButton._current_button and MenuButton._current_button != self:
+            MenuButton._current_button._close_menu()
+            self._open_menu()
+        else:
+            # Senão, abre após pequeno delay
+            self.open_timer.start(150)
+    
+    def leaveEvent(self, event):
+        """Quando o mouse sai do botão"""
+        super().leaveEvent(event)
+        
+        # Cancela abertura se estava agendada
+        self.open_timer.stop()
+        
+        # Inicia verificação para fechar
+        if not self.check_timer.isActive():
+            self.check_timer.start()
+    
+    def _open_menu(self):
+        """Abre o menu"""
+        if self.menu.isEmpty():
+            return
+        
+        # Para o timer de verificação
+        self.check_timer.stop()
+        
+        # Posiciona e mostra o menu
+        pos = self.mapToGlobal(self.rect().bottomLeft())
+        self.menu.popup(pos)
+        
+        # Atualiza o botão atual
+        MenuButton._current_button = self
+        
+        # Inicia timer de verificação
+        self.check_timer.start()
+    
+    def _close_menu(self):
+        """Fecha o menu"""
+        self.check_timer.stop()
+        if self.menu.isVisible():
+            self.menu.hide()
+        if MenuButton._current_button == self:
+            MenuButton._current_button = None
+    
+    def _check_should_close(self):
+        """Verifica se deve fechar o menu"""
+        # Só verifica se este botão tem o menu aberto
+        if MenuButton._current_button != self:
+            self.check_timer.stop()
+            return
+
+        if not self.menu.isVisible():
+            self.check_timer.stop()
+            return
+
+        # Obtém a posição global do cursor
+        cursor_pos = QCursor.pos()
+        
+        # Verifica se o mouse está sobre o botão atual
+        button_rect = self.rect()
+        button_global_rect = QRect(
+            self.mapToGlobal(button_rect.topLeft()),
+            self.mapToGlobal(button_rect.bottomRight())
+        )
+        
+        # Verifica se o mouse está sobre o menu
+        menu_rect = self.menu.rect()
+        menu_global_rect = QRect(
+            self.menu.mapToGlobal(menu_rect.topLeft()),
+            self.menu.mapToGlobal(menu_rect.bottomRight())
+        )
+        
+        # Se o mouse está sobre o botão ou o menu, não fecha
+        if button_global_rect.contains(cursor_pos) or menu_global_rect.contains(cursor_pos):
+            return
+        
+        # Verifica se o mouse está sobre outro botão MenuButton
+        for widget in self.parent().findChildren(MenuButton):
+            if widget != self:
+                other_rect = widget.rect()
+                button_global_rect = QRect(
+                    widget.mapToGlobal(other_rect.topLeft()),
+                    widget.mapToGlobal(other_rect.bottomRight())
+                )
+                if button_global_rect.contains(cursor_pos):
+                    # Mouse está sobre outro botão, fecha este e abre o outro
+                    self._close_menu()
+                    widget._open_menu()
+                    return
+
+        # Mouse não está em nenhum lugar relevante, fecha o menu
+        self._close_menu()
+    
+    def _on_menu_hide(self):
+        """Chamado quando o menu é fechado"""
+        if MenuButton._current_button == self:
+            MenuButton._current_button = None
+        self.check_timer.stop()
+    
+    def mousePressEvent(self, event):
+        """Desabilita o clique para abrir o menu"""
+        # Permite clique apenas para fechar se já estiver aberto
+        if self.menu.isVisible() and MenuButton._current_button == self:
+            self._close_menu()
+        # Não faz nada para evitar o comportamento padrão
+        pass
+    
 class NotificationPopup(QDialog):
     """Uma janela de notificação pop-up não-intrusiva."""
     def __init__(self, title, message, parent=None):

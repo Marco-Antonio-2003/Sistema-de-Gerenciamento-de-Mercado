@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.4.1"
+Versao = "Versão: v0.1.5.4.2"
 
 # ============================================================================
 # THREAD PARA DOWNLOAD EM SEGUNDO PLANO
@@ -606,15 +606,11 @@ class LoginWindow(QMainWindow):
                     f"Nova versão {nova_versao} disponível!\n"
                     f"Versão atual: {versao_atual}"
                 )
-                msg_box.setInformativeText(
-                    "Como deseja atualizar?\n\n"
-                    "• Download Automático: O sistema baixa e instala automaticamente\n"
-                    "• Download Manual: Abre a página do GitHub para download manual"
-                )
-                
-                btn_automatico = msg_box.addButton("Download Automático", QMessageBox.AcceptRole)
-                btn_manual = msg_box.addButton("Download Manual", QMessageBox.ActionRole)
-                btn_cancelar = msg_box.addButton("Agora Não", QMessageBox.RejectRole)
+                msg_box.setInformativeText("Como deseja atualizar?")
+
+                btn_automatico = msg_box.addButton("Automático", QMessageBox.AcceptRole)
+                btn_manual = msg_box.addButton("Manual", QMessageBox.ActionRole)
+                btn_cancelar = msg_box.addButton("Depois", QMessageBox.RejectRole)
                 
                 msg_box.setDefaultButton(btn_automatico)
                 msg_box.exec_()
