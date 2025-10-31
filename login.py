@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.4.2"
+Versao = "Versão: v0.1.5.4.3"
 
 # ============================================================================
 # THREAD PARA DOWNLOAD EM SEGUNDO PLANO
@@ -538,25 +538,31 @@ class LoginWindow(QMainWindow):
     def verificar_atualizacao_simples(self):
         """Verifica atualizações e oferece download automático"""
         try:
-            # Verificar se já foi checado recentemente (últimas 24 horas)
-            ultima_verificacao = self.settings.value("ultima_verificacao_atualizacao", None)
-            if ultima_verificacao:
+            # ============================================================
+            # NOVO: Verificar APENAS se recebeu erro 429 recentemente
+            # ============================================================
+            ultimo_erro_429 = self.settings.value("ultimo_erro_429", None)
+            if ultimo_erro_429:
                 from datetime import datetime
                 try:
-                    ultima_data = datetime.fromisoformat(ultima_verificacao)
+                    ultima_data = datetime.fromisoformat(ultimo_erro_429)
                     agora = datetime.now()
                     diferenca = (agora - ultima_data).total_seconds()
                     
-                    # Se verificou há menos de 24 horas (86400 segundos)
-                    if diferenca < 86400:
-                        horas_restantes = int((86400 - diferenca) / 3600)
-                        QMessageBox.information(
+                    # Bloquear apenas por 1 hora após erro 429
+                    if diferenca < 3600:
+                        minutos_restantes = int((3600 - diferenca) / 60)
+                        QMessageBox.warning(
                             self,
-                            "Verificação Recente",
-                            f"Você já verificou atualizações recentemente.\n\n"
-                            f"Aguarde aproximadamente {horas_restantes}h para verificar novamente."
+                            "Aguarde um Momento",
+                            f"Muitas verificações em pouco tempo causaram bloqueio temporário.\n\n"
+                            f"Aguarde aproximadamente {minutos_restantes} minutos para tentar novamente."
                         )
                         return
+                    else:
+                        # Tempo passou, limpar o bloqueio
+                        self.settings.remove("ultimo_erro_429")
+                        self.settings.sync()
                 except:
                     pass  # Se houver erro, continua a verificação
             
@@ -573,13 +579,19 @@ class LoginWindow(QMainWindow):
             # Fazer requisição com timeout e headers
             response = requests.get(version_url, timeout=10, headers=headers)
             
-            # Verificar o código de status
+            # ============================================================
+            # NOVO: Verificar erro 429 e salvar timestamp
+            # ============================================================
             if response.status_code == 429:
+                from datetime import datetime
+                self.settings.setValue("ultimo_erro_429", datetime.now().isoformat())
+                self.settings.sync()
+                
                 QMessageBox.warning(
                     self, 
                     "Limite de Requisições", 
                     "Muitas verificações de atualização em pouco tempo.\n\n"
-                    "Por favor, aguarde alguns minutos e tente novamente."
+                    "Por favor, aguarde 1 hora e tente novamente."
                 )
                 return
             
@@ -597,7 +609,6 @@ class LoginWindow(QMainWindow):
             
             # Compara versões
             if self.comparar_versoes_simples(nova_versao, versao_atual):
-                # ===== AQUI ESTÁ A MUDANÇA PRINCIPAL =====
                 # Mostrar opções: Download Automático ou Manual
                 msg_box = QMessageBox(self)
                 msg_box.setIcon(QMessageBox.Question)
@@ -607,10 +618,14 @@ class LoginWindow(QMainWindow):
                     f"Versão atual: {versao_atual}"
                 )
                 msg_box.setInformativeText("Como deseja atualizar?")
-
+                
                 btn_automatico = msg_box.addButton("Automático", QMessageBox.AcceptRole)
                 btn_manual = msg_box.addButton("Manual", QMessageBox.ActionRole)
                 btn_cancelar = msg_box.addButton("Depois", QMessageBox.RejectRole)
+                
+                # Tooltip explicativo nos botões
+                btn_automatico.setToolTip("O sistema baixa e instala automaticamente")
+                btn_manual.setToolTip("Abre a página do GitHub para download manual")
                 
                 msg_box.setDefaultButton(btn_automatico)
                 msg_box.exec_()
@@ -618,8 +633,8 @@ class LoginWindow(QMainWindow):
                 clicked_button = msg_box.clickedButton()
                 
                 if clicked_button == btn_automatico:
-                    # ===== FLUXO DE DOWNLOAD AUTOMÁTICO =====
-                    print("Iniciando download automático...")
+                    # FLUXO DE DOWNLOAD AUTOMÁTICO
+                    print(f"Iniciando download automático da versão {nova_versao}...")
                     
                     # Obter URL do release
                     url_download = self.obter_url_download_release(nova_versao)
@@ -627,7 +642,7 @@ class LoginWindow(QMainWindow):
                     if not url_download:
                         reply = QMessageBox.question(
                             self,
-                            "URL não encontrada",
+                            "Arquivo não encontrado",
                             "Não foi possível encontrar o arquivo de atualização automaticamente.\n\n"
                             "Deseja abrir a página de releases manualmente?",
                             QMessageBox.Yes | QMessageBox.No
@@ -656,7 +671,7 @@ class LoginWindow(QMainWindow):
                         verificar_e_aplicar_atualizacao()
                     
                 elif clicked_button == btn_manual:
-                    # ===== FLUXO MANUAL (COMO ERA ANTES) =====
+                    # FLUXO MANUAL
                     import webbrowser
                     webbrowser.open("https://github.com/Marco-Antonio-2003/Sistema-de-Gerenciamento-de-Mercado/releases/latest")
             
@@ -667,10 +682,9 @@ class LoginWindow(QMainWindow):
                     f"Seu sistema está atualizado!\n\nVersão atual: {versao_atual}"
                 )
             
-            # Salvar timestamp da verificação bem-sucedida
-            from datetime import datetime
-            self.settings.setValue("ultima_verificacao_atualizacao", datetime.now().isoformat())
-            self.settings.sync()
+            # ============================================================
+            # REMOVIDO: Não salva mais timestamp de verificação normal
+            # ============================================================
                 
         except requests.exceptions.Timeout:
             QMessageBox.warning(
@@ -689,11 +703,18 @@ class LoginWindow(QMainWindow):
         except requests.exceptions.RequestException as e:
             error_msg = str(e)
             if "429" in error_msg:
+                # ============================================================
+                # NOVO: Salvar timestamp também se erro 429 vier na exceção
+                # ============================================================
+                from datetime import datetime
+                self.settings.setValue("ultimo_erro_429", datetime.now().isoformat())
+                self.settings.sync()
+                
                 QMessageBox.warning(
                     self, 
                     "Limite de Requisições", 
                     "Muitas verificações de atualização em pouco tempo.\n\n"
-                    "Por favor, aguarde alguns minutos e tente novamente."
+                    "Por favor, aguarde 1 hora e tente novamente."
                 )
             else:
                 QMessageBox.warning(
