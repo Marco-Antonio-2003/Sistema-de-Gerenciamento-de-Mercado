@@ -101,7 +101,7 @@ class DownloadThread(QThread):
 
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização, com script .bat melhorado.
+    Verifica e aplica uma atualização, com tratamento para evitar erro _MEI.
     """
     try:
         app_dir = os.path.dirname(sys.executable)
@@ -147,21 +147,21 @@ def verificar_e_aplicar_atualizacao():
         except Exception as backup_err:
             print(f'Falha ao criar backup do executável: {backup_err}')
 
-        # --- CRIAR SCRIPT .BAT MELHORADO ---
+        # --- CRIAR SCRIPT .BAT COM DELAYS AUMENTADOS ---
         updater_script_path = os.path.join(app_dir, 'updater.bat')
         current_exe_filename = os.path.basename(current_exe)
         new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
 
-        # Script .bat com verificação e retry
+        # Script .bat com delays MUITO MAIORES para garantir limpeza completa
         script_content = f"""@echo off
 echo ════════════════════════════════════════
 echo    MB SISTEMA - Atualizacao Automatica
 echo ════════════════════════════════════════
 echo.
 
-REM Aguardar processo fechar completamente
-echo [1/5] Aguardando sistema fechar...
-timeout /t 3 /nobreak > NUL
+REM ===== ETAPA 1: FECHAMENTO COMPLETO =====
+echo [1/6] Aguardando sistema fechar completamente...
+timeout /t 5 /nobreak > NUL
 
 REM Verificar se processo ainda está rodando
 :CHECK_PROCESS
@@ -169,27 +169,49 @@ tasklist /FI "IMAGENAME eq {current_exe_filename}" 2>NUL | find /I /N "{current_
 if "%ERRORLEVEL%"=="0" (
     echo    Aguardando processo finalizar...
     taskkill /F /IM "{current_exe_filename}" > NUL 2>&1
-    timeout /t 10 /nobreak > NUL
+    timeout /t 3 /nobreak > NUL
     goto CHECK_PROCESS
 )
 echo    [OK] Processo finalizado
 echo.
 
-REM Aguardar liberação de recursos
-echo [2/5] Liberando recursos do sistema...
-timeout /t 5 /nobreak > NUL
-echo    [OK] Recursos liberados
+REM ===== ETAPA 2: LIMPEZA DE ARQUIVOS TEMPORÁRIOS =====
+echo [2/6] Limpando arquivos temporarios do Python...
+
+REM Limpar pasta _MEI do usuário atual
+set "TEMP_PATH=%TEMP%"
+for /d %%i in ("%TEMP_PATH%\\_MEI*") do (
+    echo    Removendo: %%i
+    rd /s /q "%%i" 2>NUL
+)
+
+REM Aguardar limpeza completa do Windows
+timeout /t 8 /nobreak > NUL
+echo    [OK] Arquivos temporarios limpos
 echo.
 
-REM Renomear executável atual
-echo [3/5] Fazendo backup do executavel atual...
+REM ===== ETAPA 3: BACKUP DO EXECUTÁVEL ATUAL =====
+echo [3/6] Fazendo backup do executavel atual...
 if exist "{current_exe_filename}" (
     if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-    ren "{current_exe_filename}" "{current_exe_filename}.old"
+    
+    REM Tentar renomear com retry
+    set /a attempts=0
+    :RETRY_RENAME
+    set /a attempts+=1
+    ren "{current_exe_filename}" "{current_exe_filename}.old" 2>NUL
+    
     if errorlevel 1 (
-        echo    [ERRO] Falha ao renomear arquivo!
-        pause
-        exit /b 1
+        if %attempts% LSS 5 (
+            echo    Tentativa %attempts% - aguardando...
+            timeout /t 3 /nobreak > NUL
+            goto RETRY_RENAME
+        ) else (
+            echo    [ERRO] Falha ao renomear arquivo!
+            echo    Pressione qualquer tecla para sair...
+            pause > NUL
+            exit /b 1
+        )
     )
     echo    [OK] Backup criado
 ) else (
@@ -197,45 +219,76 @@ if exist "{current_exe_filename}" (
 )
 echo.
 
-REM Mover novo executável
-echo [4/5] Instalando nova versao...
+REM ===== ETAPA 4: INSTALAÇÃO DA NOVA VERSÃO =====
+echo [4/6] Instalando nova versao...
 if exist "atualizacao\\{new_exe_filename_in_update_folder}" (
-    move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
+    REM Tentar mover com retry
+    set /a attempts=0
+    :RETRY_MOVE
+    set /a attempts+=1
+    move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}" 2>NUL
+    
     if errorlevel 1 (
-        echo    [ERRO] Falha ao mover arquivo!
-        if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-        pause
-        exit /b 1
+        if %attempts% LSS 5 (
+            echo    Tentativa %attempts% - aguardando...
+            timeout /t 3 /nobreak > NUL
+            goto RETRY_MOVE
+        ) else (
+            echo    [ERRO] Falha ao mover arquivo!
+            echo    Restaurando backup...
+            if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
+            echo    Pressione qualquer tecla para sair...
+            pause > NUL
+            exit /b 1
+        )
     )
     echo    [OK] Nova versao instalada
 ) else (
     echo    [ERRO] Arquivo de atualizacao nao encontrado!
     if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-    pause
+    echo    Pressione qualquer tecla para sair...
+    pause > NUL
     exit /b 1
 )
 echo.
 
-REM Iniciar sistema atualizado
-echo [5/5] Iniciando sistema atualizado...
+REM ===== ETAPA 5: AGUARDAR ANTES DE INICIAR =====
+echo [5/6] Preparando para iniciar sistema...
+echo    Aguardando liberacao total dos recursos...
+timeout /t 15 /nobreak > NUL
+echo    [OK] Sistema pronto para iniciar
+echo.
+
+REM ===== ETAPA 6: INICIAR SISTEMA ATUALIZADO =====
+echo [6/6] Iniciando sistema atualizado...
 start "" "{current_exe_filename}"
-timeout /t 2 /nobreak > NUL
+
+REM Aguardar inicialização
+timeout /t 5 /nobreak > NUL
 echo    [OK] Sistema iniciado
 echo.
 
-REM Limpar arquivos temporários
-echo Limpando arquivos temporarios...
-timeout /t 3 /nobreak > NUL
-if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-if exist "atualizacao" rmdir /Q "atualizacao" > NUL 2>&1
+REM ===== LIMPEZA FINAL =====
+echo Realizando limpeza final...
+timeout /t 5 /nobreak > NUL
+
+if exist "{current_exe_filename}.old" (
+    del /F /Q "{current_exe_filename}.old" > NUL 2>&1
+)
+
+if exist "atualizacao" (
+    for /d %%i in ("atualizacao\\*") do rd /s /q "%%i" 2>NUL
+    for %%i in ("atualizacao\\*") do del /f /q "%%i" 2>NUL
+    rmdir /q "atualizacao" 2>NUL
+)
 
 echo.
 echo ════════════════════════════════════════
-echo     ATUALIZACAO CONCLUIDA!
+echo     ATUALIZACAO CONCLUIDA COM SUCESSO!
 echo ════════════════════════════════════════
 echo.
-echo Esta janela sera fechada em 3 segundos...
-timeout /t 3 /nobreak > NUL
+echo Esta janela sera fechada em 5 segundos...
+timeout /t 5 /nobreak > NUL
 
 REM Auto-destruir
 del "%~f0"
@@ -247,15 +300,20 @@ del "%~f0"
         
         print(f"Script de atualização criado: {updater_script_path}")
         
-        # Executar o script - MANTÉM A FORMA ORIGINAL QUE FUNCIONAVA
+        # ===== MUDANÇA CRÍTICA: Não usar CREATE_NO_WINDOW =====
+        # Permitir que a janela apareça para mostrar o progresso
+        # Isso também ajuda na depuração
         subprocess.Popen(
             f'"{updater_script_path}"', 
-            shell=True, 
-            creationflags=subprocess.CREATE_NO_WINDOW
+            shell=True
+            # ❌ REMOVIDO: creationflags=subprocess.CREATE_NO_WINDOW
         )
         
-        # Fechar o aplicativo
+        # Aguardar um pouco mais antes de fechar
         print("Iniciando processo de atualização...")
+        time.sleep(2)  # Aumentado de 0 para 2 segundos
+        
+        # Fechar o aplicativo
         os._exit(0)
 
     except Exception as e:
