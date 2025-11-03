@@ -169,7 +169,7 @@ tasklist /FI "IMAGENAME eq {current_exe_filename}" 2>NUL | find /I /N "{current_
 if "%ERRORLEVEL%"=="0" (
     echo    Aguardando processo finalizar...
     taskkill /F /IM "{current_exe_filename}" > NUL 2>&1
-    timeout /t 2 /nobreak > NUL
+    timeout /t 10 /nobreak > NUL
     goto CHECK_PROCESS
 )
 echo    [OK] Processo finalizado
