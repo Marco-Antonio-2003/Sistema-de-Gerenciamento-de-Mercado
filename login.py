@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.4.4"
+Versao = "Versão: v0.1.5.4.5"
 
 # ============================================================================
 # THREAD PARA DOWNLOAD EM SEGUNDO PLANO
@@ -101,7 +101,7 @@ class DownloadThread(QThread):
 
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização de forma mais robusta.
+    Verifica e aplica uma atualização, com script .bat melhorado.
     """
     try:
         app_dir = os.path.dirname(sys.executable)
@@ -111,7 +111,6 @@ def verificar_e_aplicar_atualizacao():
         if not os.path.exists(new_exe_path):
             return False
 
-        # Verificar se os arquivos são diferentes
         if filecmp.cmp(current_exe, new_exe_path, shallow=False):
             try:
                 os.remove(new_exe_path)
@@ -119,7 +118,6 @@ def verificar_e_aplicar_atualizacao():
                 print(f"Não foi possível remover o arquivo de atualização antigo: {e}")
             return False
 
-        # Confirmar com o usuário
         confirm_reply = QMessageBox.question(
             None, 
             'Atualização Disponível',
@@ -131,7 +129,7 @@ def verificar_e_aplicar_atualizacao():
 
         if confirm_reply == QMessageBox.No:
             return False
-
+   
         # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
         try:
             backup_dir = os.path.join(app_dir, 'backup')
@@ -140,7 +138,6 @@ def verificar_e_aplicar_atualizacao():
             backup_filename = 'MBSistema_backup.exe'
             backup_path = os.path.join(backup_dir, backup_filename)
 
-            # Remove backup anterior se existir
             if os.path.exists(backup_path):
                 os.remove(backup_path)
                 print('Backup anterior removido para sobrescrita.')
@@ -153,119 +150,96 @@ def verificar_e_aplicar_atualizacao():
         # --- CRIAR SCRIPT .BAT MELHORADO ---
         updater_script_path = os.path.join(app_dir, 'updater.bat')
         current_exe_filename = os.path.basename(current_exe)
-        new_exe_relative = os.path.join('atualizacao', os.path.basename(new_exe_path))
+        new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
 
-        # Script .bat robusto com tratamento de erros
-        script_content = f'''@echo off
-REM MB Sistema - Atualizacao Automatica v2.0
-
-echo.
-echo ════════════════════════════════════════════════════
-echo           MB SISTEMA - ATUALIZACAO
-echo ════════════════════════════════════════════════════
+        # Script .bat com verificação e retry
+        script_content = f"""@echo off
+echo ════════════════════════════════════════
+echo    MB SISTEMA - Atualizacao Automatica
+echo ════════════════════════════════════════
 echo.
 
-echo [1/6] Aguardando sistema fechar...
-timeout /t 5 /nobreak > NUL
+REM Aguardar processo fechar completamente
+echo [1/5] Aguardando sistema fechar...
+timeout /t 3 /nobreak > NUL
 
-REM Forçar fechamento se ainda estiver rodando
+REM Verificar se processo ainda está rodando
 :CHECK_PROCESS
 tasklist /FI "IMAGENAME eq {current_exe_filename}" 2>NUL | find /I /N "{current_exe_filename}">NUL
 if "%ERRORLEVEL%"=="0" (
-    echo    Forcando fechamento do processo...
+    echo    Aguardando processo finalizar...
     taskkill /F /IM "{current_exe_filename}" > NUL 2>&1
     timeout /t 2 /nobreak > NUL
     goto CHECK_PROCESS
 )
-echo    [OK] Processo encerrado
+echo    [OK] Processo finalizado
 echo.
 
-echo [2/6] Liberando recursos...
-timeout /t 3 /nobreak > NUL
+REM Aguardar liberação de recursos
+echo [2/5] Liberando recursos do sistema...
+timeout /t 5 /nobreak > NUL
 echo    [OK] Recursos liberados
 echo.
 
-echo [3/6] Criando backup...
+REM Renomear executável atual
+echo [3/5] Fazendo backup do executavel atual...
 if exist "{current_exe_filename}" (
     if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-    
-    set /a attempts=0
-    :RETRY_RENAME
-    set /a attempts+=1
-    ren "{current_exe_filename}" "{current_exe_filename}.old" > NUL 2>&1
-    
+    ren "{current_exe_filename}" "{current_exe_filename}.old"
     if errorlevel 1 (
-        if %attempts% LSS 5 (
-            timeout /t 2 /nobreak > NUL
-            goto RETRY_RENAME
-        ) else (
-            echo    [ERRO] Falha ao renomear arquivo
-            pause
-            exit /b 1
-        )
+        echo    [ERRO] Falha ao renomear arquivo!
+        pause
+        exit /b 1
     )
     echo    [OK] Backup criado
+) else (
+    echo    [AVISO] Arquivo atual nao encontrado
 )
 echo.
 
-echo [4/6] Instalando nova versao...
-if exist "{new_exe_relative}" (
-    set /a attempts=0
-    :RETRY_COPY
-    set /a attempts+=1
-    copy /Y "{new_exe_relative}" "{current_exe_filename}" > NUL 2>&1
-    
+REM Mover novo executável
+echo [4/5] Instalando nova versao...
+if exist "atualizacao\\{new_exe_filename_in_update_folder}" (
+    move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
     if errorlevel 1 (
-        if %attempts% LSS 5 (
-            timeout /t 2 /nobreak > NUL
-            goto RETRY_COPY
-        ) else (
-            echo    [ERRO] Falha ao copiar arquivo
-            if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-            pause
-            exit /b 1
-        )
+        echo    [ERRO] Falha ao mover arquivo!
+        if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
+        pause
+        exit /b 1
     )
     echo    [OK] Nova versao instalada
 ) else (
-    echo    [ERRO] Arquivo de atualizacao nao encontrado
+    echo    [ERRO] Arquivo de atualizacao nao encontrado!
     if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
     pause
     exit /b 1
 )
 echo.
 
-echo [5/6] Verificando integridade...
-if exist "{current_exe_filename}" (
-    echo    [OK] Arquivo verificado
-) else (
-    echo    [ERRO] Arquivo nao encontrado
-    if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-    pause
-    exit /b 1
-)
-echo.
-
-echo [6/6] Iniciando sistema...
-timeout /t 2 /nobreak > NUL
+REM Iniciar sistema atualizado
+echo [5/5] Iniciando sistema atualizado...
 start "" "{current_exe_filename}"
-timeout /t 3 /nobreak > NUL
-
+timeout /t 2 /nobreak > NUL
+echo    [OK] Sistema iniciado
 echo.
+
+REM Limpar arquivos temporários
 echo Limpando arquivos temporarios...
+timeout /t 3 /nobreak > NUL
 if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-if exist "{new_exe_relative}" del /F /Q "{new_exe_relative}" > NUL 2>&1
-if exist "atualizacao" rmdir "atualizacao" > NUL 2>&1
+if exist "atualizacao" rmdir /Q "atualizacao" > NUL 2>&1
 
 echo.
-echo ════════════════════════════════════════════════════
-echo          ATUALIZACAO CONCLUIDA!
-echo ════════════════════════════════════════════════════
+echo ════════════════════════════════════════
+echo     ATUALIZACAO CONCLUIDA!
+echo ════════════════════════════════════════
 echo.
+echo Esta janela sera fechada em 3 segundos...
 timeout /t 3 /nobreak > NUL
 
-(goto) 2>nul & del "%~f0"
-'''
+REM Auto-destruir
+del "%~f0"
+"""
         
         # Salvar o script
         with open(updater_script_path, 'w', encoding='utf-8') as f:
@@ -273,26 +247,22 @@ timeout /t 3 /nobreak > NUL
         
         print(f"Script de atualização criado: {updater_script_path}")
         
-        # Executar o script de atualização
-        # IMPORTANTE: Não usar CREATE_NO_WINDOW para poder ver o progresso
+        # Executar o script - MANTÉM A FORMA ORIGINAL QUE FUNCIONAVA
         subprocess.Popen(
-            f'cmd.exe /c "{updater_script_path}"',
-            shell=False,
-            cwd=app_dir
+            f'"{updater_script_path}"', 
+            shell=True, 
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
         
-        # Fechar o aplicativo imediatamente
+        # Fechar o aplicativo
         print("Iniciando processo de atualização...")
-        time.sleep(1)  # Pequena pausa para garantir que o .bat iniciou
-        
         os._exit(0)
 
     except Exception as e:
         QMessageBox.critical(
             None, 
             "Erro na Atualização", 
-            f"Ocorreu um erro durante a atualização:\n\n{e}\n\n"
-            f"O sistema não foi modificado."
+            f"Ocorreu um erro durante a atualização:\n\n{e}"
         )
         return False
     
