@@ -22,7 +22,6 @@ except ImportError:
     MercadoLivreBackend = None
 
 from app_setup import get_app
-
 app = get_app()
 
 class ContatosWhatsAppDialog(QDialog):
