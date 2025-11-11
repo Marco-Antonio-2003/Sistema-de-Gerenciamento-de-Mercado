@@ -27,7 +27,7 @@ def main():
         PONTO_DE_ENTRADA,
         "--name", NOME_DO_PROGRAMA,
         "--onefile",
-        "--windowed",
+        #"--windowed",
         "--noconfirm",  # Evita perguntas durante a compilação
     ]
 

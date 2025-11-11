@@ -6,6 +6,7 @@ import subprocess  # Para executar o script de atualização
 import filecmp  # Para comparar arquivos
 import requests  # Para realizar requisições HTTP
 import webbrowser
+import traceback
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                           QHBoxLayout, QPushButton, QLabel, QLineEdit, QDialog,
@@ -101,7 +102,7 @@ class DownloadThread(QThread):
 
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização, com tratamento para evitar erro _MEI.
+    Verifica e aplica uma atualização automaticamente, sem interação do usuário.
     """
     try:
         app_dir = os.path.dirname(sys.executable)
@@ -147,27 +148,29 @@ def verificar_e_aplicar_atualizacao():
         except Exception as backup_err:
             print(f'Falha ao criar backup do executável: {backup_err}')
 
-        # --- CRIAR SCRIPT .BAT COM DELAYS AUMENTADOS ---
+        # --- CRIAR SCRIPT .BAT AUTOMÁTICO (SEM PAUSE) ---
         updater_script_path = os.path.join(app_dir, 'updater.bat')
         current_exe_filename = os.path.basename(current_exe)
         new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
 
-        # Script .bat com delays MUITO MAIORES para garantir limpeza completa
+        # Script .bat AUTOMÁTICO - sem pause, sem interação
         script_content = f"""@echo off
-echo ════════════════════════════════════════
-echo    MB SISTEMA - Atualizacao Automatica
-echo ════════════════════════════════════════
+title MB Sistema - Atualizacao Automatica
+color 0A
+echo.
+echo ================================================================
+echo    MB SISTEMA - ATUALIZACAO AUTOMATICA
+echo ================================================================
 echo.
 
-REM ===== ETAPA 1: FECHAMENTO COMPLETO =====
-echo [1/6] Aguardando sistema fechar completamente...
+REM ===== PASSO 1: FECHAR PROCESSO =====
+echo [1/5] Aguardando sistema fechar...
 timeout /t 5 /nobreak > NUL
 
-REM Verificar se processo ainda está rodando
 :CHECK_PROCESS
 tasklist /FI "IMAGENAME eq {current_exe_filename}" 2>NUL | find /I /N "{current_exe_filename}">NUL
 if "%ERRORLEVEL%"=="0" (
-    echo    Aguardando processo finalizar...
+    echo    Forcando fechamento do processo...
     taskkill /F /IM "{current_exe_filename}" > NUL 2>&1
     timeout /t 3 /nobreak > NUL
     goto CHECK_PROCESS
@@ -175,123 +178,79 @@ if "%ERRORLEVEL%"=="0" (
 echo    [OK] Processo finalizado
 echo.
 
-REM ===== ETAPA 2: LIMPEZA DE ARQUIVOS TEMPORÁRIOS =====
-echo [2/6] Limpando arquivos temporarios do Python...
-
-REM Limpar pasta _MEI do usuário atual
-set "TEMP_PATH=%TEMP%"
-for /d %%i in ("%TEMP_PATH%\\_MEI*") do (
-    echo    Removendo: %%i
+REM ===== PASSO 2: LIMPAR _MEI =====
+echo [2/5] Limpando arquivos temporarios...
+for /d %%i in ("%TEMP%\\_MEI*") do (
     rd /s /q "%%i" 2>NUL
 )
-
-REM Aguardar limpeza completa do Windows
-timeout /t 8 /nobreak > NUL
+timeout /t 5 /nobreak > NUL
 echo    [OK] Arquivos temporarios limpos
 echo.
 
-REM ===== ETAPA 3: BACKUP DO EXECUTÁVEL ATUAL =====
-echo [3/6] Fazendo backup do executavel atual...
+REM ===== PASSO 3: RENOMEAR ATUAL =====
+echo [3/5] Fazendo backup do executavel atual...
 if exist "{current_exe_filename}" (
     if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
     
-    REM Tentar renomear com retry
-    set /a attempts=0
-    :RETRY_RENAME
-    set /a attempts+=1
-    ren "{current_exe_filename}" "{current_exe_filename}.old" 2>NUL
+    ren "{current_exe_filename}" "{current_exe_filename}.old"
     
     if errorlevel 1 (
-        if %attempts% LSS 5 (
-            echo    Tentativa %attempts% - aguardando...
-            timeout /t 3 /nobreak > NUL
-            goto RETRY_RENAME
-        ) else (
-            echo    [ERRO] Falha ao renomear arquivo!
-            echo    Pressione qualquer tecla para sair...
-            pause > NUL
-            exit /b 1
-        )
+        echo    [ERRO] Falha ao renomear arquivo!
+        timeout /t 5 /nobreak > NUL
+        exit /b 1
     )
     echo    [OK] Backup criado
-) else (
-    echo    [AVISO] Arquivo atual nao encontrado
 )
 echo.
 
-REM ===== ETAPA 4: INSTALAÇÃO DA NOVA VERSÃO =====
-echo [4/6] Instalando nova versao...
+REM ===== PASSO 4: MOVER NOVO ARQUIVO =====
+echo [4/5] Instalando nova versao...
 if exist "atualizacao\\{new_exe_filename_in_update_folder}" (
-    REM Tentar mover com retry
-    set /a attempts=0
-    :RETRY_MOVE
-    set /a attempts+=1
-    move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}" 2>NUL
+    move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
     
     if errorlevel 1 (
-        if %attempts% LSS 5 (
-            echo    Tentativa %attempts% - aguardando...
-            timeout /t 3 /nobreak > NUL
-            goto RETRY_MOVE
-        ) else (
-            echo    [ERRO] Falha ao mover arquivo!
-            echo    Restaurando backup...
-            if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-            echo    Pressione qualquer tecla para sair...
-            pause > NUL
-            exit /b 1
-        )
+        echo    [ERRO] Falha ao mover arquivo!
+        if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
+        timeout /t 5 /nobreak > NUL
+        exit /b 1
     )
     echo    [OK] Nova versao instalada
 ) else (
     echo    [ERRO] Arquivo de atualizacao nao encontrado!
     if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-    echo    Pressione qualquer tecla para sair...
-    pause > NUL
+    timeout /t 5 /nobreak > NUL
     exit /b 1
 )
 echo.
 
-REM ===== ETAPA 5: AGUARDAR ANTES DE INICIAR =====
-echo [5/6] Preparando para iniciar sistema...
-echo    Aguardando liberacao total dos recursos...
-timeout /t 15 /nobreak > NUL
-echo    [OK] Sistema pronto para iniciar
-echo.
+REM ===== PASSO 5: INICIAR SISTEMA =====
+echo [5/5] Iniciando sistema atualizado...
+echo    Aguardando 20 segundos para garantir limpeza completa...
+timeout /t 20 /nobreak > NUL
 
-REM ===== ETAPA 6: INICIAR SISTEMA ATUALIZADO =====
-echo [6/6] Iniciando sistema atualizado...
+echo    Iniciando aplicacao...
 start "" "{current_exe_filename}"
-
-REM Aguardar inicialização
 timeout /t 5 /nobreak > NUL
 echo    [OK] Sistema iniciado
 echo.
 
-REM ===== LIMPEZA FINAL =====
+REM ===== LIMPEZA =====
 echo Realizando limpeza final...
-timeout /t 5 /nobreak > NUL
+timeout /t 3 /nobreak > NUL
 
-if exist "{current_exe_filename}.old" (
-    del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-)
-
-if exist "atualizacao" (
-    for /d %%i in ("atualizacao\\*") do rd /s /q "%%i" 2>NUL
-    for %%i in ("atualizacao\\*") do del /f /q "%%i" 2>NUL
-    rmdir /q "atualizacao" 2>NUL
-)
+if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
+if exist "atualizacao" rmdir /q "atualizacao" > NUL 2>&1
 
 echo.
-echo ════════════════════════════════════════
+echo ================================================================
 echo     ATUALIZACAO CONCLUIDA COM SUCESSO!
-echo ════════════════════════════════════════
+echo ================================================================
 echo.
-echo Esta janela sera fechada em 5 segundos...
-timeout /t 5 /nobreak > NUL
+echo Esta janela sera fechada em 3 segundos...
+timeout /t 3 /nobreak > NUL
 
-REM Auto-destruir
-del "%~f0"
+REM Auto-destruir o script
+(goto) 2>nul & del "%~f0"
 """
         
         # Salvar o script
@@ -300,18 +259,16 @@ del "%~f0"
         
         print(f"Script de atualização criado: {updater_script_path}")
         
-        # ===== MUDANÇA CRÍTICA: Não usar CREATE_NO_WINDOW =====
-        # Permitir que a janela apareça para mostrar o progresso
-        # Isso também ajuda na depuração
+        # Executar o script usando cmd.exe /c para garantir execução
+        # /c = Executa o comando e fecha
+        # /k = Executa o comando e mantém aberto (para debug)
         subprocess.Popen(
-            f'"{updater_script_path}"', 
-            shell=True
-            # ❌ REMOVIDO: creationflags=subprocess.CREATE_NO_WINDOW
+            ['cmd.exe', '/c', updater_script_path],
+            creationflags=subprocess.CREATE_NEW_CONSOLE  # Abre nova janela
         )
         
-        # Aguardar um pouco mais antes de fechar
         print("Iniciando processo de atualização...")
-        time.sleep(2)  # Aumentado de 0 para 2 segundos
+        time.sleep(2)
         
         # Fechar o aplicativo
         os._exit(0)
