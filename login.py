@@ -100,6 +100,8 @@ class DownloadThread(QThread):
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
 
+import sys  # Certifique-se de que sys está importado (já usado em sys.executable)
+
 def verificar_e_aplicar_atualizacao():
     """
     Verifica e aplica uma atualização automaticamente, sem interação do usuário.
@@ -178,6 +180,9 @@ if "%ERRORLEVEL%"=="0" (
 echo    [OK] Processo finalizado
 echo.
 
+REM Aguardar adicional para liberar locks antes de limpar
+timeout /t 5 /nobreak > NUL
+
 REM ===== PASSO 2: LIMPAR _MEI =====
 echo [2/5] Limpando arquivos temporarios...
 for /d %%i in ("%TEMP%\\_MEI*") do (
@@ -225,8 +230,8 @@ echo.
 
 REM ===== PASSO 5: INICIAR SISTEMA =====
 echo [5/5] Iniciando sistema atualizado...
-echo    Aguardando 20 segundos para garantir limpeza completa...
-timeout /t 20 /nobreak > NUL
+echo    Aguardando 30 segundos para garantir limpeza completa...
+timeout /t 30 /nobreak > NUL
 
 echo    Iniciando aplicacao...
 start "" "{current_exe_filename}"
@@ -268,10 +273,10 @@ REM Auto-destruir o script
         )
         
         print("Iniciando processo de atualização...")
-        time.sleep(2)
+   
         
-        # Fechar o aplicativo
-        os._exit(0)
+        # Fechar o aplicativo de forma graceful para permitir cleanup do PyInstaller
+        sys.exit(0)
 
     except Exception as e:
         QMessageBox.critical(
