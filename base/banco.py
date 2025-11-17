@@ -1,5 +1,3 @@
-# Arquivo: base/banco.py
-# --- IMPORTS PADRÃO E DE OTIMIZAÇÃO ---
 import json
 import os
 import sys

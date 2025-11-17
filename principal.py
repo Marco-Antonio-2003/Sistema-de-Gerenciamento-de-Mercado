@@ -1,6 +1,6 @@
 import sys
 import os
-import firebird.driver as fdb  # <-- Changed from 'import fdb'
+import firebird.driver as fdb  
 import importlib.util
 import unicodedata
 import json
@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QSize,QRect, QPropertyAnimation, QEasingCurve, QUrl
 from PyQt5.QtGui import QDesktopServices
 from base.banco import execute_query
 try:
-    # Esta estrutura de importação funciona tanto em dev quanto no .exe
+
     from mercado_livre.main_final import MercadoLivreBackend
     ML_BACKEND_DISPONIVEL = True
 except ImportError:

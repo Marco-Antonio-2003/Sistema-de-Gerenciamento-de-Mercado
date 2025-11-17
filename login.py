@@ -16,7 +16,7 @@ from PyQt5.QtCore import Qt, QSettings, QSize, QTimer, QThread, pyqtSignal
 from principal import MainWindow
 from base.banco import iniciar_syncthing_se_necessario, validar_codigo_licenca, validar_login, verificar_tabela_usuarios, obter_id_usuario
 
-Versao = "Versão: v0.1.5.4.5"
+Versao = "Versão: v0.1.5.4.4"
 
 # ============================================================================
 # THREAD PARA DOWNLOAD EM SEGUNDO PLANO
@@ -99,12 +99,9 @@ class DownloadThread(QThread):
 
 # --- INÍCIO DA SEÇÃO DE ATUALIZAÇÃO ---
 
-
-import sys  # Certifique-se de que sys está importado (já usado em sys.executable)
-
 def verificar_e_aplicar_atualizacao():
     """
-    Verifica e aplica uma atualização automaticamente, sem interação do usuário.
+    Versão CORRIGIDA - Baseada no código que funcionava
     """
     try:
         app_dir = os.path.dirname(sys.executable)
@@ -125,7 +122,7 @@ def verificar_e_aplicar_atualizacao():
             None, 
             'Atualização Disponível',
             "Uma nova versão do sistema está pronta para ser instalada.\n\n"
-            "Deseja instalar agora? O sistema será reiniciado.",
+            "Deseja instalar agora? O sistema será reiniciado automaticamente.",
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.Yes
         )
@@ -133,7 +130,7 @@ def verificar_e_aplicar_atualizacao():
         if confirm_reply == QMessageBox.No:
             return False
    
-        # --- BACKUP DO EXECUTÁVEL ANTES DE ATUALIZAR ---
+        # --- BACKUP DO EXECUTÁVEL ---
         try:
             backup_dir = os.path.join(app_dir, 'backup')
             os.makedirs(backup_dir, exist_ok=True)
@@ -150,111 +147,97 @@ def verificar_e_aplicar_atualizacao():
         except Exception as backup_err:
             print(f'Falha ao criar backup do executável: {backup_err}')
 
-        # --- CRIAR SCRIPT .BAT AUTOMÁTICO (SEM PAUSE) ---
+        # --- CRIAR SCRIPT .BAT ---
         updater_script_path = os.path.join(app_dir, 'updater.bat')
         current_exe_filename = os.path.basename(current_exe)
         new_exe_filename_in_update_folder = os.path.basename(new_exe_path)
 
-        # Script .bat AUTOMÁTICO - sem pause, sem interação
+        # Script .bat - COM ESCAPES CORRETOS
         script_content = f"""@echo off
 title MB Sistema - Atualizacao Automatica
 color 0A
+cls
 echo.
 echo ================================================================
-echo    MB SISTEMA - ATUALIZACAO AUTOMATICA
+echo    MB SISTEMA - ATUALIZACAO RAPIDA
 echo ================================================================
 echo.
 
 REM ===== PASSO 1: FECHAR PROCESSO =====
-echo [1/5] Aguardando sistema fechar...
-timeout /t 5 /nobreak > NUL
+echo [1/5] Fechando programa anterior...
+timeout /t 2 /nobreak > NUL
 
 :CHECK_PROCESS
 tasklist /FI "IMAGENAME eq {current_exe_filename}" 2>NUL | find /I /N "{current_exe_filename}">NUL
 if "%ERRORLEVEL%"=="0" (
-    echo    Forcando fechamento do processo...
     taskkill /F /IM "{current_exe_filename}" > NUL 2>&1
-    timeout /t 3 /nobreak > NUL
+    timeout /t 1 /nobreak > NUL
     goto CHECK_PROCESS
 )
-echo    [OK] Processo finalizado
+echo    [OK] Programa fechado
 echo.
 
-REM Aguardar adicional para liberar locks antes de limpar
-timeout /t 5 /nobreak > NUL
-
-REM ===== PASSO 2: LIMPAR _MEI =====
-echo [2/5] Limpando arquivos temporarios...
-for /d %%i in ("%TEMP%\\_MEI*") do (
-    rd /s /q "%%i" 2>NUL
-)
-timeout /t 5 /nobreak > NUL
-echo    [OK] Arquivos temporarios limpos
+REM ===== PASSO 2: LIMPAR TEMPORARIOS =====
+echo [2/5] Limpando temporarios...
+for /d %%i in ("%TEMP%\\_MEI*") do rd /s /q "%%i" 2>NUL
+timeout /t 1 /nobreak > NUL
+echo    [OK] Temporarios limpos
 echo.
 
-REM ===== PASSO 3: RENOMEAR ATUAL =====
-echo [3/5] Fazendo backup do executavel atual...
+REM ===== PASSO 3: BACKUP =====
+echo [3/5] Fazendo backup...
 if exist "{current_exe_filename}" (
     if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
-    
     ren "{current_exe_filename}" "{current_exe_filename}.old"
-    
     if errorlevel 1 (
-        echo    [ERRO] Falha ao renomear arquivo!
-        timeout /t 5 /nobreak > NUL
+        echo    [ERRO] Falha ao fazer backup!
+        pause
         exit /b 1
     )
     echo    [OK] Backup criado
 )
 echo.
 
-REM ===== PASSO 4: MOVER NOVO ARQUIVO =====
+REM ===== PASSO 4: INSTALAR =====
 echo [4/5] Instalando nova versao...
 if exist "atualizacao\\{new_exe_filename_in_update_folder}" (
     move /Y "atualizacao\\{new_exe_filename_in_update_folder}" "{current_exe_filename}"
-    
     if errorlevel 1 (
-        echo    [ERRO] Falha ao mover arquivo!
+        echo    [ERRO] Falha ao instalar!
         if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-        timeout /t 5 /nobreak > NUL
+        pause
         exit /b 1
     )
     echo    [OK] Nova versao instalada
 ) else (
-    echo    [ERRO] Arquivo de atualizacao nao encontrado!
+    echo    [ERRO] Arquivo nao encontrado!
     if exist "{current_exe_filename}.old" ren "{current_exe_filename}.old" "{current_exe_filename}"
-    timeout /t 5 /nobreak > NUL
+    pause
     exit /b 1
 )
 echo.
 
-REM ===== PASSO 5: INICIAR SISTEMA =====
+REM ===== PASSO 5: INICIAR =====
 echo [5/5] Iniciando sistema atualizado...
-echo    Aguardando 30 segundos para garantir limpeza completa...
-timeout /t 30 /nobreak > NUL
+timeout /t 3 /nobreak > NUL
 
-echo    Iniciando aplicacao...
 start "" "{current_exe_filename}"
-timeout /t 5 /nobreak > NUL
-echo    [OK] Sistema iniciado
+timeout /t 2 /nobreak > NUL
+echo    [OK] Sistema iniciado!
 echo.
 
 REM ===== LIMPEZA =====
-echo Realizando limpeza final...
-timeout /t 3 /nobreak > NUL
-
 if exist "{current_exe_filename}.old" del /F /Q "{current_exe_filename}.old" > NUL 2>&1
 if exist "atualizacao" rmdir /q "atualizacao" > NUL 2>&1
 
-echo.
 echo ================================================================
-echo     ATUALIZACAO CONCLUIDA COM SUCESSO!
+echo     ATUALIZACAO CONCLUIDA!
 echo ================================================================
 echo.
-echo Esta janela sera fechada em 3 segundos...
-timeout /t 3 /nobreak > NUL
+echo Fechando em 2 segundos...
+timeout /t 2 /nobreak > NUL
 
-REM Auto-destruir o script
+REM Auto-destruir
 (goto) 2>nul & del "%~f0"
 """
         
@@ -264,18 +247,15 @@ REM Auto-destruir o script
         
         print(f"Script de atualização criado: {updater_script_path}")
         
-        # Executar o script usando cmd.exe /c para garantir execução
-        # /c = Executa o comando e fecha
-        # /k = Executa o comando e mantém aberto (para debug)
+        # Executar o script
         subprocess.Popen(
             ['cmd.exe', '/c', updater_script_path],
-            creationflags=subprocess.CREATE_NEW_CONSOLE  # Abre nova janela
+            creationflags=subprocess.CREATE_NEW_CONSOLE
         )
         
         print("Iniciando processo de atualização...")
-   
         
-        # Fechar o aplicativo de forma graceful para permitir cleanup do PyInstaller
+        # Fechar o aplicativo
         sys.exit(0)
 
     except Exception as e:
@@ -285,7 +265,7 @@ REM Auto-destruir o script
             f"Ocorreu um erro durante a atualização:\n\n{e}"
         )
         return False
-    
+        
 # --- FIM DA SEÇÃO DE ATUALIZAÇÃO ---
 
 
